@@ -86,8 +86,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _legend(self) -> str:
         k = config.get_keys()
-        return (f"{k['nest_yes']} YES    {k['nest_no']} NO    {k['toggle_structure']} structure"
-                f"    {k['skip']} skip    {k['back']} back    {k['quit']} quit")
+        d = config.key_display
+        return (f"{d(k['nest_yes'])} YES nest    {d(k['nest_no'])} NO nest"
+                f"    {d(k['toggle_structure'])} toggle structure    {d(k['skip'])} skip"
+                f"    {d(k['back'])} back    {d(k['quit'])} quit")
 
     # --- keys -------------------------------------------------------------
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
@@ -229,11 +231,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.nest_chip.setText("nest: — (unlabeled)")
             self.nest_chip.setStyleSheet("padding:6px;border-radius:6px;background:#222;color:#eee;")
 
+        toggle = config.key_display(config.get_keys()["toggle_structure"])
         if self.structure:
-            self.struct_chip.setText("human-made structure: ON  (↑)")
+            self.struct_chip.setText(f"human-made structure: ON  ({toggle})")
             self.struct_chip.setStyleSheet("padding:6px;border-radius:6px;background:#1565c0;color:#fff;")
         else:
-            self.struct_chip.setText("human-made structure: off  (↑)")
+            self.struct_chip.setText(f"human-made structure: off  ({toggle})")
             self.struct_chip.setStyleSheet("padding:6px;border-radius:6px;background:#222;color:#eee;")
 
     def _meta_html(self, row: dict) -> str:
@@ -257,8 +260,8 @@ class MainWindow(QtWidgets.QMainWindow):
             f"<p>nest yes: <b>{st['yes']}</b>&nbsp;&nbsp; nest no: <b>{st['no']}</b>"
             f"&nbsp;&nbsp; human-made structure: <b>{st['structure']}</b></p>"
             f"<p>Saved to:<br><code>{self.catalog.output_path}</code></p>"
-            f"<p>Press <b>{config.get_keys()['back']}</b> to revisit the last item, "
-            f"or <b>{config.get_keys()['quit']}</b> to quit.</p>"
+            f"<p>Press <b>{config.key_display(config.get_keys()['back'])}</b> to revisit the "
+            f"last item, or <b>{config.key_display(config.get_keys()['quit'])}</b> to quit.</p>"
         )
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:

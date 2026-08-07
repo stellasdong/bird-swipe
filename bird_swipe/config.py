@@ -88,6 +88,15 @@ def key_to_name(key: int) -> str:
     return QtGui.QKeySequence(key).toString() or f"key {key}"
 
 
+# Prettier glyphs for the on-screen legend; other keys show their name as-is.
+_KEY_GLYPHS = {"Right": "→", "Left": "←", "Up": "↑", "Down": "↓"}
+
+
+def key_display(name: str) -> str:
+    """Legend-friendly label for a key name (arrows become their glyph)."""
+    return _KEY_GLYPHS.get(name, name)
+
+
 def keymap_ints() -> dict:
     """action -> Qt key int, ready for comparison against event.key()."""
     return {action: name_to_key(name) for action, name in get_keys().items()}
