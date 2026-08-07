@@ -14,8 +14,8 @@ python3.12 -m venv .venv
 ## Run (M1 — the label loop)
 
 ```bash
-# Save labels to a copy (<name>.labeled.csv); original stays untouched:
-.venv/bin/python -m bird_swipe.app path/to/export.csv
+# Save labels to a copy (<name>.labeled.csv/.xlsx); original stays untouched:
+.venv/bin/python -m bird_swipe.app path/to/export.csv    # or export.xlsx
 
 # With no path it uses the bundled example export.
 .venv/bin/python -m bird_swipe.app
@@ -46,7 +46,7 @@ Reopening the same file resumes at the first unlabeled asset.
 
 ## Status
 
-- [x] M0 — spike: native photo + embedded video in a Qt window
-- [x] M1 — label loop: validate, hotkeys, save-as-you-go, resume (CSV)
-- [ ] M2 — in-app video + `.xlsx` I/O + prefetch cache
+- [x] M0 — spike: native photo + video in a Qt window
+- [x] M1 — label loop: validate, hotkeys, save-as-you-go, resume; native video
+- [x] M2 — `.xlsx` read/write + photo prefetch for instant swipes
 - [ ] M3 — polish + PyInstaller builds (Windows/Mac)

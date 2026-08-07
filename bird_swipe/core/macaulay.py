@@ -9,7 +9,9 @@ directly for a live smoke test:
 
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import requests
@@ -72,9 +74,12 @@ def fetch_photo(
     resp.raise_for_status()
     data = resp.content
 
-    tmp = cache.with_suffix(".jpg.part")
-    tmp.write_bytes(data)
-    tmp.replace(cache)  # atomic within the cache dir
+    # Unique temp name so a prefetch and the main fetch of the same id can't
+    # clobber each other's partial file before the atomic rename.
+    fd, tmp_name = tempfile.mkstemp(dir=str(cache.parent), suffix=".part")
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+    os.replace(tmp_name, cache)  # atomic within the cache dir
     return data
 
 

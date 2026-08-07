@@ -129,6 +129,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.media.show_asset(ml_id, row.get("Format", ""))
         self.meta_lbl.setText(self._meta_html(row))
         self._update_chips()
+        self._prefetch_upcoming()
+
+    def _prefetch_upcoming(self, n: int = 3) -> None:
+        ids: list[str] = []
+        i = self.idx + 1
+        while i < len(self.catalog.rows) and len(ids) < n:
+            row = self.catalog.rows[i]
+            if row.get("Format") != "Video":  # only photos are prefetchable
+                ids.append(row["ML Catalog Number"])
+            i += 1
+        self.media.prefetch(ids)
 
     def _update_chips(self) -> None:
         row = self.catalog.rows[self.idx]
@@ -153,12 +164,13 @@ class MainWindow(QtWidgets.QMainWindow):
     def _meta_html(self, row: dict) -> str:
         ml_id = row["ML Catalog Number"]
         page = macaulay.asset_page_url(ml_id)
-        fields = [
-            "Format", "Caption", "Behaviors", "Date", "Locality", "Asset Tags",
-            "Observation Details", "Media notes",
-        ]
+        base = ["Format", "Caption", "Behaviors", "Date", "Locality", "Asset Tags"]
+        notes = ["Observation Details", "Media notes"]
         parts = [f"<b>ML {ml_id}</b> · <a href='{page}'>{page}</a><br>"]
-        parts += [f"<b>{k}:</b> {row.get(k, '')}&nbsp;&nbsp; " for k in fields if row.get(k)]
+        parts += [f"<b>{k}:</b> {row.get(k, '')}&nbsp;&nbsp; " for k in base if row.get(k)]
+        for k in notes:  # each note on its own line
+            if row.get(k):
+                parts.append(f"<br><b>{k}:</b> {row.get(k)}")
         return "".join(parts)
 
     def _show_done(self) -> None:

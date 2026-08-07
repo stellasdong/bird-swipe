@@ -14,6 +14,20 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 from bird_swipe.core import macaulay
 
 
+class _PrefetchTask(QtCore.QRunnable):
+    """Warm the disk cache for an upcoming photo; result is discarded."""
+
+    def __init__(self, ml_id: str):
+        super().__init__()
+        self.ml_id = ml_id
+
+    def run(self) -> None:
+        try:
+            macaulay.fetch_photo(self.ml_id)
+        except Exception:  # pragma: no cover - best-effort prefetch
+            pass
+
+
 class _PhotoFetcher(QtCore.QThread):
     done = QtCore.Signal(str, bytes)
     failed = QtCore.Signal(str, str)
@@ -37,6 +51,10 @@ class MediaView(QtWidgets.QStackedWidget):
         self._current_id: str | None = None
         self._pixmap: QtGui.QPixmap | None = None
         self._fetcher: _PhotoFetcher | None = None
+
+        self._pool = QtCore.QThreadPool(self)
+        self._pool.setMaxThreadCount(3)
+        self._prefetched: set[str] = set()
 
         self.photo = QtWidgets.QLabel(alignment=QtCore.Qt.AlignCenter)
         self.photo.setMinimumSize(640, 480)
@@ -106,7 +124,16 @@ class MediaView(QtWidgets.QStackedWidget):
         super().resizeEvent(event)
         self._rescale()
 
+    def prefetch(self, ml_ids: list[str]) -> None:
+        """Warm the cache for upcoming photos so the next swipe is instant."""
+        for mid in ml_ids:
+            if mid in self._prefetched:
+                continue
+            self._prefetched.add(mid)
+            self._pool.start(_PrefetchTask(mid))
+
     def stop(self) -> None:
         self._player.stop()
         if self._fetcher is not None and self._fetcher.isRunning():
             self._fetcher.wait()
+        self._pool.clear()  # drop queued prefetches; running ones finish quickly

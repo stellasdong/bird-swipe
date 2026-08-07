@@ -69,6 +69,10 @@ def default_output_path(input_path: Path) -> Path:
     return p.with_name(f"{p.stem}.labeled{p.suffix or '.csv'}")
 
 
+def _is_xlsx(path: Path) -> bool:
+    return path.suffix.lower() in (".xlsx", ".xlsm")
+
+
 def _read_csv(path: Path) -> tuple[list[dict], list[str]]:
     # utf-8-sig strips a BOM if Macaulay/Excel added one.
     with open(path, newline="", encoding="utf-8-sig") as f:
@@ -76,6 +80,32 @@ def _read_csv(path: Path) -> tuple[list[dict], list[str]]:
         rows = [dict(r) for r in reader]
         fieldnames = list(reader.fieldnames or [])
     return rows, fieldnames
+
+
+def _read_xlsx(path: Path) -> tuple[list[dict], list[str]]:
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb.active
+        it = ws.iter_rows(values_only=True)
+        header = next(it, None)
+        if header is None:
+            return [], []
+        fieldnames = [str(h) if h is not None else "" for h in header]
+        rows = []
+        for r in it:
+            if r is None or all(c is None for c in r):
+                continue  # skip blank rows
+            rows.append({name: ("" if i >= len(r) or r[i] is None else str(r[i]))
+                         for i, name in enumerate(fieldnames)})
+        return rows, fieldnames
+    finally:
+        wb.close()
+
+
+def _read_table(path: Path) -> tuple[list[dict], list[str]]:
+    return _read_xlsx(path) if _is_xlsx(path) else _read_csv(path)
 
 
 class Catalog:
@@ -106,7 +136,7 @@ class Catalog:
         out = Path(output_path) if output_path else default_output_path(input_path)
 
         source = out if (resume and out.exists()) else input_path
-        rows, fieldnames = _read_csv(source)
+        rows, fieldnames = _read_table(source)
         validation = validate_fieldnames(fieldnames)
         if not validation.ok:
             raise ValidationError("; ".join(validation.errors))
@@ -127,11 +157,27 @@ class Catalog:
     # --- persistence ------------------------------------------------------
     def save(self) -> None:
         tmp = self.output_path.with_suffix(self.output_path.suffix + ".part")
-        with open(tmp, "w", newline="", encoding="utf-8") as f:
+        if _is_xlsx(self.output_path):
+            self._write_xlsx(tmp)
+        else:
+            self._write_csv(tmp)
+        tmp.replace(self.output_path)  # atomic on the same filesystem
+
+    def _write_csv(self, path: Path) -> None:
+        with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=self.fieldnames, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(self.rows)
-        tmp.replace(self.output_path)  # atomic on the same filesystem
+
+    def _write_xlsx(self, path: Path) -> None:
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(self.fieldnames)
+        for row in self.rows:
+            ws.append([row.get(f, "") for f in self.fieldnames])
+        wb.save(path)
 
     # --- labeling ---------------------------------------------------------
     def set_label(

@@ -19,8 +19,8 @@ DEFAULT_CSV = Path(__file__).resolve().parent.parent / "ML__2026-08-07T18-46_ret
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="bird-swipe", description="Swipe through Macaulay nest media.")
-    p.add_argument("csv", nargs="?", default=str(DEFAULT_CSV), help="Macaulay export CSV")
-    p.add_argument("-o", "--output", help="Where to write labels (default: a .labeled.csv copy)")
+    p.add_argument("csv", nargs="?", default=str(DEFAULT_CSV), help="Macaulay export (.csv or .xlsx)")
+    p.add_argument("-o", "--output", help="Where to write labels (default: a .labeled copy, same format)")
     p.add_argument("--in-place", action="store_true", help="Edit the original file instead of a copy")
     p.add_argument("--no-resume", action="store_true", help="Ignore existing labels and start over")
     p.add_argument("--reviewer", default="", help="Name recorded in the reviewer column")
