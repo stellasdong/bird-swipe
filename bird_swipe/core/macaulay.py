@@ -16,6 +16,7 @@ import requests
 from platformdirs import user_cache_dir
 
 _CDN = "https://cdn.download.ams.birds.cornell.edu/api/v2/asset"
+_CDN_V1 = "https://cdn.download.ams.birds.cornell.edu/api/v1/asset"
 _SITE = "https://macaulaylibrary.org/asset"
 _UA = "bird-swipe/0.0.1 (+https://github.com/stellasdong/bird-swipe)"
 
@@ -37,6 +38,15 @@ def embed_url(ml_id: str | int) -> str:
 def photo_url(ml_id: str | int, size: int = PHOTO_SIZE_DEFAULT) -> str:
     """Direct JPEG URL for a photo asset (also the poster frame for video)."""
     return f"{_CDN}/{ml_id}/{size}"
+
+
+def video_url(ml_id: str | int) -> str:
+    """Direct MP4 (H.264) URL for a video asset — played natively via QMediaPlayer.
+
+    Note this uses the CDN's ``v1`` API; the ``v2`` path returns only a poster
+    JPEG for video assets.
+    """
+    return f"{_CDN_V1}/{ml_id}/mp4"
 
 
 def _cache_dir() -> Path:

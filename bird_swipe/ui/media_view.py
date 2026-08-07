@@ -1,9 +1,15 @@
-"""Media widget: native photo for images, embedded webview player for video."""
+"""Media widget: native photo for images, native QMediaPlayer for video.
+
+Video is played with QtMultimedia (AVFoundation on macOS, Media Foundation on
+Windows) rather than an embedded webview, because the PySide6 QtWebEngine wheels
+ship without the proprietary H.264 codec that Macaulay videos use.
+"""
 
 from __future__ import annotations
 
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PySide6.QtMultimediaWidgets import QVideoWidget
 
 from bird_swipe.core import macaulay
 
@@ -35,19 +41,29 @@ class MediaView(QtWidgets.QStackedWidget):
         self.photo = QtWidgets.QLabel(alignment=QtCore.Qt.AlignCenter)
         self.photo.setMinimumSize(640, 480)
         self.photo.setStyleSheet("background:#111;color:#bbb;font-size:14px;")
-        self.web = QWebEngineView()
+
+        self.video = QVideoWidget()
+        self.video.setStyleSheet("background:#111;")
+        self._player = QMediaPlayer(self)
+        self._audio = QAudioOutput(self)
+        self._player.setAudioOutput(self._audio)
+        self._player.setVideoOutput(self.video)
+        self._player.setLoops(QMediaPlayer.Infinite)  # loop so nothing to re-trigger
+        self._player.errorOccurred.connect(self._on_video_error)
 
         self.addWidget(self.photo)  # index 0
-        self.addWidget(self.web)    # index 1
+        self.addWidget(self.video)  # index 1
 
     def show_asset(self, ml_id: str, fmt: str) -> None:
         self._current_id = ml_id
         if fmt == "Video":
+            self.setCurrentWidget(self.video)
             self._pixmap = None
-            self.web.load(QtCore.QUrl(macaulay.embed_url(ml_id)))
-            self.setCurrentWidget(self.web)
+            self._player.setSource(QtCore.QUrl(macaulay.video_url(ml_id)))
+            self._player.play()
             return
 
+        self._player.stop()
         self.setCurrentWidget(self.photo)
         self._pixmap = None
         self.photo.setText(f"Loading {ml_id}…")
@@ -72,6 +88,11 @@ class MediaView(QtWidgets.QStackedWidget):
         if ml_id == self._current_id:
             self.photo.setText(f"Failed to load {ml_id}\n{msg}")
 
+    @QtCore.Slot(QMediaPlayer.Error, str)
+    def _on_video_error(self, error, msg: str) -> None:  # pragma: no cover - live media
+        if error != QMediaPlayer.NoError:
+            print(f"video error for {self._current_id}: {msg}")
+
     def _rescale(self) -> None:
         if self._pixmap is None:
             return
@@ -86,5 +107,6 @@ class MediaView(QtWidgets.QStackedWidget):
         self._rescale()
 
     def stop(self) -> None:
+        self._player.stop()
         if self._fetcher is not None and self._fetcher.isRunning():
             self._fetcher.wait()
