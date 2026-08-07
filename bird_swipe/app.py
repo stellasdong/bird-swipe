@@ -2,8 +2,11 @@
 
     bird-swipe [CSV]                     # save to a copy: <name>.labeled.csv
     bird-swipe CSV --output OUT.csv      # explicit output path
+    bird-swipe CSV --output-dir DIR      # write the copy into DIR
     bird-swipe CSV --in-place            # edit the original (be sure!)
     bird-swipe CSV --no-resume           # start fresh, ignore prior labels
+
+The output folder and hotkeys are also configurable in-app via File > Preferences.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from bird_swipe import config
 from bird_swipe.core.catalog import Catalog, ValidationError, default_output_path
 
 DEFAULT_CSV = Path(__file__).resolve().parent.parent / "ML__2026-08-07T18-46_rethaw.csv"
@@ -20,7 +24,8 @@ DEFAULT_CSV = Path(__file__).resolve().parent.parent / "ML__2026-08-07T18-46_ret
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="bird-swipe", description="Swipe through Macaulay nest media.")
     p.add_argument("csv", nargs="?", default=str(DEFAULT_CSV), help="Macaulay export (.csv or .xlsx)")
-    p.add_argument("-o", "--output", help="Where to write labels (default: a .labeled copy, same format)")
+    p.add_argument("-o", "--output", help="Exact output path for labels")
+    p.add_argument("--output-dir", help="Folder to write the .labeled copy into")
     p.add_argument("--in-place", action="store_true", help="Edit the original file instead of a copy")
     p.add_argument("--no-resume", action="store_true", help="Ignore existing labels and start over")
     p.add_argument("--reviewer", default="", help="Name recorded in the reviewer column")
@@ -39,6 +44,10 @@ def main(argv: list[str] | None = None) -> int:
         output = csv_path
     elif args.output:
         output = Path(args.output)
+    elif args.output_dir:
+        output = Path(args.output_dir) / default_output_path(csv_path).name
+    elif config.get_output_dir():
+        output = Path(config.get_output_dir()) / default_output_path(csv_path).name
     else:
         output = default_output_path(csv_path)
 
@@ -59,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     from bird_swipe.ui.main_window import MainWindow
 
     app = QtWidgets.QApplication(sys.argv[:1])
-    win = MainWindow(catalog, reviewer=args.reviewer)
+    win = MainWindow(catalog, input_path=csv_path, reviewer=args.reviewer)
     win.show()
     return app.exec()
 

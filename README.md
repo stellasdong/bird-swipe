@@ -21,10 +21,14 @@ python3.12 -m venv .venv
 .venv/bin/python -m bird_swipe.app
 ```
 
-Options: `--output OUT.csv`, `--in-place` (edit the original), `--no-resume`
-(start over), `--reviewer NAME`.
+Options: `--output OUT.csv`, `--output-dir DIR` (folder for the copy),
+`--in-place` (edit the original), `--no-resume` (start over), `--reviewer NAME`.
 
-### Hotkeys
+**File → Open spreadsheet…** loads another export at runtime.
+**File → Preferences…** sets the output folder and lets you rebind every hotkey
+(click an action, press the new key). Settings persist across sessions.
+
+### Hotkeys (defaults — rebindable in Preferences)
 
 | Key         | Action |
 |-------------|--------|
@@ -33,7 +37,7 @@ Options: `--output OUT.csv`, `--in-place` (edit the original), `--no-resume`
 | `↑`         | toggle **human-made structure** for the current item |
 | `Space`     | skip (leave unlabeled) → next |
 | `Backspace` | go back to the previous item |
-| `Esc` / `Q` | quit (everything is already saved) |
+| `Esc`       | quit (everything is already saved) |
 
 Reopening the same file resumes at the first unlabeled asset.
 

@@ -156,6 +156,7 @@ class Catalog:
 
     # --- persistence ------------------------------------------------------
     def save(self) -> None:
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.output_path.with_suffix(self.output_path.suffix + ".part")
         if _is_xlsx(self.output_path):
             self._write_xlsx(tmp)

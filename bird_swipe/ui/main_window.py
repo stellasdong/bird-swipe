@@ -1,23 +1,27 @@
-"""The M1 label loop: arrow-key labeling with save-as-you-go and resume."""
+"""The label loop: hotkey labeling with save-as-you-go and resume."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from bird_swipe import config
 from bird_swipe.core import macaulay
-from bird_swipe.core.catalog import Catalog
+from bird_swipe.core.catalog import Catalog, ValidationError, default_output_path
 from bird_swipe.ui.media_view import MediaView
-
-_LEGEND = "→ YES nest    ← NO nest    ↑ toggle structure    Space skip    Backspace back    Esc quit"
+from bird_swipe.ui.preferences import PreferencesDialog
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, catalog: Catalog, reviewer: str = ""):
+    def __init__(self, catalog: Catalog, input_path: str | Path, reviewer: str = ""):
         super().__init__()
         self.catalog = catalog
+        self._input_path = Path(input_path)
         self.reviewer = reviewer
         self.idx = catalog.first_unreviewed()
         self.structure = False  # pending human-made-structure toggle for current item
+        self.keys = config.keymap_ints()  # action -> Qt key int
 
         self.setWindowTitle("bird-swipe")
         self.resize(1100, 850)
@@ -26,6 +30,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # --- layout -----------------------------------------------------------
     def _build_ui(self) -> None:
+        self._build_menu()
         self.media = MediaView()
 
         self.title_lbl = QtWidgets.QLabel()
@@ -64,34 +69,104 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages.addWidget(work)       # 0
         self.pages.addWidget(self.done_lbl)  # 1
         self.setCentralWidget(self.pages)
-        self.statusBar().showMessage(_LEGEND)
+        self.statusBar().showMessage(self._legend())
+
+    def _build_menu(self) -> None:
+        filem = self.menuBar().addMenu("&File")
+        act_open = filem.addAction("Open spreadsheet…")
+        act_open.setShortcut(QtGui.QKeySequence.Open)
+        act_open.triggered.connect(self.open_spreadsheet)
+        act_prefs = filem.addAction("Preferences…")
+        act_prefs.setShortcut(QtGui.QKeySequence.Preferences)
+        act_prefs.triggered.connect(self.open_preferences)
+        filem.addSeparator()
+        act_quit = filem.addAction("Quit")
+        act_quit.setShortcut(QtGui.QKeySequence.Quit)
+        act_quit.triggered.connect(self.close)
+
+    def _legend(self) -> str:
+        k = config.get_keys()
+        return (f"{k['nest_yes']} YES    {k['nest_no']} NO    {k['toggle_structure']} structure"
+                f"    {k['skip']} skip    {k['back']} back    {k['quit']} quit")
 
     # --- keys -------------------------------------------------------------
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
-        key = event.key()
-        if key in (QtCore.Qt.Key_Escape, QtCore.Qt.Key_Q):
+        action = self._action_for(event.key())
+        if action == "quit":
             self.close()
             return
-        if key == QtCore.Qt.Key_Backspace:
+        if action == "back":
             self.go_back()
             return
 
-        at_end = self.idx >= len(self.catalog.rows)
-        if at_end:
+        if self.idx >= len(self.catalog.rows):  # on the done screen
             super().keyPressEvent(event)
             return
 
-        if key == QtCore.Qt.Key_Up:
+        if action == "toggle_structure":
             self.structure = not self.structure
             self._update_chips()
-        elif key == QtCore.Qt.Key_Right:
+        elif action == "nest_yes":
             self._commit(nest=True)
-        elif key == QtCore.Qt.Key_Left:
+        elif action == "nest_no":
             self._commit(nest=False)
-        elif key == QtCore.Qt.Key_Space:
+        elif action == "skip":
             self.advance()
         else:
             super().keyPressEvent(event)
+
+    def _action_for(self, key: int) -> str | None:
+        for action, bound in self.keys.items():
+            if bound == key:
+                return action
+        return None
+
+    # --- menu actions -----------------------------------------------------
+    def open_spreadsheet(self) -> None:
+        start = str(self._input_path.parent)
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open Macaulay export", start,
+            "Spreadsheets (*.csv *.xlsx *.xlsm);;All files (*)",
+        )
+        if not fn:
+            return
+        input_path = Path(fn)
+        out = self._compute_output_path(input_path)
+        try:
+            catalog, _ = Catalog.open(input_path, out)
+        except (ValidationError, OSError) as exc:
+            QtWidgets.QMessageBox.critical(self, "Can't open file", str(exc))
+            return
+        self.media.stop()
+        self.catalog = catalog
+        self._input_path = input_path
+        self.idx = catalog.first_unreviewed()
+        self.structure = False
+        self.show_current()
+
+    def open_preferences(self) -> None:
+        dlg = PreferencesDialog(self, current_output_dir=config.get_output_dir())
+        if dlg.exec() != QtWidgets.QDialog.Accepted:
+            return
+        config.set_keys(dlg.result_keys())
+        self.keys = config.keymap_ints()
+        self._apply_output_dir(dlg.result_output_dir())
+        self.statusBar().showMessage(self._legend())
+        self.show_current()  # refresh done-screen hints, etc.
+
+    def _compute_output_path(self, input_path: Path) -> Path:
+        dflt = default_output_path(input_path)
+        out_dir = config.get_output_dir()
+        return Path(out_dir) / dflt.name if out_dir else dflt
+
+    def _apply_output_dir(self, out_dir: str | None) -> None:
+        config.set_output_dir(out_dir)
+        name = Path(self.catalog.output_path).name
+        base = Path(out_dir) if out_dir else default_output_path(self._input_path).parent
+        new_path = base / name
+        if new_path != self.catalog.output_path:
+            self.catalog.output_path = new_path
+            self.catalog.save()  # write the copy into the new folder immediately
 
     # --- actions ----------------------------------------------------------
     def _commit(self, nest: bool) -> None:
@@ -182,7 +257,8 @@ class MainWindow(QtWidgets.QMainWindow):
             f"<p>nest yes: <b>{st['yes']}</b>&nbsp;&nbsp; nest no: <b>{st['no']}</b>"
             f"&nbsp;&nbsp; human-made structure: <b>{st['structure']}</b></p>"
             f"<p>Saved to:<br><code>{self.catalog.output_path}</code></p>"
-            f"<p>Press <b>Backspace</b> to revisit the last item, or <b>Esc</b> to quit.</p>"
+            f"<p>Press <b>{config.get_keys()['back']}</b> to revisit the last item, "
+            f"or <b>{config.get_keys()['quit']}</b> to quit.</p>"
         )
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
