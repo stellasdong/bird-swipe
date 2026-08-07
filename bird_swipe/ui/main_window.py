@@ -153,7 +153,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def _meta_html(self, row: dict) -> str:
         ml_id = row["ML Catalog Number"]
         page = macaulay.asset_page_url(ml_id)
-        fields = ["Format", "Caption", "Behaviors", "Date", "Locality", "Asset Tags"]
+        fields = [
+            "Format", "Caption", "Behaviors", "Date", "Locality", "Asset Tags",
+            "Observation Details", "Media notes",
+        ]
         parts = [f"<b>ML {ml_id}</b> · <a href='{page}'>{page}</a><br>"]
         parts += [f"<b>{k}:</b> {row.get(k, '')}&nbsp;&nbsp; " for k in fields if row.get(k)]
         return "".join(parts)
