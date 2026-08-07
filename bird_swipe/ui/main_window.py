@@ -203,10 +203,13 @@ class MainWindow(QtWidgets.QMainWindow):
         st = self.catalog.stats()
         self.progress_lbl.setText(f"[{self.idx + 1} / {total}]   reviewed {st['reviewed']}")
         self.setWindowTitle(f"bird-swipe · [{self.idx + 1}/{total}] · ML {ml_id}")
-        self.media.show_asset(ml_id, row.get("Format", ""))
+        fmt = row.get("Format", "")
+        self.media.show_asset(ml_id, fmt)
         self.meta_lbl.setText(self._meta_html(row))
         self._update_chips()
         self._prefetch_upcoming()
+        hint = "    ·    click video to play/pause" if fmt == "Video" else ""
+        self.statusBar().showMessage(self._legend() + hint)
 
     def _prefetch_upcoming(self, n: int = 3) -> None:
         ids: list[str] = []

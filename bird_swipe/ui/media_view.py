@@ -14,6 +14,16 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 from bird_swipe.core import macaulay
 
 
+class _ClickableVideo(QVideoWidget):
+    """A video surface that reports clicks so we can toggle play/pause."""
+
+    clicked = QtCore.Signal()
+
+    def mousePressEvent(self, event) -> None:
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+
 class _PrefetchTask(QtCore.QRunnable):
     """Warm the disk cache for an upcoming photo; result is discarded."""
 
@@ -60,8 +70,11 @@ class MediaView(QtWidgets.QStackedWidget):
         self.photo.setMinimumSize(640, 480)
         self.photo.setStyleSheet("background:#111;color:#bbb;font-size:14px;")
 
-        self.video = QVideoWidget()
+        self.video = _ClickableVideo()
         self.video.setStyleSheet("background:#111;")
+        self.video.setCursor(QtCore.Qt.PointingHandCursor)
+        self.video.setToolTip("Click to play / pause")
+        self.video.clicked.connect(self.toggle_play)
         self._player = QMediaPlayer(self)
         self._audio = QAudioOutput(self)
         self._player.setAudioOutput(self._audio)
@@ -123,6 +136,15 @@ class MediaView(QtWidgets.QStackedWidget):
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
         self._rescale()
+
+    def toggle_play(self) -> None:
+        """Pause/resume the video (no-op when a photo is showing)."""
+        if self.currentWidget() is not self.video:
+            return
+        if self._player.playbackState() == QMediaPlayer.PlayingState:
+            self._player.pause()
+        else:
+            self._player.play()
 
     def prefetch(self, ml_ids: list[str]) -> None:
         """Warm the cache for upcoming photos so the next swipe is instant."""
