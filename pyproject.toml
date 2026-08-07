@@ -1,0 +1,22 @@
+[project]
+name = "bird-swipe"
+version = "0.0.1"
+description = "Bird Tinder — swipe through Macaulay Library nest media and label it fast."
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6",
+    "requests>=2.31",
+    "platformdirs>=4.0",
+    "pandas>=2.0",
+    "openpyxl>=3.1",
+]
+
+[project.scripts]
+bird-swipe = "bird_swipe.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["bird_swipe*"]
