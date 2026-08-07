@@ -28,3 +28,10 @@ npm-debug.log*
 # Editor
 .vscode/
 .idea/
+
+# bird-swipe output copies
+*.labeled.csv
+*.labeled.xlsx
+
+# Prototype media (large, keep local)
+proto_video/
