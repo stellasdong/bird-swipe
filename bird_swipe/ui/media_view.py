@@ -60,7 +60,7 @@ class MediaView(QtWidgets.QStackedWidget):
         super().__init__(parent)
         self._current_id: str | None = None
         self._pixmap: QtGui.QPixmap | None = None
-        self._fetcher: _PhotoFetcher | None = None
+        self._fetchers: list[_PhotoFetcher] = []  # kept alive until each finishes
 
         self._pool = QtCore.QThreadPool(self)
         self._pool.setMaxThreadCount(3)
@@ -90,6 +90,9 @@ class MediaView(QtWidgets.QStackedWidget):
         if fmt == "Video":
             self.setCurrentWidget(self.video)
             self._pixmap = None
+            # Fully stop the previous stream before re-pointing the backend, so
+            # rapid swiping doesn't leave a half-buffered network stream behind.
+            self._player.stop()
             self._player.setSource(QtCore.QUrl(macaulay.video_url(ml_id)))
             self._player.play()
             return
@@ -98,12 +101,19 @@ class MediaView(QtWidgets.QStackedWidget):
         self.setCurrentWidget(self.photo)
         self._pixmap = None
         self.photo.setText(f"Loading {ml_id}…")
-        if self._fetcher is not None and self._fetcher.isRunning():
-            self._fetcher.wait()
-        self._fetcher = _PhotoFetcher(ml_id)
-        self._fetcher.done.connect(self._on_photo)
-        self._fetcher.failed.connect(self._on_error)
-        self._fetcher.start()
+        # Start a fetch without blocking the UI thread; a stale result is dropped
+        # in _on_photo by the ml_id check. The thread is reaped when it finishes.
+        fetcher = _PhotoFetcher(ml_id)
+        fetcher.done.connect(self._on_photo)
+        fetcher.failed.connect(self._on_error)
+        fetcher.finished.connect(lambda f=fetcher: self._reap_fetcher(f))
+        self._fetchers.append(fetcher)
+        fetcher.start()
+
+    def _reap_fetcher(self, fetcher: _PhotoFetcher) -> None:
+        if fetcher in self._fetchers:
+            self._fetchers.remove(fetcher)
+        fetcher.deleteLater()
 
     @QtCore.Slot(str, bytes)
     def _on_photo(self, ml_id: str, data: bytes) -> None:
@@ -156,6 +166,8 @@ class MediaView(QtWidgets.QStackedWidget):
 
     def stop(self) -> None:
         self._player.stop()
-        if self._fetcher is not None and self._fetcher.isRunning():
-            self._fetcher.wait()
+        # Wait for any in-flight fetch threads so none is destroyed while running.
+        for fetcher in list(self._fetchers):
+            if fetcher.isRunning():
+                fetcher.wait()
         self._pool.clear()  # drop queued prefetches; running ones finish quickly
