@@ -49,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"File not found: {input_path}", file=sys.stderr)
         return 1
 
-    out_dir = Path(args.output_dir) if args.output_dir else config.resolved_output_dir()
+    out_dir = args.output_dir or config.get_output_dir()  # None -> ./labeled default
 
     try:
         catalog, validation = Catalog.open(input_path, out_dir, resume=not args.no_resume)

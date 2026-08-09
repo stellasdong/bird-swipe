@@ -62,9 +62,9 @@ class PreferencesDialog(QtWidgets.QDialog):
 
         # --- output folder ---
         lay.addWidget(QtWidgets.QLabel("<b>Output folder</b> &nbsp;<span style='color:#888'>"
-                                       "(holds each file's completed entries as &lt;name&gt;_labeled)</span>"))
+                                       "(holds &lt;name&gt;_labeled and nest/&lt;name&gt;_nest)</span>"))
         self._out_edit = QtWidgets.QLineEdit(self._output_dir or "")
-        self._out_edit.setPlaceholderText(f"Default: {config.default_output_dir()}")
+        self._out_edit.setPlaceholderText("Default: a 'labeled' folder next to each CSV")
         self._out_edit.setReadOnly(True)
         browse = QtWidgets.QPushButton("Browse…")
         browse.clicked.connect(self._browse)

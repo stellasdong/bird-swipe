@@ -1,10 +1,14 @@
-"""Spreadsheet load / validate, plus a per-file log of completed entries.
+"""Spreadsheet load / validate, plus per-file logs of completed entries.
 
-Model: the original download is never modified. As you label, every *completed*
-entry is written live into ``<original name>_labeled.<ext>`` inside the output
-folder, keyed by ML catalog number. Each Macaulay download is one species, so the
-output folder accumulates one labeled file per species over time. Reopening a
-file restores its prior labels so you resume where you left off.
+Model: the original download is never modified. As you label, output goes into a
+``labeled/`` folder that defaults to sitting next to the original file:
+
+    <csv dir>/labeled/<name>_labeled.<ext>     all completed entries
+    <csv dir>/labeled/nest/<name>_nest.<ext>   only the nest=yes entries
+
+Both are keyed by ML catalog number and written live; flipping a row out of
+"nest=yes" removes it from the nest file. Reopening a file restores its prior
+labels so you resume where you left off.
 
 Each write is a full atomic rewrite (temp file + rename), so a crash mid-write
 can't corrupt the file. Input and output may be CSV or XLSX.
@@ -32,10 +36,25 @@ LABEL_COLUMNS = ["nest_label", "human_structure", "reviewed", "reviewed_at", "re
 REVIEWED = "TRUE"
 
 
+LABELED_DIRNAME = "labeled"
+NEST_DIRNAME = "nest"
+
+
 def labeled_name(input_path: str | Path) -> str:
     """`ML__..._rethaw.csv` -> `ML__..._rethaw_labeled.csv` (extension kept)."""
     p = Path(input_path)
     return f"{p.stem}_labeled{p.suffix or '.csv'}"
+
+
+def nest_name(input_path: str | Path) -> str:
+    """`ML__..._rethaw.csv` -> `ML__..._rethaw_nest.csv` (extension kept)."""
+    p = Path(input_path)
+    return f"{p.stem}_nest{p.suffix or '.csv'}"
+
+
+def default_output_dir(input_path: str | Path) -> Path:
+    """Where labels go by default: a ``labeled/`` folder beside the original."""
+    return Path(input_path).parent / LABELED_DIRNAME
 
 
 class ValidationError(Exception):
@@ -144,6 +163,11 @@ class LabeledFile:
         self.rows_by_id[str(row[CATALOG_KEY])] = dict(row)
         self.save()
 
+    def discard(self, ml_id: str | int) -> None:
+        """Remove an entry if present, then persist."""
+        if self.rows_by_id.pop(str(ml_id), None) is not None:
+            self.save()
+
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".part")
@@ -174,12 +198,19 @@ class LabeledFile:
 
 
 class Catalog:
-    """Rows of one Macaulay export, with completed labels persisted to a LabeledFile."""
+    """Rows of one Macaulay export, with completed labels persisted to disk.
 
-    def __init__(self, rows: list[dict], fieldnames: list[str], labeled: LabeledFile):
+    Writes two files: ``labeled`` (all completed entries) and ``nest`` (only the
+    nest=yes ones).
+    """
+
+    def __init__(self, rows: list[dict], fieldnames: list[str],
+                 labeled: LabeledFile, nest: LabeledFile, input_path: Path):
         self.rows = rows
         self.fieldnames = fieldnames
         self.labeled = labeled
+        self.nest = nest
+        self._input_path = Path(input_path)
         self._ensure_label_columns()
 
     # --- construction -----------------------------------------------------
@@ -187,19 +218,21 @@ class Catalog:
     def open(
         cls,
         input_path: str | Path,
-        output_dir: str | Path,
+        output_dir: str | Path | None = None,
         *,
         resume: bool = True,
     ) -> tuple["Catalog", Validation]:
-        """Load ``input_path``; labels go to ``output_dir/<name>_labeled.<ext>``."""
+        """Load ``input_path``; labels go to ``output_dir`` (default: ./labeled)."""
         input_path = Path(input_path)
         rows, fieldnames = _read_table(input_path)
         validation = validate_fieldnames(fieldnames)
         if not validation.ok:
             raise ValidationError("; ".join(validation.errors))
 
-        labeled = LabeledFile(Path(output_dir) / labeled_name(input_path))
-        cat = cls(rows, fieldnames, labeled)
+        out = Path(output_dir) if output_dir else default_output_dir(input_path)
+        labeled = LabeledFile(out / labeled_name(input_path))
+        nest = LabeledFile(out / NEST_DIRNAME / nest_name(input_path))
+        cat = cls(rows, fieldnames, labeled, nest, input_path)
         if resume:
             cat._restore_from_labeled()
         return cat, validation
@@ -221,17 +254,21 @@ class Catalog:
                     row[col] = prior.get(col, "")
 
     def retarget_output_dir(self, folder: str | Path) -> None:
-        """Move the labeled file to a new folder, carrying completed rows across."""
-        self.labeled = LabeledFile(Path(folder) / self.labeled.path.name)
+        """Move both output files to a new folder, carrying completed rows across."""
+        folder = Path(folder)
+        self.labeled = LabeledFile(folder / labeled_name(self._input_path))
+        self.nest = LabeledFile(folder / NEST_DIRNAME / nest_name(self._input_path))
         for row in self.rows:
             if row.get("reviewed") == REVIEWED:
                 self.labeled.upsert(row)
+                if row.get("nest_label") == "yes":
+                    self.nest.upsert(row)
 
     # --- labeling ---------------------------------------------------------
     def set_label(
         self, index: int, nest: bool | None, structure: bool, reviewer: str = ""
     ) -> None:
-        """Record a decision for row ``index`` and persist it to the labeled file."""
+        """Record a decision for row ``index`` and persist it to disk."""
         row = self.rows[index]
         row["nest_label"] = "" if nest is None else ("yes" if nest else "no")
         row["human_structure"] = "yes" if structure else "no"
@@ -239,6 +276,10 @@ class Catalog:
         row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         row["reviewer"] = reviewer
         self.labeled.upsert(row)
+        if nest:
+            self.nest.upsert(row)
+        else:  # flipped to no / unset — drop it from the nest file
+            self.nest.discard(row[CATALOG_KEY])
 
     def is_reviewed(self, index: int) -> bool:
         return self.rows[index].get("reviewed") == REVIEWED

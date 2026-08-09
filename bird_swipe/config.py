@@ -103,23 +103,11 @@ def keymap_ints() -> dict:
 
 
 # --- output folder ----------------------------------------------------------
-def default_output_dir() -> Path:
-    """Where the master log lives when the user hasn't chosen a folder."""
-    docs = Path.home() / "Documents"
-    base = docs if docs.is_dir() else Path.home()
-    return base / "bird-swipe-labeled"
-
-
 def get_output_dir() -> str | None:
-    """The user's chosen output folder, or None to use :func:`default_output_dir`."""
+    """The user's chosen output folder, or None to use the default (a ``labeled/``
+    folder beside each input file — see ``catalog.default_output_dir``)."""
     value = load().get("output_dir")
     return value if isinstance(value, str) and value else None
-
-
-def resolved_output_dir() -> Path:
-    """The output folder actually in effect (chosen, else default)."""
-    chosen = get_output_dir()
-    return Path(chosen) if chosen else default_output_dir()
 
 
 def set_output_dir(path: str | None) -> None:

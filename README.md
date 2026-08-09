@@ -20,13 +20,19 @@ python3.12 -m venv .venv
 .venv/bin/python -m bird_swipe.app
 ```
 
-The original download is never modified. Every **completed** entry is written
-live into `<original name>_labeled.<ext>` inside the output folder, keyed by ML
-catalog number. Each Macaulay download is one species, so the folder accumulates
-one labeled file per species over time; reopening a file restores its labels so
-you resume where you left off.
+The original download is never modified. Labels are written live into a
+`labeled/` folder that defaults to sitting next to the original file:
 
-Options: `--output-dir DIR` (folder for the `_labeled` files),
+```
+<csv dir>/labeled/<name>_labeled.csv     all completed entries
+<csv dir>/labeled/nest/<name>_nest.csv   only the nest=yes entries
+```
+
+Both are keyed by ML catalog number; flipping a row out of "nest=yes" removes it
+from the nest file. Reopening a file restores its labels so you resume where you
+left off.
+
+Options: `--output-dir DIR` (override the output folder),
 `--no-resume` (ignore prior labels for this file), `--reviewer NAME`.
 
 **File → Open spreadsheet…** loads another export at runtime (same master).
