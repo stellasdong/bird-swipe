@@ -12,6 +12,7 @@ also configurable in-app via File > Preferences.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,28 @@ from bird_swipe import config
 from bird_swipe.core.catalog import Catalog, ValidationError
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Uncategorized Qt warnings (not filterable via QT_LOGGING_RULES) that flood the
+# console during video playback on macOS. Harmless — Qt probing an audio *input*
+# device we never use. See README / the audio-warning discussion.
+_QT_NOISE = (
+    "QAudioSource: Unable to use find most recent CoreAudio",
+)
+
+
+def _silence_multimedia_noise() -> None:
+    """Quiet Qt's multimedia log spam without hiding real errors."""
+    # Must be set before Qt initializes: drops the categorized qt.multimedia lines.
+    os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.*=false")
+
+    from PySide6 import QtCore
+
+    def handler(mode, context, message):
+        if any(noise in message for noise in _QT_NOISE):
+            return  # swallow the repetitive audio-input warning
+        sys.stderr.write(message + "\n")  # forward everything else
+
+    QtCore.qInstallMessageHandler(handler)
 
 
 def _default_input() -> str | None:
@@ -64,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"resuming at item {catalog.first_unreviewed() + 1} of {len(catalog.rows)}")
 
     # Import Qt lazily so --help etc. work without a display.
+    _silence_multimedia_noise()
     from PySide6 import QtWidgets
     from bird_swipe.ui.main_window import MainWindow
 
