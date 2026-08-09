@@ -29,9 +29,8 @@ npm-debug.log*
 .vscode/
 .idea/
 
-# bird-swipe output copies
-*.labeled.csv
-*.labeled.xlsx
+# bird-swipe generated label output (a labeled/ folder beside each CSV)
+labeled/
 
 # Prototype media (large, keep local)
 proto_video/
