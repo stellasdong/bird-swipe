@@ -1,13 +1,13 @@
-"""Spreadsheet load / validate, plus a persistent master log of completed entries.
+"""Spreadsheet load / validate, plus a per-file log of completed entries.
 
 Model: the original download is never modified. As you label, every *completed*
-entry is written live into a single accumulating master CSV — ``all_labeled.csv``
-inside a persistent output folder — keyed by ML catalog number. Labeling many
-species files over time grows that one master. Reopening a file restores its
-prior labels from the master so you resume where you left off.
+entry is written live into ``<original name>_labeled.<ext>`` inside the output
+folder, keyed by ML catalog number. Each Macaulay download is one species, so the
+output folder accumulates one labeled file per species over time. Reopening a
+file restores its prior labels so you resume where you left off.
 
 Each write is a full atomic rewrite (temp file + rename), so a crash mid-write
-can't corrupt the master. Input may be CSV or XLSX; the master is always CSV.
+can't corrupt the file. Input and output may be CSV or XLSX.
 """
 
 from __future__ import annotations
@@ -29,8 +29,13 @@ CATALOG_KEY = "ML Catalog Number"
 # Columns bird-swipe appends. Order preserved when new to a file.
 LABEL_COLUMNS = ["nest_label", "human_structure", "reviewed", "reviewed_at", "reviewer"]
 
-MASTER_FILENAME = "all_labeled.csv"
 REVIEWED = "TRUE"
+
+
+def labeled_name(input_path: str | Path) -> str:
+    """`ML__..._rethaw.csv` -> `ML__..._rethaw_labeled.csv` (extension kept)."""
+    p = Path(input_path)
+    return f"{p.stem}_labeled{p.suffix or '.csv'}"
 
 
 class ValidationError(Exception):
@@ -105,16 +110,15 @@ def _read_table(path: Path) -> tuple[list[dict], list[str]]:
     return _read_xlsx(path) if _is_xlsx(path) else _read_csv(path)
 
 
-class MasterLog:
-    """The accumulating ``all_labeled.csv`` of every completed entry.
+class LabeledFile:
+    """One ``<name>_labeled.<ext>`` holding the completed entries for a species file.
 
     Rows are keyed by ML catalog number; re-labeling an asset updates its row.
-    Columns are the union across every file contributed so far.
+    Written as CSV or XLSX to match the path's extension.
     """
 
-    def __init__(self, folder: str | Path):
-        self.folder = Path(folder)
-        self.path = self.folder / MASTER_FILENAME
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
         self.rows_by_id: dict[str, dict] = {}
         self.fieldnames: list[str] = []
         self._load()
@@ -122,7 +126,7 @@ class MasterLog:
     def _load(self) -> None:
         if not self.path.exists():
             return
-        rows, fieldnames = _read_csv(self.path)
+        rows, fieldnames = _read_table(self.path)
         self.fieldnames = fieldnames
         for r in rows:
             key = r.get(CATALOG_KEY)
@@ -141,25 +145,41 @@ class MasterLog:
         self.save()
 
     def save(self) -> None:
-        self.folder.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".csv.part")
-        with open(tmp, "w", newline="", encoding="utf-8") as f:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(self.path.suffix + ".part")
+        if _is_xlsx(self.path):
+            self._write_xlsx(tmp)
+        else:
+            self._write_csv(tmp)
+        tmp.replace(self.path)  # atomic on the same filesystem
+
+    def _write_csv(self, path: Path) -> None:
+        with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=self.fieldnames, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(self.rows_by_id.values())
-        tmp.replace(self.path)  # atomic on the same filesystem
+
+    def _write_xlsx(self, path: Path) -> None:
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(self.fieldnames)
+        for row in self.rows_by_id.values():
+            ws.append([row.get(f, "") for f in self.fieldnames])
+        wb.save(path)
 
     def count(self) -> int:
         return len(self.rows_by_id)
 
 
 class Catalog:
-    """Rows of one Macaulay export, with labels persisted to a shared MasterLog."""
+    """Rows of one Macaulay export, with completed labels persisted to a LabeledFile."""
 
-    def __init__(self, rows: list[dict], fieldnames: list[str], master: MasterLog):
+    def __init__(self, rows: list[dict], fieldnames: list[str], labeled: LabeledFile):
         self.rows = rows
         self.fieldnames = fieldnames
-        self.master = master
+        self.labeled = labeled
         self._ensure_label_columns()
 
     # --- construction -----------------------------------------------------
@@ -167,20 +187,21 @@ class Catalog:
     def open(
         cls,
         input_path: str | Path,
-        master: MasterLog,
+        output_dir: str | Path,
         *,
         resume: bool = True,
     ) -> tuple["Catalog", Validation]:
-        """Load ``input_path`` and restore prior labels for it from ``master``."""
+        """Load ``input_path``; labels go to ``output_dir/<name>_labeled.<ext>``."""
         input_path = Path(input_path)
         rows, fieldnames = _read_table(input_path)
         validation = validate_fieldnames(fieldnames)
         if not validation.ok:
             raise ValidationError("; ".join(validation.errors))
 
-        cat = cls(rows, fieldnames, master)
+        labeled = LabeledFile(Path(output_dir) / labeled_name(input_path))
+        cat = cls(rows, fieldnames, labeled)
         if resume:
-            cat._restore_from_master()
+            cat._restore_from_labeled()
         return cat, validation
 
     def _ensure_label_columns(self) -> None:
@@ -191,33 +212,33 @@ class Catalog:
             for col in LABEL_COLUMNS:
                 row.setdefault(col, "")
 
-    def _restore_from_master(self) -> None:
-        """Copy label fields back onto rows already present in the master."""
+    def _restore_from_labeled(self) -> None:
+        """Copy label fields back onto rows already present in the labeled file."""
         for row in self.rows:
-            prior = self.master.get(row.get(CATALOG_KEY, ""))
+            prior = self.labeled.get(row.get(CATALOG_KEY, ""))
             if prior and prior.get("reviewed") == REVIEWED:
                 for col in LABEL_COLUMNS:
                     row[col] = prior.get(col, "")
 
-    def retarget_master(self, master: MasterLog) -> None:
-        """Point at a new master folder, carrying this file's completed rows in."""
-        self.master = master
+    def retarget_output_dir(self, folder: str | Path) -> None:
+        """Move the labeled file to a new folder, carrying completed rows across."""
+        self.labeled = LabeledFile(Path(folder) / self.labeled.path.name)
         for row in self.rows:
             if row.get("reviewed") == REVIEWED:
-                master.upsert(row)
+                self.labeled.upsert(row)
 
     # --- labeling ---------------------------------------------------------
     def set_label(
         self, index: int, nest: bool | None, structure: bool, reviewer: str = ""
     ) -> None:
-        """Record a decision for row ``index`` and persist it to the master."""
+        """Record a decision for row ``index`` and persist it to the labeled file."""
         row = self.rows[index]
         row["nest_label"] = "" if nest is None else ("yes" if nest else "no")
         row["human_structure"] = "yes" if structure else "no"
         row["reviewed"] = REVIEWED
         row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         row["reviewer"] = reviewer
-        self.master.upsert(row)
+        self.labeled.upsert(row)
 
     def is_reviewed(self, index: int) -> bool:
         return self.rows[index].get("reviewed") == REVIEWED

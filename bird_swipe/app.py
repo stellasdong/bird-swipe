@@ -1,12 +1,12 @@
 """bird-swipe entry point.
 
     bird-swipe [EXPORT]                   # label a Macaulay export (.csv/.xlsx)
-    bird-swipe EXPORT --output-dir DIR    # put all_labeled.csv in DIR
+    bird-swipe EXPORT --output-dir DIR    # put <name>_labeled.csv in DIR
     bird-swipe EXPORT --no-resume         # ignore prior labels for this file
 
-Completed entries accumulate into <output-dir>/all_labeled.csv, written live as
-you label. The output folder and hotkeys are also configurable in-app via
-File > Preferences.
+Completed entries are written live into <output-dir>/<name>_labeled.<ext> (the
+original file name plus a _labeled suffix). The output folder and hotkeys are
+also configurable in-app via File > Preferences.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from bird_swipe import config
-from bird_swipe.core.catalog import Catalog, MasterLog, ValidationError
+from bird_swipe.core.catalog import Catalog, ValidationError
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -32,7 +32,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="bird-swipe", description="Swipe through Macaulay nest media.")
     p.add_argument("export", nargs="?", default=_default_input(),
                    help="Macaulay export (.csv or .xlsx)")
-    p.add_argument("--output-dir", help="Folder for all_labeled.csv (default: see Preferences)")
+    p.add_argument("--output-dir", help="Folder for <name>_labeled files (default: see Preferences)")
     p.add_argument("--no-resume", action="store_true", help="Ignore existing labels for this file")
     p.add_argument("--reviewer", default="", help="Name recorded in the reviewer column")
     return p.parse_args(argv)
@@ -50,10 +50,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     out_dir = Path(args.output_dir) if args.output_dir else config.resolved_output_dir()
-    master = MasterLog(out_dir)
 
     try:
-        catalog, validation = Catalog.open(input_path, master, resume=not args.no_resume)
+        catalog, validation = Catalog.open(input_path, out_dir, resume=not args.no_resume)
     except ValidationError as exc:
         print(f"Not a valid Macaulay export:\n  {exc}", file=sys.stderr)
         return 2
@@ -61,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     for w in validation.warnings:
         print(f"warning: {w}", file=sys.stderr)
     print(f"input : {input_path}")
-    print(f"output: {master.path}   ({master.count()} completed entries so far)")
+    print(f"output: {catalog.labeled.path}   ({catalog.labeled.count()} completed entries so far)")
     print(f"resuming at item {catalog.first_unreviewed() + 1} of {len(catalog.rows)}")
 
     # Import Qt lazily so --help etc. work without a display.

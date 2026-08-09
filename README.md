@@ -21,13 +21,12 @@ python3.12 -m venv .venv
 ```
 
 The original download is never modified. Every **completed** entry is written
-live into a single accumulating master — `all_labeled.csv` inside the output
-folder — keyed by ML catalog number. Labeling many species files over time grows
-that one CSV; reopening a file restores its labels so you resume where you left
-off. (Each Macaulay download is already one species, so no per-species split is
-needed.)
+live into `<original name>_labeled.<ext>` inside the output folder, keyed by ML
+catalog number. Each Macaulay download is one species, so the folder accumulates
+one labeled file per species over time; reopening a file restores its labels so
+you resume where you left off.
 
-Options: `--output-dir DIR` (folder for `all_labeled.csv`),
+Options: `--output-dir DIR` (folder for the `_labeled` files),
 `--no-resume` (ignore prior labels for this file), `--reviewer NAME`.
 
 **File → Open spreadsheet…** loads another export at runtime (same master).
