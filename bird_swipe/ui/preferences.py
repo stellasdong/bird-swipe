@@ -61,18 +61,19 @@ class PreferencesDialog(QtWidgets.QDialog):
         lay = QtWidgets.QVBoxLayout(self)
 
         # --- output folder ---
-        lay.addWidget(QtWidgets.QLabel("<b>Output folder</b>"))
+        lay.addWidget(QtWidgets.QLabel("<b>Output folder</b> &nbsp;<span style='color:#888'>"
+                                       "(holds all_labeled.csv — all completed entries)</span>"))
         self._out_edit = QtWidgets.QLineEdit(self._output_dir or "")
-        self._out_edit.setPlaceholderText("Same folder as the input file")
+        self._out_edit.setPlaceholderText(f"Default: {config.default_output_dir()}")
         self._out_edit.setReadOnly(True)
         browse = QtWidgets.QPushButton("Browse…")
         browse.clicked.connect(self._browse)
-        use_input = QtWidgets.QPushButton("Use input folder")
-        use_input.clicked.connect(self._clear_output)
+        use_default = QtWidgets.QPushButton("Use default")
+        use_default.clicked.connect(self._clear_output)
         row = QtWidgets.QHBoxLayout()
         row.addWidget(self._out_edit, stretch=1)
         row.addWidget(browse)
-        row.addWidget(use_input)
+        row.addWidget(use_default)
         lay.addLayout(row)
 
         # --- hotkeys ---

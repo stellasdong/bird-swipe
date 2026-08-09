@@ -11,20 +11,26 @@ python3.12 -m venv .venv
 .venv/bin/python -m pip install -e .
 ```
 
-## Run (M1 — the label loop)
+## Run (the label loop)
 
 ```bash
-# Save labels to a copy (<name>.labeled.csv/.xlsx); original stays untouched:
 .venv/bin/python -m bird_swipe.app path/to/export.csv    # or export.xlsx
 
-# With no path it uses the bundled example export.
+# With no path it uses a bundled example from test/.
 .venv/bin/python -m bird_swipe.app
 ```
 
-Options: `--output OUT.csv`, `--output-dir DIR` (folder for the copy),
-`--in-place` (edit the original), `--no-resume` (start over), `--reviewer NAME`.
+The original download is never modified. Every **completed** entry is written
+live into a single accumulating master — `all_labeled.csv` inside the output
+folder — keyed by ML catalog number. Labeling many species files over time grows
+that one CSV; reopening a file restores its labels so you resume where you left
+off. (Each Macaulay download is already one species, so no per-species split is
+needed.)
 
-**File → Open spreadsheet…** loads another export at runtime.
+Options: `--output-dir DIR` (folder for `all_labeled.csv`),
+`--no-resume` (ignore prior labels for this file), `--reviewer NAME`.
+
+**File → Open spreadsheet…** loads another export at runtime (same master).
 **File → Preferences…** sets the output folder and lets you rebind every hotkey
 (click an action, press the new key). Settings persist across sessions.
 

@@ -19,7 +19,10 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from bird_swipe.core import macaulay
 
-DEFAULT_CSV = Path(__file__).resolve().parent.parent / "ML__2026-08-07T18-46_rethaw.csv"
+DEFAULT_CSV = next(
+    iter(sorted((Path(__file__).resolve().parent.parent / "test").glob("*.csv"))),
+    Path("nonexistent.csv"),
+)
 
 
 def load_rows(path: Path) -> list[dict]:

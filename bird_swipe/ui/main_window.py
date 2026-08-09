@@ -8,7 +8,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from bird_swipe import config
 from bird_swipe.core import macaulay
-from bird_swipe.core.catalog import Catalog, ValidationError, default_output_path
+from bird_swipe.core.catalog import Catalog, MasterLog, ValidationError
 from bird_swipe.ui.media_view import MediaView
 from bird_swipe.ui.preferences import PreferencesDialog
 
@@ -133,9 +133,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if not fn:
             return
         input_path = Path(fn)
-        out = self._compute_output_path(input_path)
         try:
-            catalog, _ = Catalog.open(input_path, out)
+            catalog, _ = Catalog.open(input_path, self.catalog.master)
         except (ValidationError, OSError) as exc:
             QtWidgets.QMessageBox.critical(self, "Can't open file", str(exc))
             return
@@ -156,19 +155,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar().showMessage(self._legend())
         self.show_current()  # refresh done-screen hints, etc.
 
-    def _compute_output_path(self, input_path: Path) -> Path:
-        dflt = default_output_path(input_path)
-        out_dir = config.get_output_dir()
-        return Path(out_dir) / dflt.name if out_dir else dflt
-
     def _apply_output_dir(self, out_dir: str | None) -> None:
         config.set_output_dir(out_dir)
-        name = Path(self.catalog.output_path).name
-        base = Path(out_dir) if out_dir else default_output_path(self._input_path).parent
-        new_path = base / name
-        if new_path != self.catalog.output_path:
-            self.catalog.output_path = new_path
-            self.catalog.save()  # write the copy into the new folder immediately
+        folder = config.resolved_output_dir()
+        if Path(self.catalog.master.folder) != folder:
+            # Move to the new master, carrying this file's completed rows across.
+            self.catalog.retarget_master(MasterLog(folder))
 
     # --- actions ----------------------------------------------------------
     def _commit(self, nest: bool) -> None:
@@ -262,7 +254,8 @@ class MainWindow(QtWidgets.QMainWindow):
             f"<h2>All {st['total']} assets reviewed 🎉</h2>"
             f"<p>nest yes: <b>{st['yes']}</b>&nbsp;&nbsp; nest no: <b>{st['no']}</b>"
             f"&nbsp;&nbsp; human-made structure: <b>{st['structure']}</b></p>"
-            f"<p>Saved to:<br><code>{self.catalog.output_path}</code></p>"
+            f"<p>{self.catalog.master.count()} completed entries saved to:<br>"
+            f"<code>{self.catalog.master.path}</code></p>"
             f"<p>Press <b>{config.key_display(config.get_keys()['back'])}</b> to revisit the "
             f"last item, or <b>{config.key_display(config.get_keys()['quit'])}</b> to quit.</p>"
         )
