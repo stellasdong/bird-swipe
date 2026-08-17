@@ -16,9 +16,6 @@ import os
 import sys
 from pathlib import Path
 
-from bird_swipe import config
-from bird_swipe.core.catalog import Catalog, ValidationError
-
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Uncategorized Qt warnings (not filterable via QT_LOGGING_RULES) that flood the
@@ -64,36 +61,24 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
 
-    if not args.export:
-        print("No export given and no test file found. Pass a .csv/.xlsx path.", file=sys.stderr)
-        return 1
-    input_path = Path(args.export)
-    if not input_path.exists():
+    input_path = Path(args.export) if args.export else None
+    if input_path and not input_path.exists():
         print(f"File not found: {input_path}", file=sys.stderr)
         return 1
 
-    out_dir = args.output_dir or config.get_output_dir()  # None -> ./labeled default
-
-    try:
-        catalog, validation = Catalog.open(input_path, out_dir, resume=not args.no_resume)
-    except ValidationError as exc:
-        print(f"Not a valid Macaulay export:\n  {exc}", file=sys.stderr)
-        return 2
-
-    for w in validation.warnings:
-        print(f"warning: {w}", file=sys.stderr)
-    print(f"input : {input_path}")
-    print(f"output: {catalog.labeled.path}   ({catalog.labeled.count()} completed entries so far)")
-    print(f"resuming at item {catalog.first_unreviewed() + 1} of {len(catalog.rows)}")
-
-    # Import Qt lazily so --help etc. work without a display.
+    # Import Qt lazily (after silencing) so --help etc. work without a display.
     _silence_multimedia_noise()
     from PySide6 import QtWidgets
     from bird_swipe.ui.main_window import MainWindow
 
     app = QtWidgets.QApplication(sys.argv[:1])
-    win = MainWindow(catalog, input_path=input_path, reviewer=args.reviewer)
+    win = MainWindow(reviewer=args.reviewer, output_dir=args.output_dir)
     win.show()
+    if input_path:
+        win.load_file(input_path, resume=not args.no_resume)
+    else:
+        # First-run / no file: prompt with an open dialog, else show welcome.
+        win.prompt_open_on_start()
     return app.exec()
 
 

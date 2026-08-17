@@ -35,7 +35,11 @@ left off.
 Options: `--output-dir DIR` (override the output folder),
 `--no-resume` (ignore prior labels for this file), `--reviewer NAME`.
 
-**File → Open spreadsheet…** loads another export at runtime (same master).
+Launched with no file (e.g. a freshly installed app), it opens a file picker and,
+if you cancel, shows a welcome screen with **Open spreadsheet…** / **Preferences…**
+buttons rather than exiting.
+
+**File → Open spreadsheet…** loads another export at runtime.
 **File → Preferences…** sets the output folder and lets you rebind every hotkey
 (click an action, press the new key). Settings persist across sessions.
 

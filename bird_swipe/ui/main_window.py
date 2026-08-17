@@ -14,19 +14,41 @@ from bird_swipe.ui.preferences import PreferencesDialog
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, catalog: Catalog, input_path: str | Path, reviewer: str = ""):
+    def __init__(self, reviewer: str = "", output_dir: str | None = None):
         super().__init__()
-        self.catalog = catalog
-        self._input_path = Path(input_path)
+        self.catalog: Catalog | None = None
+        self._input_path: Path | None = None
+        self._output_override = output_dir  # from --output-dir; else config/default
         self.reviewer = reviewer
-        self.idx = catalog.first_unreviewed()
+        self.idx = 0
         self.structure = False  # pending human-made-structure toggle for current item
         self.keys = config.keymap_ints()  # action -> Qt key int
 
         self.setWindowTitle("bird-swipe")
         self.resize(1100, 850)
         self._build_ui()
+        self._show_welcome()
+
+    def load_file(self, input_path: str | Path, *, resume: bool = True) -> bool:
+        """Open a spreadsheet into the label loop. Returns True on success."""
+        input_path = Path(input_path)
+        out_dir = self._output_override or config.get_output_dir()
+        try:
+            catalog, _ = Catalog.open(input_path, out_dir, resume=resume)
+        except (ValidationError, OSError) as exc:
+            QtWidgets.QMessageBox.critical(self, "Can't open file", str(exc))
+            return False
+        self.media.stop()
+        self.catalog = catalog
+        self._input_path = input_path
+        self.idx = catalog.first_unreviewed()
+        self.structure = False
         self.show_current()
+        return True
+
+    def prompt_open_on_start(self) -> None:
+        """First-run: pop the open dialog; if cancelled, the welcome page stays."""
+        self.open_spreadsheet()
 
     # --- layout -----------------------------------------------------------
     def _build_ui(self) -> None:
@@ -66,10 +88,41 @@ class MainWindow(QtWidgets.QMainWindow):
         self.done_lbl.setStyleSheet("font-size:18px;padding:40px;")
 
         self.pages = QtWidgets.QStackedWidget()
-        self.pages.addWidget(work)       # 0
-        self.pages.addWidget(self.done_lbl)  # 1
+        self.pages.addWidget(work)             # 0
+        self.pages.addWidget(self.done_lbl)    # 1
+        self.pages.addWidget(self._build_welcome())  # 2
         self.setCentralWidget(self.pages)
         self.statusBar().showMessage(self._legend())
+
+    def _build_welcome(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(page)
+        lay.addStretch()
+        title = QtWidgets.QLabel("bird-swipe", alignment=QtCore.Qt.AlignCenter)
+        title.setStyleSheet("font-size:32px;font-weight:700;")
+        sub = QtWidgets.QLabel(
+            "Open a Macaulay Library export (.csv or .xlsx) to start labeling nests.",
+            alignment=QtCore.Qt.AlignCenter,
+        )
+        sub.setStyleSheet("color:#aaa;padding:8px;")
+        open_btn = QtWidgets.QPushButton("Open spreadsheet…")
+        open_btn.setMinimumWidth(220)
+        open_btn.clicked.connect(self.open_spreadsheet)
+        prefs_btn = QtWidgets.QPushButton("Preferences…")
+        prefs_btn.setMinimumWidth(220)
+        prefs_btn.clicked.connect(self.open_preferences)
+        for w in (title, sub):
+            lay.addWidget(w)
+        lay.addSpacing(12)
+        lay.addWidget(open_btn, alignment=QtCore.Qt.AlignCenter)
+        lay.addWidget(prefs_btn, alignment=QtCore.Qt.AlignCenter)
+        lay.addStretch()
+        return page
+
+    def _show_welcome(self) -> None:
+        self.pages.setCurrentIndex(2)
+        self.setWindowTitle("bird-swipe")
+        self.statusBar().showMessage("Open a Macaulay export to begin  ·  File ▸ Open spreadsheet…")
 
     def _build_menu(self) -> None:
         filem = self.menuBar().addMenu("&File")
@@ -96,6 +149,9 @@ class MainWindow(QtWidgets.QMainWindow):
         action = self._action_for(event.key())
         if action == "quit":
             self.close()
+            return
+        if self.catalog is None:  # welcome page — labeling keys do nothing
+            super().keyPressEvent(event)
             return
         if action == "back":
             self.go_back()
@@ -125,25 +181,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # --- menu actions -----------------------------------------------------
     def open_spreadsheet(self) -> None:
-        start = str(self._input_path.parent)
+        start = str(self._input_path.parent) if self._input_path else str(Path.home())
         fn, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Open Macaulay export", start,
             "Spreadsheets (*.csv *.xlsx *.xlsm);;All files (*)",
         )
-        if not fn:
-            return
-        input_path = Path(fn)
-        try:
-            catalog, _ = Catalog.open(input_path, config.get_output_dir())
-        except (ValidationError, OSError) as exc:
-            QtWidgets.QMessageBox.critical(self, "Can't open file", str(exc))
-            return
-        self.media.stop()
-        self.catalog = catalog
-        self._input_path = input_path
-        self.idx = catalog.first_unreviewed()
-        self.structure = False
-        self.show_current()
+        if fn:
+            self.load_file(Path(fn))
 
     def open_preferences(self) -> None:
         dlg = PreferencesDialog(self, current_output_dir=config.get_output_dir())
@@ -152,11 +196,16 @@ class MainWindow(QtWidgets.QMainWindow):
         config.set_keys(dlg.result_keys())
         self.keys = config.keymap_ints()
         self._apply_output_dir(dlg.result_output_dir())
-        self.statusBar().showMessage(self._legend())
-        self.show_current()  # refresh done-screen hints, etc.
+        if self.catalog is None:
+            self._show_welcome()
+        else:
+            self.statusBar().showMessage(self._legend())
+            self.show_current()  # refresh done-screen hints, etc.
 
     def _apply_output_dir(self, out_dir: str | None) -> None:
         config.set_output_dir(out_dir)
+        if self.catalog is None:  # nothing open yet; setting takes effect on next open
+            return
         folder = Path(out_dir) if out_dir else default_output_dir(self._input_path)
         if Path(self.catalog.labeled.path.parent) != folder:
             # Move the output files to the new folder, carrying rows across.
@@ -182,6 +231,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # --- rendering --------------------------------------------------------
     def show_current(self) -> None:
+        if self.catalog is None:
+            self._show_welcome()
+            return
         total = len(self.catalog.rows)
         if self.idx >= total:
             self.media.stop()
