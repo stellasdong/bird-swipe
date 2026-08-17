@@ -1,0 +1,64 @@
+name: Build apps
+
+# Build the macOS and Windows apps. Runs on every push (so you always know the
+# build is healthy) and, when you push a version tag like v1.0.0, also publishes
+# the apps to a GitHub Release that non-technical users can download.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to create the Release on tag pushes
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: bird-swipe-macos
+          - os: windows-latest
+            artifact: bird-swipe-windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pyinstaller
+
+      - name: Build
+        run: pyinstaller packaging/bird_swipe.spec --noconfirm --distpath dist --workpath build/pyi
+
+      # Zip the results so the download is a single file with a clean name.
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent "bird-swipe.app" "../${{ matrix.artifact }}.zip"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/bird-swipe/* -DestinationPath ${{ matrix.artifact }}.zip
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
+
+      - name: Attach to Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}.zip
+          generate_release_notes: true
