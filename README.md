@@ -1,6 +1,6 @@
 # bird-swipe
 
-"Bird Tinder" — swipe through Macaulay Library nest media and label each asset
+Swipe through Macaulay Library nest media and label each asset
 **nest yes/no** and **human-made structure yes/no**, driven by arrow-key hotkeys,
 saving after every entry. See [PLAN.md](PLAN.md) for the full design.
 
