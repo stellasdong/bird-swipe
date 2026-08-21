@@ -13,6 +13,29 @@ from bird_swipe.ui.media_view import MediaView
 from bird_swipe.ui.preferences import PreferencesDialog
 
 
+class _NotesEdit(QtWidgets.QPlainTextEdit):
+    """Notes box: Enter returns to labeling (Shift+Enter inserts a line break).
+
+    Esc also returns to labeling — kept only so it can't propagate up and quit
+    the app while you're typing.
+    """
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        key = event.key()
+        if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            if event.modifiers() & QtCore.Qt.ShiftModifier:
+                super().keyPressEvent(event)  # Shift+Enter -> newline
+                return
+            self.clearFocus()  # Enter -> back to the label loop
+            event.accept()
+            return
+        if key == QtCore.Qt.Key_Escape:
+            self.clearFocus()  # safety: never let Esc bubble up and quit
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, reviewer: str = "", output_dir: str | None = None):
         super().__init__()
@@ -77,12 +100,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self.meta_lbl.setOpenExternalLinks(True)
         self.meta_lbl.setStyleSheet("padding:6px;color:#ccc;")
 
+        notes_key = config.key_display(config.get_keys()["focus_notes"])
+        self.notes_lbl = QtWidgets.QLabel(f"Notes  ({notes_key} to edit · Enter to return)")
+        self.notes_lbl.setStyleSheet("color:#888;padding:0 6px;")
+        self.notes_edit = _NotesEdit()
+        self.notes_edit.setPlaceholderText("Your note for this item (saved when you press YES/NO)…")
+        self.notes_edit.setFixedHeight(56)  # ~1–2 sentences
+        # Only focus on click or via the focus_notes key — never auto/Tab-grab,
+        # so arrow keys stay with the label loop until you deliberately edit.
+        self.notes_edit.setFocusPolicy(QtCore.Qt.ClickFocus)
+
         work = QtWidgets.QWidget()
         wlay = QtWidgets.QVBoxLayout(work)
         wlay.addLayout(header)
         wlay.addLayout(chips)
         wlay.addWidget(self.media, stretch=1)
         wlay.addWidget(self.meta_lbl)
+        wlay.addWidget(self.notes_lbl)
+        wlay.addWidget(self.notes_edit)
 
         self.done_lbl = QtWidgets.QLabel(alignment=QtCore.Qt.AlignCenter, wordWrap=True)
         self.done_lbl.setStyleSheet("font-size:18px;padding:40px;")
@@ -141,8 +176,8 @@ class MainWindow(QtWidgets.QMainWindow):
         k = config.get_keys()
         d = config.key_display
         return (f"{d(k['nest_yes'])} YES nest    {d(k['nest_no'])} NO nest"
-                f"    {d(k['toggle_structure'])} toggle structure    {d(k['skip'])} skip"
-                f"    {d(k['back'])} back    {d(k['quit'])} quit")
+                f"    {d(k['toggle_structure'])} toggle structure    {d(k['focus_notes'])} note"
+                f"    {d(k['skip'])} skip    {d(k['back'])} back    {d(k['quit'])} quit")
 
     # --- keys -------------------------------------------------------------
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
@@ -164,6 +199,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if action == "toggle_structure":
             self.structure = not self.structure
             self._update_chips()
+        elif action == "focus_notes":
+            self.notes_edit.setFocus()
         elif action == "nest_yes":
             self._commit(nest=True)
         elif action == "nest_no":
@@ -213,7 +250,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # --- actions ----------------------------------------------------------
     def _commit(self, nest: bool) -> None:
-        self.catalog.set_label(self.idx, nest=nest, structure=self.structure, reviewer=self.reviewer)
+        self.catalog.set_label(
+            self.idx, nest=nest, structure=self.structure,
+            reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip(),
+        )
         self.advance()
 
     def advance(self) -> None:
@@ -250,6 +290,10 @@ class MainWindow(QtWidgets.QMainWindow):
         fmt = row.get("Format", "")
         self.media.show_asset(ml_id, fmt)
         self.meta_lbl.setText(self._meta_html(row))
+        self.notes_lbl.setText(
+            f"Notes  ({config.key_display(config.get_keys()['focus_notes'])} to edit · Enter to return)"
+        )
+        self.notes_edit.setPlainText(row.get("notes", ""))
         self._update_chips()
         self._prefetch_upcoming()
         hint = "    ·    click video to play/pause" if fmt == "Video" else ""

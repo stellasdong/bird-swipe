@@ -31,7 +31,7 @@ REQUIRED_COLUMNS = [
 CATALOG_KEY = "ML Catalog Number"
 
 # Columns bird-swipe appends. Order preserved when new to a file.
-LABEL_COLUMNS = ["nest_label", "human_structure", "reviewed", "reviewed_at", "reviewer"]
+LABEL_COLUMNS = ["nest_label", "human_structure", "notes", "reviewed", "reviewed_at", "reviewer"]
 
 REVIEWED = "TRUE"
 
@@ -266,12 +266,14 @@ class Catalog:
 
     # --- labeling ---------------------------------------------------------
     def set_label(
-        self, index: int, nest: bool | None, structure: bool, reviewer: str = ""
+        self, index: int, nest: bool | None, structure: bool,
+        reviewer: str = "", notes: str = "",
     ) -> None:
         """Record a decision for row ``index`` and persist it to disk."""
         row = self.rows[index]
         row["nest_label"] = "" if nest is None else ("yes" if nest else "no")
         row["human_structure"] = "yes" if structure else "no"
+        row["notes"] = notes
         row["reviewed"] = REVIEWED
         row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         row["reviewer"] = reviewer

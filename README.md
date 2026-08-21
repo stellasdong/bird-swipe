@@ -32,6 +32,7 @@ saving after every entry. See [PLAN.md](PLAN.md) for the full design.
 | `→`         | nest = **YES** → save + next |
 | `←`         | nest = **NO** → save + next |
 | `↑`         | toggle **human-made structure** for the current item |
+| `N`         | type a **note** for this item (Enter returns to labeling; saved on YES/NO) |
 | `Space`     | skip (leave unlabeled) → next |
 | `Backspace` | go back to the previous item |
 | `Esc`       | quit (everything is already saved) |
