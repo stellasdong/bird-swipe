@@ -45,6 +45,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reviewer = reviewer
         self.idx = 0
         self.structure = False  # pending human-made-structure toggle for current item
+        self._reviewing_skipped = False  # walking only skipped items from the done screen
+        self._review_history: list[int] = []  # breadcrumb of visited items in that pass
         self.keys = config.keymap_ints()  # action -> Qt key int
 
         self.setWindowTitle("bird-swipe")
@@ -66,6 +68,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._input_path = input_path
         self.idx = catalog.first_unreviewed()
         self.structure = False
+        self._reviewing_skipped = False
+        self._review_history = []
         self.show_current()
         return True
 
@@ -118,12 +122,21 @@ class MainWindow(QtWidgets.QMainWindow):
         wlay.addWidget(self.notes_lbl)
         wlay.addWidget(self.notes_edit)
 
+        done_page = QtWidgets.QWidget()
+        dlay = QtWidgets.QVBoxLayout(done_page)
+        dlay.addStretch()
         self.done_lbl = QtWidgets.QLabel(alignment=QtCore.Qt.AlignCenter, wordWrap=True)
-        self.done_lbl.setStyleSheet("font-size:18px;padding:40px;")
+        self.done_lbl.setStyleSheet("font-size:18px;padding:24px;")
+        self.review_skipped_btn = QtWidgets.QPushButton("Review skipped items")
+        self.review_skipped_btn.setMinimumWidth(220)
+        self.review_skipped_btn.clicked.connect(self._start_review_skipped)
+        dlay.addWidget(self.done_lbl)
+        dlay.addWidget(self.review_skipped_btn, alignment=QtCore.Qt.AlignCenter)
+        dlay.addStretch()
 
         self.pages = QtWidgets.QStackedWidget()
         self.pages.addWidget(work)             # 0
-        self.pages.addWidget(self.done_lbl)    # 1
+        self.pages.addWidget(done_page)        # 1
         self.pages.addWidget(self._build_welcome())  # 2
         self.setCentralWidget(self.pages)
         self.statusBar().showMessage(self._legend())
@@ -203,7 +216,7 @@ class MainWindow(QtWidgets.QMainWindow):
         elif action == "nest_no":
             self._commit(nest=False)
         elif action == "skip":
-            self.advance()
+            self._skip()
         else:
             super().keyPressEvent(event)
 
@@ -253,17 +266,57 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self.advance()
 
+    def _skip(self) -> None:
+        self.catalog.set_skip(
+            self.idx, reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip()
+        )
+        self.advance()
+
     def advance(self) -> None:
-        self.idx += 1
         self.structure = False
+        if self._reviewing_skipped:
+            nxt = self._next_skipped_after(self.idx)
+            if nxt is None:  # no skips left -> back to the done screen
+                self._reviewing_skipped = False
+                self._review_history = []
+                self.idx = len(self.catalog.rows)
+            else:
+                self._review_history.append(nxt)
+                self.idx = nxt
+        else:
+            self.idx += 1
         self.show_current()
 
     def go_back(self) -> None:
-        if self.idx <= 0:
-            return
-        self.idx -= 1
+        if self._reviewing_skipped:
+            # Walk back through the items visited this pass — even ones we've
+            # since labeled (so they're no longer "skip") — via a breadcrumb stack.
+            if len(self._review_history) <= 1:
+                return
+            self._review_history.pop()
+            self.idx = self._review_history[-1]
+        else:
+            if self.idx <= 0:
+                return
+            self.idx -= 1
         row = self.catalog.rows[self.idx]
         self.structure = row.get("human_structure") == "yes"
+        self.show_current()
+
+    def _next_skipped_after(self, i: int) -> int | None:
+        for j in range(i + 1, len(self.catalog.rows)):
+            if self.catalog.is_skipped(j):
+                return j
+        return None
+
+    def _start_review_skipped(self) -> None:
+        skipped = self.catalog.skipped_indices()
+        if not skipped:
+            return
+        self._reviewing_skipped = True
+        self._review_history = [skipped[0]]
+        self.idx = skipped[0]
+        self.structure = self.catalog.rows[self.idx].get("human_structure") == "yes"
         self.show_current()
 
     # --- rendering --------------------------------------------------------
@@ -282,7 +335,8 @@ class MainWindow(QtWidgets.QMainWindow):
         ml_id = row["ML Catalog Number"]
         self.title_lbl.setText(f"{row.get('Common Name', '')}  ·  {row.get('Scientific Name', '')}")
         st = self.catalog.stats()
-        self.progress_lbl.setText(f"[{self.idx + 1} / {total}]   reviewed {st['reviewed']}")
+        mode = "  ·  reviewing skipped" if self._reviewing_skipped else ""
+        self.progress_lbl.setText(f"[{self.idx + 1} / {total}]   reviewed {st['reviewed']}{mode}")
         self.setWindowTitle(f"bird-swipe · [{self.idx + 1}/{total}] · ML {ml_id}")
         fmt = row.get("Format", "")
         self.media.show_asset(ml_id, fmt)
@@ -312,6 +366,9 @@ class MainWindow(QtWidgets.QMainWindow):
         elif label == "no":
             self.nest_chip.setText("nest: NO ✗")
             self.nest_chip.setStyleSheet("padding:6px;border-radius:6px;background:#7f1d1d;color:#fff;")
+        elif label == "skip":
+            self.nest_chip.setText("nest: SKIPPED")
+            self.nest_chip.setStyleSheet("padding:6px;border-radius:6px;background:#7a5c00;color:#fff;")
         else:
             self.nest_chip.setText("nest: — (unlabeled)")
             self.nest_chip.setStyleSheet("padding:6px;border-radius:6px;background:#222;color:#eee;")
@@ -337,13 +394,21 @@ class MainWindow(QtWidgets.QMainWindow):
         return "".join(parts)
 
     def _show_done(self) -> None:
+        self._reviewing_skipped = False
         st = self.catalog.stats()
         self.pages.setCurrentIndex(1)
         self.setWindowTitle("bird-swipe · done")
+        skipped = st["skipped"]
+        skipped_line = (
+            f"<p><b>{skipped}</b> skipped &mdash; use the button below to review them.</p>"
+            if skipped else ""
+        )
         self.done_lbl.setText(
             f"<h2>All {st['total']} assets reviewed 🎉</h2>"
             f"<p>nest yes: <b>{st['yes']}</b>&nbsp;&nbsp; nest no: <b>{st['no']}</b>"
+            f"&nbsp;&nbsp; skipped: <b>{skipped}</b>"
             f"&nbsp;&nbsp; human-made structure: <b>{st['structure']}</b></p>"
+            f"{skipped_line}"
             f"<p>{self.catalog.labeled.count()} completed entries saved to:<br>"
             f"<code>{self.catalog.labeled.path}</code></p>"
             f"<p>{self.catalog.nest.count()} nests saved to:<br>"
@@ -351,6 +416,8 @@ class MainWindow(QtWidgets.QMainWindow):
             f"<p>Press <b>{config.key_display(config.get_keys()['back'])}</b> to revisit the "
             f"last item, or <b>{config.key_display(config.get_keys()['quit'])}</b> to quit.</p>"
         )
+        self.review_skipped_btn.setVisible(bool(skipped))
+        self.review_skipped_btn.setText(f"Review {skipped} skipped item{'s' if skipped != 1 else ''}")
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.media.stop()

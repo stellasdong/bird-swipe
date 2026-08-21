@@ -32,12 +32,14 @@ saving after every entry. See [PLAN.md](PLAN.md) for the full design.
 | `→`         | nest = **YES** → save + next |
 | `←`         | nest = **NO** → save + next |
 | `↑`         | toggle **human-made structure** for the current item |
-| `Space`     | skip (leave unlabeled) → next |
+| `Space`     | skip → marks `nest_label=skip` (counts as reviewed) → next |
 | `Backspace` | go back to the previous item |
 | `Esc`       | quit (everything is already saved) |
 
 Hotkeys are rebindable in **File → Preferences…**. Reopening a file resumes at
-the first unlabeled asset. Click a video to play/pause it. To add a **note** to
+the first **un-reviewed** asset (skipped items count as reviewed, so it won't
+jump back to them — but the done screen has a **Review skipped items** button to
+revisit them). Click a video to play/pause it. To add a **note** to
 an item, click the Notes box, type, then press **Enter** to return to labeling —
 the note is saved when you press YES/NO.
 

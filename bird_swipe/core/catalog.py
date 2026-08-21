@@ -34,6 +34,7 @@ CATALOG_KEY = "ML Catalog Number"
 LABEL_COLUMNS = ["nest_label", "human_structure", "notes", "reviewed", "reviewed_at", "reviewer"]
 
 REVIEWED = "TRUE"
+SKIPPED = "skip"  # nest_label value for a skipped-but-reviewed item
 
 
 LABELED_DIRNAME = "labeled"
@@ -283,8 +284,27 @@ class Catalog:
         else:  # flipped to no / unset — drop it from the nest file
             self.nest.discard(row[CATALOG_KEY])
 
+    def set_skip(self, index: int, reviewer: str = "", notes: str = "") -> None:
+        """Mark row ``index`` skipped: reviewed, but flagged nest_label=skip.
+
+        Counts as reviewed (so resume passes over it) yet stays clearly marked in
+        the spreadsheet, and can be revisited from the done screen.
+        """
+        row = self.rows[index]
+        row["nest_label"] = SKIPPED
+        row["human_structure"] = ""  # no structure decision on a skip
+        row["notes"] = notes
+        row["reviewed"] = REVIEWED
+        row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        row["reviewer"] = reviewer
+        self.labeled.upsert(row)
+        self.nest.discard(row[CATALOG_KEY])  # a skip is never a nest
+
     def is_reviewed(self, index: int) -> bool:
         return self.rows[index].get("reviewed") == REVIEWED
+
+    def is_skipped(self, index: int) -> bool:
+        return self.rows[index].get("nest_label") == SKIPPED
 
     def first_unreviewed(self) -> int:
         for i in range(len(self.rows)):
@@ -292,9 +312,14 @@ class Catalog:
                 return i
         return len(self.rows)  # all done
 
+    def skipped_indices(self) -> list[int]:
+        return [i for i in range(len(self.rows)) if self.is_skipped(i)]
+
     def stats(self) -> dict:
         reviewed = sum(1 for r in self.rows if r.get("reviewed") == REVIEWED)
         yes = sum(1 for r in self.rows if r.get("nest_label") == "yes")
         no = sum(1 for r in self.rows if r.get("nest_label") == "no")
+        skipped = sum(1 for r in self.rows if r.get("nest_label") == SKIPPED)
         struct = sum(1 for r in self.rows if r.get("human_structure") == "yes")
-        return {"total": len(self.rows), "reviewed": reviewed, "yes": yes, "no": no, "structure": struct}
+        return {"total": len(self.rows), "reviewed": reviewed, "yes": yes, "no": no,
+                "skipped": skipped, "structure": struct}
