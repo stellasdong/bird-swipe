@@ -8,7 +8,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from bird_swipe import config
 from bird_swipe.core import macaulay
-from bird_swipe.core.catalog import Catalog, ValidationError, default_output_dir
+from bird_swipe.core.catalog import Catalog, SaveError, ValidationError, default_output_dir
 from bird_swipe.ui.media_view import MediaView
 from bird_swipe.ui.preferences import PreferencesDialog
 
@@ -260,17 +260,30 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # --- actions ----------------------------------------------------------
     def _commit(self, nest: bool) -> None:
-        self.catalog.set_label(
-            self.idx, nest=nest, structure=self.structure,
-            reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip(),
-        )
+        try:
+            self.catalog.set_label(
+                self.idx, nest=nest, structure=self.structure,
+                reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip(),
+            )
+        except SaveError as exc:
+            self._warn_save_failed(exc)
+            return
         self.advance()
 
     def _skip(self) -> None:
-        self.catalog.set_skip(
-            self.idx, reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip()
-        )
+        try:
+            self.catalog.set_skip(
+                self.idx, reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip()
+            )
+        except SaveError as exc:
+            self._warn_save_failed(exc)
+            return
         self.advance()
+
+    def _warn_save_failed(self, exc: SaveError) -> None:
+        # Stay on the current item (nothing was saved) and tell the user why, so a
+        # locked output file reads as "close Excel and press again", not a dead key.
+        self.statusBar().showMessage(f"⚠  {exc}", 10000)
 
     def advance(self) -> None:
         self.structure = False

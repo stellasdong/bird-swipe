@@ -17,6 +17,8 @@ can't corrupt the file. Input and output may be CSV or XLSX.
 from __future__ import annotations
 
 import csv
+import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,6 +41,10 @@ SKIPPED = "skip"  # nest_label value for a skipped-but-reviewed item
 
 LABELED_DIRNAME = "labeled"
 NEST_DIRNAME = "nest"
+
+
+class SaveError(Exception):
+    """Labels couldn't be written — usually the output file is open elsewhere."""
 
 
 def labeled_name(input_path: str | Path) -> str:
@@ -157,26 +163,64 @@ class LabeledFile:
         return self.rows_by_id.get(str(ml_id))
 
     def upsert(self, row: dict) -> None:
-        """Insert or update a completed entry, then persist."""
+        """Insert or update a completed entry, then persist (rolls back on failure)."""
+        key = str(row[CATALOG_KEY])
+        prev_row = self.rows_by_id.get(key)
+        prev_fieldnames = list(self.fieldnames)
         for col in row:  # grow the column union, preserving order
             if col not in self.fieldnames:
                 self.fieldnames.append(col)
-        self.rows_by_id[str(row[CATALOG_KEY])] = dict(row)
-        self.save()
+        self.rows_by_id[key] = dict(row)
+        try:
+            self.save()
+        except SaveError:
+            if prev_row is None:
+                self.rows_by_id.pop(key, None)
+            else:
+                self.rows_by_id[key] = prev_row
+            self.fieldnames = prev_fieldnames
+            raise
 
     def discard(self, ml_id: str | int) -> None:
-        """Remove an entry if present, then persist."""
-        if self.rows_by_id.pop(str(ml_id), None) is not None:
+        """Remove an entry if present, then persist (restores it on failure)."""
+        key = str(ml_id)
+        prev_row = self.rows_by_id.pop(key, None)
+        if prev_row is None:
+            return
+        try:
             self.save()
+        except SaveError:
+            self.rows_by_id[key] = prev_row
+            raise
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".part")
-        if _is_xlsx(self.path):
-            self._write_xlsx(tmp)
-        else:
-            self._write_csv(tmp)
-        tmp.replace(self.path)  # atomic on the same filesystem
+        # Retry briefly to ride out a transient lock (e.g. Excel/Numbers has the
+        # file open for a moment); if it still fails, raise a clear SaveError so
+        # the UI can tell the user instead of the commit silently breaking.
+        last_exc: OSError | None = None
+        for attempt in range(3):
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                if _is_xlsx(self.path):
+                    self._write_xlsx(tmp)
+                else:
+                    self._write_csv(tmp)
+                os.replace(tmp, self.path)  # atomic on the same filesystem
+                return
+            except OSError as exc:
+                last_exc = exc
+                try:
+                    if tmp.exists():
+                        tmp.unlink()
+                except OSError:
+                    pass
+                if attempt < 2:
+                    time.sleep(0.1)
+        raise SaveError(
+            f"Couldn't write {self.path.name}. Is it open in Excel/Numbers? "
+            f"Close it and try again.\n({last_exc})"
+        ) from last_exc
 
     def _write_csv(self, path: Path) -> None:
         with open(path, "w", newline="", encoding="utf-8") as f:
@@ -272,17 +316,22 @@ class Catalog:
     ) -> None:
         """Record a decision for row ``index`` and persist it to disk."""
         row = self.rows[index]
+        snapshot = {c: row.get(c, "") for c in LABEL_COLUMNS}  # for rollback
         row["nest_label"] = "" if nest is None else ("yes" if nest else "no")
         row["human_structure"] = "yes" if structure else "no"
         row["notes"] = notes
         row["reviewed"] = REVIEWED
         row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         row["reviewer"] = reviewer
-        self.labeled.upsert(row)
-        if nest:
-            self.nest.upsert(row)
-        else:  # flipped to no / unset — drop it from the nest file
-            self.nest.discard(row[CATALOG_KEY])
+        try:
+            self.labeled.upsert(row)
+            if nest:
+                self.nest.upsert(row)
+            else:  # flipped to no / unset — drop it from the nest file
+                self.nest.discard(row[CATALOG_KEY])
+        except SaveError:
+            row.update(snapshot)  # keep memory consistent with disk
+            raise
 
     def set_skip(self, index: int, reviewer: str = "", notes: str = "") -> None:
         """Mark row ``index`` skipped: reviewed, but flagged nest_label=skip.
@@ -291,14 +340,19 @@ class Catalog:
         the spreadsheet, and can be revisited from the done screen.
         """
         row = self.rows[index]
+        snapshot = {c: row.get(c, "") for c in LABEL_COLUMNS}  # for rollback
         row["nest_label"] = SKIPPED
         row["human_structure"] = ""  # no structure decision on a skip
         row["notes"] = notes
         row["reviewed"] = REVIEWED
         row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         row["reviewer"] = reviewer
-        self.labeled.upsert(row)
-        self.nest.discard(row[CATALOG_KEY])  # a skip is never a nest
+        try:
+            self.labeled.upsert(row)
+            self.nest.discard(row[CATALOG_KEY])  # a skip is never a nest
+        except SaveError:
+            row.update(snapshot)
+            raise
 
     def is_reviewed(self, index: int) -> bool:
         return self.rows[index].get("reviewed") == REVIEWED
