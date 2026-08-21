@@ -100,14 +100,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.meta_lbl.setOpenExternalLinks(True)
         self.meta_lbl.setStyleSheet("padding:6px;color:#ccc;")
 
-        notes_key = config.key_display(config.get_keys()["focus_notes"])
-        self.notes_lbl = QtWidgets.QLabel(f"Notes  ({notes_key} to edit · Enter to return)")
+        self.notes_lbl = QtWidgets.QLabel("Notes  (click to edit · Enter to return)")
         self.notes_lbl.setStyleSheet("color:#888;padding:0 6px;")
         self.notes_edit = _NotesEdit()
         self.notes_edit.setPlaceholderText("Your note for this item (saved when you press YES/NO)…")
         self.notes_edit.setFixedHeight(56)  # ~1–2 sentences
-        # Only focus on click or via the focus_notes key — never auto/Tab-grab,
-        # so arrow keys stay with the label loop until you deliberately edit.
+        # Focus only on click — never auto/Tab-grab — so arrow keys stay with the
+        # label loop until you deliberately click into the box.
         self.notes_edit.setFocusPolicy(QtCore.Qt.ClickFocus)
 
         work = QtWidgets.QWidget()
@@ -176,7 +175,7 @@ class MainWindow(QtWidgets.QMainWindow):
         k = config.get_keys()
         d = config.key_display
         return (f"{d(k['nest_yes'])} YES nest    {d(k['nest_no'])} NO nest"
-                f"    {d(k['toggle_structure'])} toggle structure    {d(k['focus_notes'])} note"
+                f"    {d(k['toggle_structure'])} toggle structure"
                 f"    {d(k['skip'])} skip    {d(k['back'])} back    {d(k['quit'])} quit")
 
     # --- keys -------------------------------------------------------------
@@ -199,8 +198,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if action == "toggle_structure":
             self.structure = not self.structure
             self._update_chips()
-        elif action == "focus_notes":
-            self.notes_edit.setFocus()
         elif action == "nest_yes":
             self._commit(nest=True)
         elif action == "nest_no":
@@ -290,9 +287,6 @@ class MainWindow(QtWidgets.QMainWindow):
         fmt = row.get("Format", "")
         self.media.show_asset(ml_id, fmt)
         self.meta_lbl.setText(self._meta_html(row))
-        self.notes_lbl.setText(
-            f"Notes  ({config.key_display(config.get_keys()['focus_notes'])} to edit · Enter to return)"
-        )
         self.notes_edit.setPlainText(row.get("notes", ""))
         self._update_chips()
         self._prefetch_upcoming()

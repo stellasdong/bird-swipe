@@ -19,17 +19,15 @@ DEFAULT_KEYS = {
     "nest_yes": "Right",
     "nest_no": "Left",
     "toggle_structure": "Up",
-    "focus_notes": "N",
     "skip": "Space",
     "back": "Backspace",
     "quit": "Esc",
 }
-ACTION_ORDER = ["nest_yes", "nest_no", "toggle_structure", "focus_notes", "skip", "back", "quit"]
+ACTION_ORDER = ["nest_yes", "nest_no", "toggle_structure", "skip", "back", "quit"]
 ACTION_LABELS = {
     "nest_yes": "Nest = YES  (save + next)",
     "nest_no": "Nest = NO  (save + next)",
     "toggle_structure": "Toggle human-made structure",
-    "focus_notes": "Type a note for this item",
     "skip": "Skip  (leave unlabeled)",
     "back": "Previous item",
     "quit": "Quit",
