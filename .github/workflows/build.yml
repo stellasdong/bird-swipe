@@ -62,3 +62,22 @@ jobs:
         with:
           files: ${{ matrix.artifact }}.zip
           generate_release_notes: true
+          body: |
+            ## 📥 Download the app — pick the file for your computer
+
+            | Your computer | Download this file |
+            |---------------|--------------------|
+            | 🍎 **Mac**     | **`bird-swipe-macos.zip`** |
+            | 🪟 **Windows** | **`bird-swipe-windows.zip`** |
+
+            (Both files are listed under **Assets** at the bottom of this page.)
+
+            ### Then open it
+            1. Double-click the downloaded `.zip` to unzip it.
+            2. **Mac:** the first time, **right-click** `bird-swipe.app` → **Open** → **Open**
+               (this clears Apple's "unidentified developer" warning; normal double-click works afterward).
+               **Windows:** open the folder and double-click `bird-swipe.exe`; if you see
+               "Windows protected your PC", click **More info → Run anyway**.
+            3. Click **Open spreadsheet…** and choose your Macaulay Library export (`.csv` or `.xlsx`).
+
+            ---
