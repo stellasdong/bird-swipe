@@ -107,7 +107,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.notes_lbl = QtWidgets.QLabel("Notes  (click to edit · Enter to return)")
         self.notes_lbl.setStyleSheet("color:#888;padding:0 6px;")
         self.notes_edit = _NotesEdit()
-        self.notes_edit.setPlaceholderText("Your note for this item (saved when you press YES/NO)…")
+        self.notes_edit.setPlaceholderText("Your note for this item (eg: wrong species id)...")
         self.notes_edit.setFixedHeight(56)  # ~1–2 sentences
         # Focus only on click — never auto/Tab-grab — so arrow keys stay with the
         # label loop until you deliberately click into the box.
