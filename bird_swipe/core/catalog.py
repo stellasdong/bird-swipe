@@ -33,7 +33,10 @@ REQUIRED_COLUMNS = [
 CATALOG_KEY = "ML Catalog Number"
 
 # Columns bird-swipe appends. Order preserved when new to a file.
-LABEL_COLUMNS = ["nest_label", "human_structure", "notes", "reviewed", "reviewed_at", "reviewer"]
+LABEL_COLUMNS = [
+    "nest_label", "human_structure", "anthropogenic", "eggs",
+    "notes", "reviewed", "reviewed_at", "reviewer",
+]
 
 REVIEWED = "TRUE"
 SKIPPED = "skip"  # nest_label value for a skipped-but-reviewed item
@@ -312,6 +315,7 @@ class Catalog:
     # --- labeling ---------------------------------------------------------
     def set_label(
         self, index: int, nest: bool | None, structure: bool,
+        anthropogenic: bool = False, eggs: bool = False,
         reviewer: str = "", notes: str = "",
     ) -> None:
         """Record a decision for row ``index`` and persist it to disk."""
@@ -319,6 +323,8 @@ class Catalog:
         snapshot = {c: row.get(c, "") for c in LABEL_COLUMNS}  # for rollback
         row["nest_label"] = "" if nest is None else ("yes" if nest else "no")
         row["human_structure"] = "yes" if structure else "no"
+        row["anthropogenic"] = "yes" if anthropogenic else "no"
+        row["eggs"] = "yes" if eggs else "no"
         row["notes"] = notes
         row["reviewed"] = REVIEWED
         row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -342,7 +348,9 @@ class Catalog:
         row = self.rows[index]
         snapshot = {c: row.get(c, "") for c in LABEL_COLUMNS}  # for rollback
         row["nest_label"] = SKIPPED
-        row["human_structure"] = ""  # no structure decision on a skip
+        row["human_structure"] = ""  # no observations recorded on a skip
+        row["anthropogenic"] = ""
+        row["eggs"] = ""
         row["notes"] = notes
         row["reviewed"] = REVIEWED
         row["reviewed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -375,5 +383,8 @@ class Catalog:
         no = sum(1 for r in self.rows if r.get("nest_label") == "no")
         skipped = sum(1 for r in self.rows if r.get("nest_label") == SKIPPED)
         struct = sum(1 for r in self.rows if r.get("human_structure") == "yes")
+        anthro = sum(1 for r in self.rows if r.get("anthropogenic") == "yes")
+        eggs = sum(1 for r in self.rows if r.get("eggs") == "yes")
         return {"total": len(self.rows), "reviewed": reviewed, "yes": yes, "no": no,
-                "skipped": skipped, "structure": struct}
+                "skipped": skipped, "structure": struct, "anthropogenic": anthro,
+                "eggs": eggs}

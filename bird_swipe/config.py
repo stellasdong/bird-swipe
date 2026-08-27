@@ -14,22 +14,46 @@ from PySide6 import QtGui
 
 APP = "bird-swipe"
 
-# action -> default key name
+# Bump when the default hotkey scheme changes shape. Saved bindings from an older
+# scheme are ignored (reset to the new defaults) rather than merged, so stale keys
+# can't collide with reassigned defaults. Re-saving Preferences stamps this version.
+KEYS_VERSION = 2
+
+# action -> default key name. The three observation toggles each have a letter
+# and a number binding (the number pad mirror), so both are rebindable.
 DEFAULT_KEYS = {
     "nest_yes": "Right",
     "nest_no": "Left",
-    "toggle_structure": "Up",
-    "skip": "Space",
-    "back": "Backspace",
+    "forward": "Up",
+    "back": "Down",
+    "notes": "Return",
+    "toggle_structure": "Q",
+    "toggle_structure_num": "1",
+    "toggle_anthropogenic": "W",
+    "toggle_anthropogenic_num": "2",
+    "toggle_eggs": "E",
+    "toggle_eggs_num": "3",
     "quit": "Esc",
 }
-ACTION_ORDER = ["nest_yes", "nest_no", "toggle_structure", "skip", "back", "quit"]
+ACTION_ORDER = [
+    "nest_yes", "nest_no", "forward", "back", "notes",
+    "toggle_structure", "toggle_structure_num",
+    "toggle_anthropogenic", "toggle_anthropogenic_num",
+    "toggle_eggs", "toggle_eggs_num",
+    "quit",
+]
 ACTION_LABELS = {
     "nest_yes": "Nest = YES  (save + next)",
     "nest_no": "Nest = NO  (save + next)",
-    "toggle_structure": "Toggle human-made structure",
-    "skip": "Skip  (leave unlabeled)",
-    "back": "Previous item",
+    "forward": "Forward  (skip if undecided)",
+    "back": "Back  (previous item)",
+    "notes": "Edit notes",
+    "toggle_structure": "Human-made structure (letter)",
+    "toggle_structure_num": "Human-made structure (number)",
+    "toggle_anthropogenic": "Anthropogenic material (letter)",
+    "toggle_anthropogenic_num": "Anthropogenic material (number)",
+    "toggle_eggs": "Eggs present (letter)",
+    "toggle_eggs_num": "Eggs present (number)",
     "quit": "Quit",
 }
 
@@ -55,9 +79,13 @@ def save(cfg: dict) -> None:
 
 # --- hotkeys ----------------------------------------------------------------
 def get_keys() -> dict:
-    """Merge saved key names over the defaults."""
+    """Merge saved key names over the defaults (ignoring bindings from an older
+    keymap scheme — see ``KEYS_VERSION``)."""
     keys = dict(DEFAULT_KEYS)
-    saved = load().get("keys", {})
+    cfg = load()
+    if cfg.get("keys_version") != KEYS_VERSION:
+        return keys  # pre-rework config: start from the new defaults
+    saved = cfg.get("keys", {})
     if isinstance(saved, dict):
         for action, name in saved.items():
             if action in keys and isinstance(name, str) and name:
@@ -68,6 +96,7 @@ def get_keys() -> dict:
 def set_keys(keys: dict) -> None:
     cfg = load()
     cfg["keys"] = {a: keys[a] for a in DEFAULT_KEYS if a in keys}
+    cfg["keys_version"] = KEYS_VERSION
     save(cfg)
 
 
@@ -89,7 +118,7 @@ def key_to_name(key: int) -> str:
 
 
 # Prettier glyphs for the on-screen legend; other keys show their name as-is.
-_KEY_GLYPHS = {"Right": "→", "Left": "←", "Up": "↑", "Down": "↓"}
+_KEY_GLYPHS = {"Right": "→", "Left": "←", "Up": "↑", "Down": "↓", "Return": "Enter"}
 
 
 def key_display(name: str) -> str:

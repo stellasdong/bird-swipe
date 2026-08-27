@@ -44,10 +44,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._output_override = output_dir  # from --output-dir; else config/default
         self.reviewer = reviewer
         self.idx = 0
-        self.structure = False  # pending human-made-structure toggle for current item
         self._reviewing_skipped = False  # walking only skipped items from the done screen
         self._review_history: list[int] = []  # breadcrumb of visited items in that pass
         self.keys = config.keymap_ints()  # action -> Qt key int
+        # Both the letter and number binding of a toggle map to the same field.
+        self._toggle_fields = {
+            "toggle_structure": "structure", "toggle_structure_num": "structure",
+            "toggle_anthropogenic": "anthropogenic", "toggle_anthropogenic_num": "anthropogenic",
+            "toggle_eggs": "eggs", "toggle_eggs_num": "eggs",
+        }
 
         self.setWindowTitle("bird-swipe")
         self.resize(1100, 850)
@@ -67,7 +72,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.catalog = catalog
         self._input_path = input_path
         self.idx = catalog.first_unreviewed()
-        self.structure = False
         self._reviewing_skipped = False
         self._review_history = []
         self.show_current()
@@ -90,14 +94,37 @@ class MainWindow(QtWidgets.QMainWindow):
         header.addWidget(self.progress_lbl)
 
         self.nest_chip = QtWidgets.QLabel(alignment=QtCore.Qt.AlignCenter)
-        self.struct_chip = QtWidgets.QLabel(alignment=QtCore.Qt.AlignCenter)
-        for chip in (self.nest_chip, self.struct_chip):
-            chip.setMinimumWidth(220)
-            chip.setStyleSheet("padding:6px;border-radius:6px;background:#222;color:#eee;")
+        self.nest_chip.setMinimumWidth(220)
+        self.nest_chip.setStyleSheet("padding:6px;border-radius:6px;background:#222;color:#eee;")
+
+        # Three per-image observation toggles, shown left-to-right as clickable
+        # checkboxes that fill green when ticked (yes) and red when clear (no),
+        # mirroring the nest chip. Order matches their hotkeys: structure, anthro, eggs.
+        chk_style = (
+            "QCheckBox { padding:6px; border-radius:6px; background:#7f1d1d; color:#fff; }"
+            "QCheckBox:checked { background:#1b5e20; }"
+        )
+        self.checkboxes: dict[str, QtWidgets.QCheckBox] = {}
+        self._checkbox_bases = {
+            "structure": "human-made structure",
+            "anthropogenic": "anthropogenic material",
+            "eggs": "eggs present",
+        }
+        for field in ("structure", "anthropogenic", "eggs"):
+            chk = QtWidgets.QCheckBox(self._checkbox_bases[field])
+            chk.setMinimumWidth(200)
+            chk.setStyleSheet(chk_style)
+            # Mouse-clickable, but never grab keyboard focus so arrow keys stay
+            # with the label loop.
+            chk.setFocusPolicy(QtCore.Qt.NoFocus)
+            self.checkboxes[field] = chk
+
         chips = QtWidgets.QHBoxLayout()
         chips.addWidget(self.nest_chip)
-        chips.addWidget(self.struct_chip)
+        for field in ("structure", "anthropogenic", "eggs"):
+            chips.addWidget(self.checkboxes[field])
         chips.addStretch()
+        self._refresh_checkbox_labels()
 
         self.meta_lbl = QtWidgets.QLabel(wordWrap=True)
         self.meta_lbl.setTextFormat(QtCore.Qt.RichText)
@@ -187,9 +214,20 @@ class MainWindow(QtWidgets.QMainWindow):
     def _legend(self) -> str:
         k = config.get_keys()
         d = config.key_display
-        return (f"{d(k['nest_yes'])} YES nest    {d(k['nest_no'])} NO nest"
-                f"    {d(k['toggle_structure'])} toggle structure"
-                f"    {d(k['skip'])} skip    {d(k['back'])} back    {d(k['quit'])} quit")
+        return (f"{d(k['nest_yes'])} YES    {d(k['nest_no'])} NO"
+                f"    {d(k['forward'])} next    {d(k['back'])} back    {d(k['notes'])} notes"
+                f"    {d(k['toggle_structure'])}/{d(k['toggle_structure_num'])} structure"
+                f"    {d(k['toggle_anthropogenic'])}/{d(k['toggle_anthropogenic_num'])} anthro"
+                f"    {d(k['toggle_eggs'])}/{d(k['toggle_eggs_num'])} eggs"
+                f"    {d(k['quit'])} quit")
+
+    def _refresh_checkbox_labels(self) -> None:
+        keys = config.get_keys()
+        d = config.key_display
+        for field, chk in self.checkboxes.items():
+            letter = d(keys[f"toggle_{field}"])
+            number = d(keys[f"toggle_{field}_num"])
+            chk.setText(f"{self._checkbox_bases[field]}  ({letter}/{number})")
 
     # --- keys -------------------------------------------------------------
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
@@ -208,15 +246,17 @@ class MainWindow(QtWidgets.QMainWindow):
             super().keyPressEvent(event)
             return
 
-        if action == "toggle_structure":
-            self.structure = not self.structure
-            self._update_chips()
+        if action in self._toggle_fields:
+            chk = self.checkboxes[self._toggle_fields[action]]
+            chk.setChecked(not chk.isChecked())
+        elif action == "notes":
+            self.notes_edit.setFocus()
+        elif action == "forward":
+            self._forward()
         elif action == "nest_yes":
             self._commit(nest=True)
         elif action == "nest_no":
             self._commit(nest=False)
-        elif action == "skip":
-            self._skip()
         else:
             super().keyPressEvent(event)
 
@@ -242,6 +282,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         config.set_keys(dlg.result_keys())
         self.keys = config.keymap_ints()
+        self._refresh_checkbox_labels()
         self._apply_output_dir(dlg.result_output_dir())
         if self.catalog is None:
             self._show_welcome()
@@ -262,7 +303,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def _commit(self, nest: bool) -> None:
         try:
             self.catalog.set_label(
-                self.idx, nest=nest, structure=self.structure,
+                self.idx, nest=nest,
+                structure=self.checkboxes["structure"].isChecked(),
+                anthropogenic=self.checkboxes["anthropogenic"].isChecked(),
+                eggs=self.checkboxes["eggs"].isChecked(),
                 reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip(),
             )
         except SaveError as exc:
@@ -270,14 +314,18 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.advance()
 
-    def _skip(self) -> None:
-        try:
-            self.catalog.set_skip(
-                self.idx, reviewer=self.reviewer, notes=self.notes_edit.toPlainText().strip()
-            )
-        except SaveError as exc:
-            self._warn_save_failed(exc)
-            return
+    def _forward(self) -> None:
+        """Advance one item. An undecided item is recorded as a skip on the way
+        out; an already-decided item is just navigated past."""
+        if not self.catalog.is_reviewed(self.idx):
+            try:
+                self.catalog.set_skip(
+                    self.idx, reviewer=self.reviewer,
+                    notes=self.notes_edit.toPlainText().strip(),
+                )
+            except SaveError as exc:
+                self._warn_save_failed(exc)
+                return
         self.advance()
 
     def _warn_save_failed(self, exc: SaveError) -> None:
@@ -286,7 +334,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar().showMessage(f"⚠  {exc}", 10000)
 
     def advance(self) -> None:
-        self.structure = False
         if self._reviewing_skipped:
             nxt = self._next_skipped_after(self.idx)
             if nxt is None:  # no skips left -> back to the done screen
@@ -312,8 +359,6 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.idx <= 0:
                 return
             self.idx -= 1
-        row = self.catalog.rows[self.idx]
-        self.structure = row.get("human_structure") == "yes"
         self.show_current()
 
     def _next_skipped_after(self, i: int) -> int | None:
@@ -329,7 +374,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._reviewing_skipped = True
         self._review_history = [skipped[0]]
         self.idx = skipped[0]
-        self.structure = self.catalog.rows[self.idx].get("human_structure") == "yes"
         self.show_current()
 
     # --- rendering --------------------------------------------------------
@@ -355,6 +399,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.media.show_asset(ml_id, fmt)
         self.meta_lbl.setText(self._meta_html(row))
         self.notes_edit.setPlainText(row.get("notes", ""))
+        for field, col in (("structure", "human_structure"),
+                           ("anthropogenic", "anthropogenic"), ("eggs", "eggs")):
+            self.checkboxes[field].setChecked(row.get(col) == "yes")
         self._update_chips()
         self._prefetch_upcoming()
         hint = "    ·    click video to play/pause" if fmt == "Video" else ""
@@ -386,14 +433,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.nest_chip.setText("nest: — (unlabeled)")
             self.nest_chip.setStyleSheet("padding:6px;border-radius:6px;background:#222;color:#eee;")
 
-        toggle = config.key_display(config.get_keys()["toggle_structure"])
-        if self.structure:
-            self.struct_chip.setText(f"human-made structure: ON  ({toggle})")
-            self.struct_chip.setStyleSheet("padding:6px;border-radius:6px;background:#1565c0;color:#fff;")
-        else:
-            self.struct_chip.setText(f"human-made structure: off  ({toggle})")
-            self.struct_chip.setStyleSheet("padding:6px;border-radius:6px;background:#222;color:#eee;")
-
     def _meta_html(self, row: dict) -> str:
         ml_id = row["ML Catalog Number"]
         page = macaulay.asset_page_url(ml_id)
@@ -419,8 +458,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.done_lbl.setText(
             f"<h2>All {st['total']} assets reviewed 🎉</h2>"
             f"<p>nest yes: <b>{st['yes']}</b>&nbsp;&nbsp; nest no: <b>{st['no']}</b>"
-            f"&nbsp;&nbsp; skipped: <b>{skipped}</b>"
-            f"&nbsp;&nbsp; human-made structure: <b>{st['structure']}</b></p>"
+            f"&nbsp;&nbsp; skipped: <b>{skipped}</b></p>"
+            f"<p>human-made structure: <b>{st['structure']}</b>"
+            f"&nbsp;&nbsp; anthropogenic: <b>{st['anthropogenic']}</b>"
+            f"&nbsp;&nbsp; eggs: <b>{st['eggs']}</b></p>"
             f"{skipped_line}"
             f"<p>{self.catalog.labeled.count()} completed entries saved to:<br>"
             f"<code>{self.catalog.labeled.path}</code></p>"
