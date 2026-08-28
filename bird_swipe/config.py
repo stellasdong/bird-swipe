@@ -24,8 +24,8 @@ KEYS_VERSION = 2
 DEFAULT_KEYS = {
     "nest_yes": "Right",
     "nest_no": "Left",
-    "forward": "Up",
-    "back": "Down",
+    "forward": "Down",
+    "back": "Up",
     "notes": "Return",
     "toggle_structure": "Q",
     "toggle_structure_num": "1",
