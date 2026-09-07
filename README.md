@@ -1,8 +1,9 @@
 # bird-swipe
 
-Swipe through Macaulay Library nest media and label each asset
-**nest yes/no** and **human-made structure yes/no**, driven by arrow-key hotkeys,
-saving after every entry. See [PLAN.md](PLAN.md) for the full design.
+Swipe through Macaulay Library nest media and label each asset **nest yes/no**,
+plus three per-image observations — **human-made structure**, **anthropogenic
+material**, and **eggs present** — driven by hotkeys, saving after every entry.
+See [PLAN.md](PLAN.md) for the full design.
 
 ## Download & install (no coding needed)
 
@@ -27,21 +28,32 @@ saving after every entry. See [PLAN.md](PLAN.md) for the full design.
 
 ## How to label
 
-| Key         | Action |
-|-------------|--------|
-| `→`         | nest = **YES** → save + next |
-| `←`         | nest = **NO** → save + next |
-| `↑`         | toggle **human-made structure** for the current item |
-| `Space`     | skip → marks `nest_label=skip` (counts as reviewed) → next |
-| `Backspace` | go back to the previous item |
-| `Esc`       | quit (everything is already saved) |
+| Key       | Action |
+|-----------|--------|
+| `→`       | nest = **YES** → save + next |
+| `←`       | nest = **NO** → save + next |
+| `↓`       | next item — an undecided one is recorded as `nest_label=skip` (counts as reviewed) |
+| `↑`       | back to the previous item |
+| `Q` / `1` | toggle **human-made structure** for the current item |
+| `W` / `2` | toggle **anthropogenic material** |
+| `E` / `3` | toggle **eggs present** |
+| `Enter`   | jump to the notes box |
+| `Esc`     | quit (everything is already saved) |
 
-Hotkeys are rebindable in **File → Preferences…**. Reopening a file resumes at
-the first **un-reviewed** asset (skipped items count as reviewed, so it won't
-jump back to them — but the done screen has a **Review skipped items** button to
-revisit them). Click a video to play/pause it. To add a **note** to
-an item, click the Notes box, type, then press **Enter** to return to labeling —
-the note is saved when you press YES/NO.
+Each toggle has a letter key and the matching number key, so a number pad works
+too. The three also appear as checkboxes above the image — **green** when yes,
+**red** when no — and you can click them instead of using the keys. They always
+show what is already saved for that item, so stepping back shows your earlier
+answer rather than a blank slate.
+
+Hotkeys are rebindable in **File → Preferences…**. (Upgrading from v1.x resets
+hotkeys to the defaults above, because the scheme changed — your output-folder
+setting is kept.) Reopening a file resumes at the first **un-reviewed** asset
+(skipped items count as reviewed, so it won't jump back to them — but the done
+screen has a **Review skipped items** button to revisit them). Click a video to
+play/pause it. To add a **note** to an item, press `Enter` (or click the Notes
+box), type, then press `Enter` again to return to labeling — the note is saved
+when you press YES/NO.
 
 ## How labels are saved
 
@@ -53,8 +65,11 @@ The original download is never modified. Labels are written live into a
 <csv dir>/labeled/nest/<name>_nest.csv   only the nest=yes entries
 ```
 
-Both are keyed by ML catalog number; flipping a row out of "nest=yes" removes it
-from the nest file. Change where these go in **File → Preferences…**.
+Each row gets the columns `nest_label`, `human_structure`, `anthropogenic`,
+`eggs`, `notes`, `reviewed`, `reviewed_at`, and `reviewer` appended to the
+original ones. Both files are keyed by ML catalog number; flipping a row out of
+"nest=yes" removes it from the nest file. Change where these go in
+**File → Preferences…**.
 
 ---
 
@@ -90,7 +105,7 @@ macOS and Windows on every push. **To publish a release for users**, push a
 version tag — that attaches the built apps to a GitHub Release:
 
 ```bash
-git tag v1.0.0 && git push origin v1.0.0
+git tag v2.1.0 && git push origin v2.1.0
 ```
 
 ### Media probe / spike

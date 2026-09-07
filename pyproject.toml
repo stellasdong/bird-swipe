@@ -1,6 +1,6 @@
 [project]
 name = "bird-swipe"
-version = "0.0.1"
+version = "2.0.1"
 description = "Bird Tinder — swipe through Macaulay Library nest media and label it fast."
 requires-python = ">=3.10"
 dependencies = [
