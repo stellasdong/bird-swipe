@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from bird_swipe import config
+from bird_swipe import __version__, config
 from bird_swipe.core import macaulay
 from bird_swipe.core.catalog import Catalog, SaveError, ValidationError, default_output_dir
 from bird_swipe.ui.media_view import MediaView
@@ -179,13 +179,15 @@ class MainWindow(QtWidgets.QMainWindow):
             alignment=QtCore.Qt.AlignCenter,
         )
         sub.setStyleSheet("color:#aaa;padding:8px;")
+        ver = QtWidgets.QLabel(f"version {__version__}", alignment=QtCore.Qt.AlignCenter)
+        ver.setStyleSheet("color:#777;font-size:11px;")
         open_btn = QtWidgets.QPushButton("Open spreadsheet…")
         open_btn.setMinimumWidth(220)
         open_btn.clicked.connect(self.open_spreadsheet)
         prefs_btn = QtWidgets.QPushButton("Preferences…")
         prefs_btn.setMinimumWidth(220)
         prefs_btn.clicked.connect(self.open_preferences)
-        for w in (title, sub):
+        for w in (title, sub, ver):
             lay.addWidget(w)
         lay.addSpacing(12)
         lay.addWidget(open_btn, alignment=QtCore.Qt.AlignCenter)

@@ -16,6 +16,8 @@ import os
 import sys
 from pathlib import Path
 
+from bird_swipe import __version__
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Uncategorized Qt warnings (not filterable via QT_LOGGING_RULES) that flood the
@@ -55,6 +57,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--output-dir", help="Folder for <name>_labeled files (default: see Preferences)")
     p.add_argument("--no-resume", action="store_true", help="Ignore existing labels for this file")
     p.add_argument("--reviewer", default="", help="Name recorded in the reviewer column")
+    p.add_argument("--version", action="version", version=f"bird-swipe {__version__}")
     return p.parse_args(argv)
 
 

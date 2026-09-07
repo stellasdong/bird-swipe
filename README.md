@@ -90,7 +90,8 @@ python3.12 -m venv .venv
 ```
 
 Options: `--output-dir DIR` (override the output folder),
-`--no-resume` (ignore prior labels for this file), `--reviewer NAME`.
+`--no-resume` (ignore prior labels for this file), `--reviewer NAME`,
+`--version` (print the version and exit).
 
 ### Build the apps
 
