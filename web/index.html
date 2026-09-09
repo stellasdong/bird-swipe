@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bird-swipe</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ------------------------------------------------------------- welcome -->
+<section id="screen-welcome" class="screen centered">
+  <h1>bird-swipe</h1>
+  <p class="subtitle">
+    Swipe through Macaulay Library nest media and label it fast.
+    Your labels are written straight into the folder you choose — nothing is
+    uploaded anywhere.
+  </p>
+
+  <div id="unsupported" class="notice error" hidden>
+    <b>This browser can't open a folder.</b><br>
+    bird-swipe needs Chrome or Edge on a Mac or Windows PC. Safari and Firefox
+    don't support writing to a local folder, so labels couldn't be saved.
+  </div>
+
+  <div id="welcome-error" class="notice error" hidden></div>
+
+  <div id="welcome-body" class="stack">
+    <div class="field">
+      <label for="reviewer">Your name</label>
+      <input type="text" id="reviewer" placeholder="e.g. Stella Dong" autocomplete="name">
+    </div>
+    <p class="subtitle" style="font-size:12px">
+      Recorded in the <code>reviewer</code> column so labels can be traced back to you.
+    </p>
+
+    <div class="stack">
+      <button id="reconnect" class="primary" hidden>Reconnect “<span id="reconnect-name"></span>”</button>
+      <button id="choose-folder" class="primary">Choose folder…</button>
+      <button id="prefs-welcome">Preferences…</button>
+    </div>
+
+    <div id="folder-info" class="notice info" hidden></div>
+    <ul id="file-list" class="file-list" hidden></ul>
+    <div id="no-files" class="notice warn" hidden>
+      No Macaulay exports (<code>.csv</code>) found in that folder. Put a species
+      export in it, then choose it again.
+    </div>
+  </div>
+
+  <p class="version">version <span id="version"></span></p>
+</section>
+
+<!-- --------------------------------------------------------------- label -->
+<section id="screen-label" class="screen" hidden>
+  <div class="bar">
+    <span class="title" id="row-title"></span>
+    <span class="spacer"></span>
+    <span class="progress" id="progress"></span>
+    <span class="save-state" id="save-state"></span>
+  </div>
+
+  <div class="chips">
+    <span class="chip" id="nest-chip">nest: — (unlabeled)</span>
+    <button class="toggle" id="t-structure" aria-pressed="false" type="button"></button>
+    <button class="toggle" id="t-anthropogenic" aria-pressed="false" type="button"></button>
+    <button class="toggle" id="t-eggs" aria-pressed="false" type="button"></button>
+  </div>
+
+  <div class="media" id="media">
+    <div class="placeholder" id="media-placeholder">Loading…</div>
+    <img id="photo" alt="" hidden>
+    <video id="video" loop playsinline hidden></video>
+  </div>
+
+  <div class="meta" id="meta"></div>
+
+  <div class="notes-wrap">
+    <div class="notes-label" id="notes-label">Notes</div>
+    <textarea id="notes" placeholder="Your note for this item (eg: wrong species id)…"></textarea>
+  </div>
+
+  <div class="legend" id="legend"></div>
+</section>
+
+<!-- ---------------------------------------------------------------- done -->
+<section id="screen-done" class="screen centered done" hidden>
+  <h2 id="done-title"></h2>
+  <p class="row" id="done-counts"></p>
+  <p class="row" id="done-observations"></p>
+  <p class="row" id="done-skipped"></p>
+  <button id="review-skipped" hidden></button>
+  <p class="row" id="done-paths"></p>
+  <p class="row" id="done-hint"></p>
+  <div class="stack">
+    <button id="done-open-another">Open another export…</button>
+  </div>
+</section>
+
+<!-- --------------------------------------------------------- preferences -->
+<dialog id="prefs">
+  <h2>Preferences</h2>
+  <p class="subtitle" style="font-size:12px;margin:0 0 10px">
+    Click a key, then press the new key.
+  </p>
+  <div class="keygrid" id="keygrid"></div>
+  <div id="prefs-warning" class="notice error" hidden></div>
+  <div class="dialog-actions">
+    <button id="prefs-reset">Reset to defaults</button>
+    <span class="spacer"></span>
+    <button id="prefs-cancel">Cancel</button>
+    <button id="prefs-save" class="primary">Save</button>
+  </div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
