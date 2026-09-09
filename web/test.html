@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bird-swipe tests</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:24px; background:#111; color:#eee;
+         font:13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  h1 { font:600 20px/1.3 -apple-system, BlinkMacSystemFont, sans-serif; margin:0 0 16px; }
+  #summary { font-size:16px; padding:10px 14px; border-radius:6px; margin-bottom:16px;
+             background:#222; border:1px solid #333; }
+  .pass { color:#4ade80; } .fail { color:#f87171; } .dim { color:#888; }
+  .group { margin:14px 0 4px; color:#93c5fd; font-weight:600; }
+  .row { padding-left:14px; }
+  pre { margin:2px 0 2px 28px; color:#fbbf24; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<h1>bird-swipe tests</h1>
+<div id="summary">running…</div>
+<div id="out"></div>
+
+<script type="module">
+import { parseRows, parseTable, serializeTable } from './csv.js';
+import {
+  Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
+  LABEL_COLUMNS, REVIEWED, SKIPPED,
+} from './catalog.js';
+import { assertReadLooksComplete, TruncatedReadError, DebouncedWriter } from './storage.js';
+import { DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay } from './settings.js';
+
+const out = document.getElementById('out');
+let passed = 0, failed = 0;
+
+const group = name => {
+  const d = document.createElement('div');
+  d.className = 'group';
+  d.textContent = name;
+  out.appendChild(d);
+};
+function check(name, cond, detail) {
+  const d = document.createElement('div');
+  d.className = 'row ' + (cond ? 'pass' : 'fail');
+  d.textContent = (cond ? '✓ ' : '✗ ') + name;
+  out.appendChild(d);
+  if (cond) passed++; else {
+    failed++;
+    if (detail !== undefined) {
+      const p = document.createElement('pre');
+      p.textContent = typeof detail === 'string' ? detail : JSON.stringify(detail, null, 2);
+      out.appendChild(p);
+    }
+  }
+}
+let skipped = 0;
+function skip(name, why) {
+  const d = document.createElement('div');
+  d.className = 'row dim';
+  d.textContent = `– ${name} (skipped: ${why})`;
+  out.appendChild(d);
+  skipped++;
+}
+const eq = (name, actual, expected) =>
+  check(name, JSON.stringify(actual) === JSON.stringify(expected),
+        `expected: ${JSON.stringify(expected)}\nactual:   ${JSON.stringify(actual)}`);
+
+// ---------------------------------------------------------------- CSV parsing
+group('csv.js — parsing');
+eq('plain row', parseRows('a,b,c'), [['a', 'b', 'c']]);
+eq('quoted field with comma', parseRows('a,"b,c",d'), [['a', 'b,c', 'd']]);
+eq('escaped quotes', parseRows('a,"say ""hi""",c'), [['a', 'say "hi"', 'c']]);
+eq('embedded newline in quotes', parseRows('a,"line1\nline2",c'), [['a', 'line1\nline2', 'c']]);
+eq('CRLF rows', parseRows('a,b\r\nc,d'), [['a', 'b'], ['c', 'd']]);
+eq('LF rows', parseRows('a,b\nc,d'), [['a', 'b'], ['c', 'd']]);
+eq('trailing newline makes no extra row', parseRows('a,b\r\n'), [['a', 'b']]);
+eq('BOM stripped', parseRows('﻿a,b'), [['a', 'b']]);
+eq('blank line dropped', parseRows('a,b\n\nc,d'), [['a', 'b'], ['c', 'd']]);
+eq('empty trailing field kept', parseRows('a,b,'), [['a', 'b', '']]);
+eq('quoted empty field kept', parseRows('a,"",c'), [['a', '', 'c']]);
+eq('row of only an empty quoted field', parseRows('""'), [['']]);
+eq('CRLF inside quotes preserved', parseRows('"a\r\nb",c'), [['a\r\nb', 'c']]);
+
+group('csv.js — table shape');
+{
+  const t = parseTable('A,B\r\n1,2\r\n3,4\r\n');
+  eq('fieldnames', t.fieldnames, ['A', 'B']);
+  eq('rows', t.rows, [{ A: '1', B: '2' }, { A: '3', B: '4' }]);
+  const short = parseTable('A,B,C\r\n1,2\r\n');
+  eq('missing cells fill empty', short.rows, [{ A: '1', B: '2', C: '' }]);
+}
+
+group('csv.js — serializing');
+eq('quotes only when needed', serializeTable(['a', 'b'], [{ a: 'x', b: 'y,z' }]),
+   'a,b\r\nx,"y,z"\r\n');
+eq('doubles inner quotes', serializeTable(['a'], [{ a: 'say "hi"' }]),
+   'a\r\n"say ""hi"""\r\n');
+eq('newline forces quoting', serializeTable(['a'], [{ a: 'l1\nl2' }]), 'a\r\n"l1\nl2"\r\n');
+eq('missing key becomes empty', serializeTable(['a', 'b'], [{ a: '1' }]), 'a,b\r\n1,\r\n');
+{
+  const tricky = [['A', 'B', 'C'], ['plain', 'has,comma', 'has "quote"'],
+                  ['multi\nline', '', 'trailing ']];
+  const round = parseRows(serializeTable(tricky[0],
+    tricky.slice(1).map(r => ({ A: r[0], B: r[1], C: r[2] }))));
+  eq('round-trip preserves tricky values', round, tricky);
+}
+
+// ------------------------------------------------------------------- catalog
+group('catalog.js — names & validation');
+eq('labeledName', labeledName('ML__x.csv'), 'ML__x_labeled.csv');
+eq('nestName', nestName('ML__x.csv'), 'ML__x_nest.csv');
+eq('extensionless defaults to .csv', labeledName('export'), 'export_labeled.csv');
+eq('xlsx extension kept', labeledName('a.xlsx'), 'a_labeled.xlsx');
+check('rejects wrong first column',
+      !validateFieldnames(['Format', 'ML Catalog Number']).ok);
+check('rejects missing header', !validateFieldnames([]).ok);
+{
+  const v = validateFieldnames(['ML Catalog Number', 'Format', 'Common Name',
+                                'Scientific Name', 'Asset Tags']);
+  check('accepts the five required columns', v.ok, v.errors);
+  check('warns when the export looks trimmed', v.warnings.length === 1, v.warnings);
+}
+
+// Build a small synthetic export covering the label loop.
+const HEADER = ['ML Catalog Number', 'Format', 'Common Name', 'Scientific Name', 'Asset Tags'];
+const makeExport = ids => serializeTable(HEADER, ids.map(([id, fmt]) => ({
+  'ML Catalog Number': id, Format: fmt, 'Common Name': 'Cactus Wren',
+  'Scientific Name': 'Campylorhynchus brunneicapillus', 'Asset Tags': 'nest',
+})));
+const SAMPLE = makeExport([['1', 'Photo'], ['2', 'Video'], ['3', 'Photo'], ['4', 'Photo']]);
+
+group('catalog.js — labeling');
+{
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+  eq('all label columns added', LABEL_COLUMNS.every(c => c in catalog.rows[0]), true);
+  eq('starts unreviewed', catalog.firstUnreviewed(), 0);
+
+  catalog.setLabel(0, { nest: true, structure: true, eggs: true, reviewer: 'stella' });
+  eq('nest yes recorded', catalog.rows[0].nest_label, 'yes');
+  eq('structure recorded', catalog.rows[0].human_structure, 'yes');
+  eq('eggs recorded', catalog.rows[0].eggs, 'yes');
+  eq('anthropogenic defaults to no', catalog.rows[0].anthropogenic, 'no');
+  eq('marked reviewed', catalog.rows[0].reviewed, REVIEWED);
+  eq('reviewer stamped', catalog.rows[0].reviewer, 'stella');
+  check('reviewed_at matches Python isoformat(timespec="seconds")',
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/.test(catalog.rows[0].reviewed_at),
+        catalog.rows[0].reviewed_at);
+  eq('yes row lands in the nest file', catalog.nest.count(), 1);
+  eq('and in the labeled file', catalog.labeled.count(), 1);
+
+  catalog.setLabel(0, { nest: false, structure: false });
+  eq('flipping to no removes it from the nest file', catalog.nest.count(), 0);
+  eq('but it stays in the labeled file', catalog.labeled.count(), 1);
+
+  catalog.setSkip(1, { reviewer: 'stella' });
+  eq('skip sets the sentinel', catalog.rows[1].nest_label, SKIPPED);
+  eq('skip clears observations', catalog.rows[1].human_structure, '');
+  check('skip counts as reviewed', catalog.isReviewed(1));
+  check('skip is detectable', catalog.isSkipped(1));
+  eq('resume passes over skips', catalog.firstUnreviewed(), 2);
+  eq('skippedIndices', catalog.skippedIndices(), [1]);
+  eq('nextSkippedAfter finds none past it', catalog.nextSkippedAfter(1), null);
+
+  const st = catalog.stats();
+  eq('stats total', st.total, 4);
+  eq('stats reviewed', st.reviewed, 2);
+  eq('stats no', st.no, 1);
+  eq('stats skipped', st.skipped, 1);
+}
+
+group('catalog.js — resume across a reload');
+{
+  const first = Catalog.open('s.csv', SAMPLE).catalog;
+  first.setLabel(0, { nest: true, structure: false, anthropogenic: true,
+                      reviewer: 'stella', notes: 'wrong species id' });
+  first.setSkip(1, { reviewer: 'stella' });
+  const labeledText = first.labeled.serialize();
+  const nestText = first.nest.serialize();
+
+  const { catalog: again } = Catalog.open('s.csv', SAMPLE, { labeledText, nestText });
+  eq('label restored', again.rows[0].nest_label, 'yes');
+  eq('anthropogenic restored', again.rows[0].anthropogenic, 'yes');
+  eq('notes restored', again.rows[0].notes, 'wrong species id');
+  eq('skip restored', again.rows[1].nest_label, SKIPPED);
+  eq('resumes at the first unreviewed row', again.firstUnreviewed(), 2);
+  eq('labeled count survives', again.labeled.count(), 2);
+  eq('nest count survives', again.nest.count(), 1);
+
+  const noResume = Catalog.open('s.csv', SAMPLE, { labeledText, resume: false }).catalog;
+  eq('resume:false ignores prior labels', noResume.firstUnreviewed(), 0);
+}
+
+group('catalog.js — reviewer collision detection');
+{
+  const a = Catalog.open('s.csv', SAMPLE).catalog;
+  a.setLabel(0, { nest: true, structure: false, reviewer: 'alex' });
+  const { catalog: b } = Catalog.open('s.csv', SAMPLE, { labeledText: a.labeled.serialize() });
+  eq('sees the other reviewer', b.otherReviewers('stella'), ['alex']);
+  eq('does not flag yourself', b.otherReviewers('alex'), []);
+}
+
+group('catalog.js — column union growth');
+{
+  // A v1.x labeled file: only 5 of the 8 label columns.
+  const old = serializeTable([...HEADER, 'nest_label', 'human_structure',
+                              'reviewed', 'reviewed_at', 'reviewer'],
+    [{ 'ML Catalog Number': '1', Format: 'Photo', 'Common Name': 'Cactus Wren',
+       'Scientific Name': 'C. b.', 'Asset Tags': 'nest', nest_label: 'yes',
+       human_structure: 'no', reviewed: 'TRUE',
+       reviewed_at: '2026-08-09T21:13:23+00:00', reviewer: '' }]);
+  const lf = new LabeledFile('x_labeled.csv', old);
+  eq('old file parsed', lf.count(), 1);
+  check('old column order preserved', lf.fieldnames.indexOf('nest_label') === 5, lf.fieldnames);
+  lf.upsert({ 'ML Catalog Number': '2', nest_label: 'no', notes: 'new column',
+              anthropogenic: 'yes', eggs: 'no' });
+  check('new columns appended at the end',
+        lf.fieldnames.slice(-3).join() === 'notes,anthropogenic,eggs', lf.fieldnames.slice(-5));
+  check('re-parses cleanly after growth',
+        new LabeledFile('x', lf.serialize()).count() === 2);
+}
+
+// ------------------------------------------------------- storage & settings
+group('storage.js — Files-On-Demand truncation guard');
+{
+  const threw = fn => { try { fn(); return null; } catch (e) { return e; } };
+  check('empty file with zero size is fine',
+        threw(() => assertReadLooksComplete({ name: 'a', size: 0 }, '')) === null);
+  check('a full read passes',
+        threw(() => assertReadLooksComplete({ name: 'a', size: 100 }, 'x'.repeat(100))) === null);
+  {
+    const e = threw(() => assertReadLooksComplete({ name: 'a', size: 5000 }, ''));
+    check('non-empty file reading as empty is rejected', e instanceof TruncatedReadError);
+    check('the error names the placeholder cause', /placeholder/i.test(e?.message ?? ''), e?.message);
+  }
+  check('a badly short read is rejected',
+        threw(() => assertReadLooksComplete({ name: 'a', size: 5000 }, 'x'.repeat(100)))
+          instanceof TruncatedReadError);
+  check('multi-byte UTF-8 is not mistaken for truncation',
+        threw(() => assertReadLooksComplete({ name: 'a', size: 300 }, '°'.repeat(150))) === null);
+}
+
+group('storage.js — debounced writer');
+{
+  // Stand-in for a Folder: records writes, and can be told to fail.
+  const fakeFolder = () => ({
+    writes: [], failNext: false,
+    async writeOutputs(name, payload) {
+      if (this.failNext) { this.failNext = false; throw new Error('disk on fire'); }
+      this.writes.push(payload);
+    },
+  });
+  const fakeCatalog = tag => ({
+    labeled: { serialize: () => `labeled:${tag}` },
+    nest: { serialize: () => `nest:${tag}` },
+  });
+  const tick = ms => new Promise(r => setTimeout(r, ms));
+
+  {
+    const folder = fakeFolder();
+    const w = new DebouncedWriter(folder, 'x.csv', { delay: 20 });
+    w.schedule(fakeCatalog('a'));
+    w.schedule(fakeCatalog('b'));
+    w.schedule(fakeCatalog('c'));
+    check('nothing written yet', folder.writes.length === 0);
+    await tick(60);
+    eq('three commits coalesce into one write', folder.writes.length, 1);
+    eq('the newest state wins', folder.writes[0].labeledText, 'labeled:c');
+    w.dispose();
+  }
+  {
+    const folder = fakeFolder();
+    const w = new DebouncedWriter(folder, 'x.csv', { delay: 10000 });
+    w.schedule(fakeCatalog('a'));
+    await w.flush();
+    eq('flush() writes immediately without waiting', folder.writes.length, 1);
+    w.dispose();
+  }
+  {
+    const folder = fakeFolder();
+    let errored = null;
+    const w = new DebouncedWriter(folder, 'x.csv', { delay: 5, onError: e => { errored = e; } });
+    folder.failNext = true;
+    w.schedule(fakeCatalog('a'));
+    await tick(40);
+    check('a failed write is reported', errored?.message === 'disk on fire', errored);
+    eq('and nothing was recorded', folder.writes.length, 0);
+    await w.flush();
+    eq('the retry writes the same work', folder.writes.length, 1);
+    eq('with the data intact', folder.writes[0].nestText, 'nest:a');
+    w.dispose();
+  }
+  {
+    const folder = fakeFolder();
+    const w = new DebouncedWriter(folder, 'x.csv', { delay: 5 });
+    w.block();
+    w.schedule(fakeCatalog('a'));
+    await tick(30);
+    await w.flush();
+    eq('a blocked writer never writes (truncated read)', folder.writes.length, 0);
+    w.dispose();
+  }
+}
+
+group('settings.js — hotkeys');
+{
+  const keys = { ...DEFAULT_KEYS };
+  eq('arrow right is nest_yes', actionForEvent({ key: 'ArrowRight' }, keys), 'nest_yes');
+  eq('arrow left is nest_no', actionForEvent({ key: 'ArrowLeft' }, keys), 'nest_no');
+  eq('down is forward', actionForEvent({ key: 'ArrowDown' }, keys), 'forward');
+  eq('up is back', actionForEvent({ key: 'ArrowUp' }, keys), 'back');
+  eq('q toggles structure', actionForEvent({ key: 'q' }, keys), 'toggle_structure');
+  eq('Q works with caps lock on', actionForEvent({ key: 'Q' }, keys), 'toggle_structure');
+  eq('1 mirrors q on the number pad', actionForEvent({ key: '1' }, keys), 'toggle_structure_num');
+  eq('unbound key is null', actionForEvent({ key: 'z' }, keys), null);
+  eq('defaults have no duplicate bindings', duplicateKey(keys), null);
+  eq('a collision is reported', duplicateKey({ ...keys, back: 'ArrowRight' })?.[0], 'ArrowRight');
+  eq('arrows display as glyphs', keyDisplay('ArrowRight'), '→');
+  eq('letters display uppercase', keyDisplay('q'), 'Q');
+}
+
+// ------------------------------------------------- real Macaulay export files
+group('real export files from test/');
+// Locally this page is /web/test.html; on Pages the app is at the root.
+const TEST_DIR = location.pathname.includes('/web/') ? '../test/' : 'test/';
+const EXPORTS = [
+  'ML__2026-08-07T17-20_y00678.csv',
+  'ML__2026-08-09T19-55_t-11995866.csv',
+  'ML__2026-08-09T19-56_rethaw.csv',
+];
+for (const name of EXPORTS) {
+  try {
+    const text = await (await fetch(`${TEST_DIR}${name}`)).text();
+    const { rows, fieldnames } = parseTable(text);
+    check(`${name}: parsed ${rows.length} rows × ${fieldnames.length} cols`, rows.length > 0);
+    const v = validateFieldnames(fieldnames);
+    check(`${name}: validates as a Macaulay export`, v.ok, v.errors);
+    check(`${name}: no spurious warnings`, v.warnings.length === 0, v.warnings);
+    check(`${name}: every row has a catalog number`,
+          rows.every(r => r['ML Catalog Number']),
+          rows.filter(r => !r['ML Catalog Number']).slice(0, 2));
+
+    // Round-trip the real file through serialize -> parse.
+    const again = parseTable(serializeTable(fieldnames, rows));
+    check(`${name}: round-trip preserves every cell`,
+          JSON.stringify(again.rows) === JSON.stringify(rows),
+          (() => {
+            for (let i = 0; i < rows.length; i++) {
+              for (const f of fieldnames) {
+                if (rows[i][f] !== again.rows[i]?.[f]) {
+                  return `row ${i} col "${f}"\nbefore: ${JSON.stringify(rows[i][f])}\nafter:  ${JSON.stringify(again.rows[i]?.[f])}`;
+                }
+              }
+            }
+            return 'row count differs';
+          })());
+
+    // Resume against the v1.x labeled output. That folder is gitignored (it's
+    // real labeling output), so it exists locally but not in a fresh checkout.
+    const labeledResp = await fetch(`${TEST_DIR}labeled/${labeledName(name)}`);
+    if (!labeledResp.ok) {
+      skip(`${name}: resume from prior labels`, 'test/labeled/ not in this checkout');
+    } else {
+      const labeledText = await labeledResp.text();
+      const { catalog } = Catalog.open(name, text, { labeledText });
+      const st = catalog.stats();
+      check(`${name}: resume restored ${st.reviewed}/${st.total} reviewed`, st.reviewed > 0, st);
+      check(`${name}: yes+no+skip accounts for every reviewed row`,
+            st.yes + st.no + st.skipped === st.reviewed, st);
+    }
+  } catch (e) {
+    check(`${name}: loaded`, false, `${e.name}: ${e.message}`);
+  }
+}
+
+const s = document.getElementById('summary');
+s.textContent = `${passed} passed, ${failed} failed` + (skipped ? `, ${skipped} skipped` : '');
+s.className = failed ? 'fail' : 'pass';
+document.title = `${failed ? '✗' : '✓'} bird-swipe tests (${passed}/${passed + failed})`;
+</script>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bird-swipe spike — File System Access probe</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:24px; background:#111; color:#eee;
+         font:14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:#888; margin:0 0 20px; }
+  button { font:inherit; padding:8px 14px; margin:0 8px 8px 0; border-radius:6px;
+           border:1px solid #444; background:#222; color:#eee; cursor:pointer; }
+  button:hover:not(:disabled) { background:#2c2c2c; }
+  button:disabled { opacity:.4; cursor:default; }
+  #log { background:#000; border:1px solid #333; border-radius:6px; padding:12px;
+         white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+         font-size:12px; max-height:340px; overflow:auto; }
+  .ok   { color:#4ade80; }
+  .bad  { color:#f87171; }
+  .warn { color:#fbbf24; }
+  .dim  { color:#888; }
+  .media { display:flex; gap:16px; margin-top:16px; flex-wrap:wrap; }
+  .media > * { background:#000; border:1px solid #333; border-radius:6px;
+               width:380px; height:260px; object-fit:contain; }
+  section { margin-bottom:20px; }
+</style>
+</head>
+<body>
+
+<h1>bird-swipe spike</h1>
+<p class="sub">Probes every risk in the plan before any porting happens.
+Run this on a <b>university-managed laptop</b>, against the <b>real SharePoint-synced folder</b>.</p>
+
+<section>
+  <button id="probe">1. Probe browser support</button>
+  <button id="pick">2. Pick folder &amp; run read/write test</button>
+  <button id="reconnect">3. Test reconnect (reload first)</button>
+  <button id="media">4. Test media</button>
+  <button id="clear">Clear log</button>
+</section>
+
+<div id="log"></div>
+
+<div class="media">
+  <img id="photo" alt="photo test — not loaded">
+  <video id="video" controls loop muted playsinline></video>
+</div>
+
+<script type="module">
+const PHOTO_ID = '661965337';
+const VIDEO_ID = '655670814';
+const PHOTO_URL = `https://cdn.download.ams.birds.cornell.edu/api/v2/asset/${PHOTO_ID}/1200`;
+const VIDEO_URL = `https://cdn.download.ams.birds.cornell.edu/api/v1/asset/${VIDEO_ID}/mp4`;
+
+const logEl = document.getElementById('log');
+const log = (msg, cls = '') => {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+};
+const ok   = m => log('PASS  ' + m, 'ok');
+const bad  = m => log('FAIL  ' + m, 'bad');
+const warn = m => log('WARN  ' + m, 'warn');
+const dim  = m => log('      ' + m, 'dim');
+const head = m => log('\n=== ' + m + ' ===');
+
+// --- IndexedDB: persist the directory handle across reloads ----------------
+const DB = 'bird-swipe-spike', STORE = 'handles', KEY = 'dir';
+function idb(mode, fn) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open(DB, 1);
+    open.onupgradeneeded = () => open.result.createObjectStore(STORE);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const tx = open.result.transaction(STORE, mode);
+      const req = fn(tx.objectStore(STORE));
+      tx.oncomplete = () => resolve(req?.result);
+      tx.onerror = () => reject(tx.error);
+    };
+  });
+}
+const saveHandle = h => idb('readwrite', s => s.put(h, KEY));
+const loadHandle = () => idb('readonly', s => s.get(KEY));
+
+// --- 1. support probe ------------------------------------------------------
+document.getElementById('probe').onclick = () => {
+  head('Browser support');
+  dim(navigator.userAgent);
+  log(`secure context: ${window.isSecureContext}`);
+  if (!window.isSecureContext) bad('Not a secure context — needs HTTPS or localhost.');
+
+  if (typeof window.showDirectoryPicker === 'function') {
+    ok('showDirectoryPicker exists — Chromium-based browser.');
+  } else {
+    bad('showDirectoryPicker MISSING. This is Safari or Firefox — neither has ever');
+    dim('shipped it. Use Chrome or Edge. No fallback restores folder writing.');
+    return;
+  }
+  ok('FileSystemDirectoryHandle: ' + (typeof FileSystemDirectoryHandle));
+  ok('createWritable: ' + (typeof FileSystemFileHandle?.prototype?.createWritable));
+  dim('Note: enterprise policy can still block the API at pick time — step 2 is the real test.');
+};
+
+// --- 2. pick + read/write --------------------------------------------------
+document.getElementById('pick').onclick = async () => {
+  head('Folder read/write test');
+  let dir;
+  try {
+    dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch (e) {
+    if (e.name === 'AbortError') { dim('Cancelled by user.'); return; }
+    bad(`Picker rejected: ${e.name}: ${e.message}`);
+    dim('If this is NotAllowedError/SecurityError WITHOUT you cancelling, the API is');
+    dim('likely disabled by device policy (DefaultFileSystemWriteGuardSetting).');
+    dim('That would invalidate the approach — report this exact message.');
+    return;
+  }
+  ok(`Picked folder: ${dir.name}`);
+  await saveHandle(dir);
+  ok('Handle stored in IndexedDB (reload, then try step 3).');
+  await runFolderTests(dir);
+};
+
+async function runFolderTests(dir) {
+  // List what's there, and flag OneDrive placeholder stubs.
+  head('Listing folder');
+  const csvs = [];
+  let count = 0;
+  try {
+    for await (const [name, handle] of dir.entries()) {
+      count++;
+      if (handle.kind === 'file' && /\.(csv|xlsx)$/i.test(name)) {
+        const f = await handle.getFile();
+        csvs.push({ name, handle, size: f.size });
+        log(`  ${name} — ${f.size.toLocaleString()} bytes`);
+        if (f.size === 0) warn(`${name} is 0 bytes — a OneDrive cloud-only placeholder?`);
+      }
+    }
+    ok(`Listed ${count} entries, ${csvs.length} spreadsheet(s).`);
+  } catch (e) {
+    bad(`Could not list folder: ${e.name}: ${e.message}`);
+    dim('On macOS this can mean a FileProvider-backed cloud folder blocked the read.');
+    return;
+  }
+
+  // Read one spreadsheet fully — this is what hydrates a Files-On-Demand stub.
+  if (csvs.length) {
+    head('Reading a spreadsheet (Files-On-Demand check)');
+    const target = csvs[0];
+    try {
+      const t0 = performance.now();
+      const text = await (await target.handle.getFile()).text();
+      const ms = Math.round(performance.now() - t0);
+      const lines = text.split(/\r?\n/).filter(l => l.trim()).length;
+      ok(`Read ${target.name}: ${text.length.toLocaleString()} chars, ${lines} lines, ${ms}ms.`);
+      if (ms > 2000) warn('Slow read — placeholder hydration. Expected on first open.');
+      if (text.length < target.size / 2) {
+        bad('READ IS TRUNCATED vs reported file size. This is the data-loss hazard.');
+        dim('Do not let the real app write after a read like this.');
+      } else {
+        ok('Read length is consistent with file size — no truncation.');
+      }
+      dim('First line: ' + text.split(/\r?\n/)[0].slice(0, 120));
+    } catch (e) {
+      bad(`Read failed: ${e.name}: ${e.message}`);
+    }
+  } else {
+    warn('No .csv/.xlsx in this folder — copy a Macaulay export here to test reading.');
+  }
+
+  // Write into a nested subdirectory, exactly like labeled/nest/.
+  head('Writing (creates labeled/nest/ then removes it)');
+  try {
+    const labeled = await dir.getDirectoryHandle('labeled', { create: true });
+    const nest = await labeled.getDirectoryHandle('nest', { create: true });
+    ok('Created labeled/nest/ subdirectories.');
+
+    const payload = `spike write test\n${new Date().toISOString()}\n${navigator.userAgent}\n`;
+    const fh = await nest.getFileHandle('_spike_test.txt', { create: true });
+    const w = await fh.createWritable();
+    await w.write(payload);
+    await w.close();
+    ok('Wrote labeled/nest/_spike_test.txt via createWritable().');
+
+    const back = await (await fh.getFile()).text();
+    if (back === payload) ok('Read back identical — round-trip works.');
+    else bad(`Round-trip MISMATCH: wrote ${payload.length} chars, read ${back.length}.`);
+
+    await nest.removeEntry('_spike_test.txt');
+    ok('Cleaned up test file.');
+    dim('Left labeled/ and labeled/nest/ in place — delete them by hand if unwanted.');
+    log('\nAll folder tests finished.', 'ok');
+  } catch (e) {
+    bad(`Write failed: ${e.name}: ${e.message}`);
+    dim('If NotAllowedError here but the pick succeeded, write is policy-blocked');
+    dim('(FileSystemWriteBlockedForUrls). Read-only would not be enough for this app.');
+  }
+}
+
+// --- 3. reconnect after reload --------------------------------------------
+document.getElementById('reconnect').onclick = async () => {
+  head('Reconnect test');
+  const dir = await loadHandle();
+  if (!dir) { warn('No stored handle. Run step 2 first, then reload the page.'); return; }
+  ok(`Handle survived reload: ${dir.name}`);
+
+  let perm = await dir.queryPermission({ mode: 'readwrite' });
+  log(`queryPermission → ${perm}`);
+  if (perm === 'granted') {
+    ok('Still granted — Chrome 122+ persistent permission, no prompt needed.');
+  } else {
+    dim('Requesting permission (this click is the required user gesture)…');
+    perm = await dir.requestPermission({ mode: 'readwrite' });
+    log(`requestPermission → ${perm}`);
+    if (perm === 'granted') ok('Re-granted with one click — this is the expected flow.');
+    else { bad('Permission denied — user must re-pick the folder.'); return; }
+  }
+  await runFolderTests(dir);
+};
+
+// --- 4. media --------------------------------------------------------------
+document.getElementById('media').onclick = () => {
+  head('Media test (Cornell CDN)');
+  const img = document.getElementById('photo');
+  const vid = document.getElementById('video');
+
+  const t0 = performance.now();
+  img.onload  = () => ok(`Photo ${PHOTO_ID} loaded: ${img.naturalWidth}x${img.naturalHeight}, ${Math.round(performance.now() - t0)}ms.`);
+  img.onerror = () => bad(`Photo ${PHOTO_ID} failed — CDN blocked the browser origin?`);
+  img.src = PHOTO_URL;
+
+  const t1 = performance.now();
+  vid.onloadeddata = () => ok(`Video ${VIDEO_ID} streaming: ${vid.videoWidth}x${vid.videoHeight}, ${Math.round(vid.duration)}s, ${Math.round(performance.now() - t1)}ms to first frame.`);
+  vid.onerror = () => bad(`Video ${VIDEO_ID} failed — codec or CDN issue.`);
+  vid.src = VIDEO_URL;
+  vid.play().catch(() => dim('Autoplay blocked; press play manually.'));
+  dim('Range requests let it seek without downloading all 84MB.');
+};
+
+document.getElementById('clear').onclick = () => { logEl.textContent = ''; };
+
+log('Ready. Run the steps in order.', 'dim');
+log('Steps 2 and 3 are the ones that can invalidate the plan.', 'dim');
+</script>
+</body>
+</html>
