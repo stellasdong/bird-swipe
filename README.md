@@ -59,8 +59,8 @@ warning — the browser copy is the one that has to work.
 ### Setting up the shared folder (once)
 
 Work for this project goes into the **Macaulay Raptor Nest Project** folder,
-where each researcher has their own designated subfolder. Ask the project lead
-for the link if you don't have it.
+where each researcher has their own designated subfolder. Ask Mei for the link
+if you don't have it.
 
 1. Open the link and click **Add shortcut to My files**. The folder now appears
    in your own OneDrive.
@@ -144,7 +144,7 @@ To that it adds what makes a problem diagnosable: app version, browser, which
 spreadsheet and row, whether the folders are still connected, and the actual
 error with its stack. You see every line before anything leaves, and **nothing
 from your spreadsheet is included**. Press **Copy report** and paste it into an
-email — the first line is a ready-made subject.
+email to **Stella** — the first line is a ready-made subject.
 
 If an error does happen, your labeling is still saved: the app says so, and
 carries on.

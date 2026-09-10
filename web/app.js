@@ -1231,8 +1231,8 @@ on(el.reportCopy, 'click', async () => {
   delete el.reportStatus.dataset.role;
   el.reportStatus.className = `notice ${copied ? 'info' : 'warn'}`;
   el.reportStatus.textContent = copied
-    ? 'Copied. Paste it straight into an email to whoever runs the project — the ' +
-      'first line is a ready-made subject.'
+    ? 'Copied. Paste it straight into an email to Stella — the first line is a ' +
+      'ready-made subject.'
     : "Couldn't copy automatically — select the text above and copy it by hand.";
   el.reportStatus.hidden = false;
 });
