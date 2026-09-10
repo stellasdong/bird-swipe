@@ -41,9 +41,7 @@ on every visit** so later submissions are one click.
 
 ### The two folders
 
-The welcome screen shows a card for each, side by side, and **neither is
-required** — you can open a spreadsheet, label it and save it to your computer
-without ever setting up OneDrive.
+The welcome screen shows a card for each, side by side. **Set up both.**
 
 **Local folder** — a copy on this computer, written as you label. Without one,
 your work is kept only in the browser. **Save local** on the done screen writes

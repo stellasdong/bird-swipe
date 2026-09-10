@@ -233,7 +233,7 @@ async function renderSubmitTarget() {
       el.submitStatus.append('Sending finished work to ', quoted(name), '.');
       el.onedriveChoose.textContent = 'Change folder';
     } else {
-      el.submitStatus.append(notSet('Not set up'), ' — you can still save to your computer.');
+      el.submitStatus.append(notSet('Not set up'), " — finished work won't reach the team yet.");
       el.onedriveChoose.textContent = 'Choose OneDrive folder…';
     }
   }
