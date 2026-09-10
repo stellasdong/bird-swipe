@@ -7,6 +7,7 @@
 
 import {
   Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
+  normalizeCount,
 } from './catalog.js';
 import { assetPageUrl, photoUrl, videoUrl } from './macaulay.js';
 import {
@@ -54,7 +55,10 @@ const el = {
   toggles: {
     structure: $('t-structure'),
     anthropogenic: $('t-anthropogenic'),
-    eggs: $('t-eggs'),
+  },
+  counters: {
+    eggs: { box: $('c-eggs'), input: $('count-eggs') },
+    chicks: { box: $('c-chicks'), input: $('count-chicks') },
   },
   media: $('media'),
   mediaPlaceholder: $('media-placeholder'),
@@ -85,17 +89,23 @@ const el = {
   prefsSave: $('prefs-save'),
 };
 
-const TOGGLE_FIELDS = { structure: 'human_structure', anthropogenic: 'anthropogenic', eggs: 'eggs' };
+const TOGGLE_FIELDS = { structure: 'human_structure', anthropogenic: 'anthropogenic' };
 const TOGGLE_LABELS = {
   structure: 'human-made structure',
   anthropogenic: 'anthropogenic material',
-  eggs: 'eggs present',
 };
 // Both the letter and number binding of a toggle map to the same field.
 const TOGGLE_ACTIONS = {
   toggle_structure: 'structure', toggle_structure_num: 'structure',
   toggle_anthropogenic: 'anthropogenic', toggle_anthropogenic_num: 'anthropogenic',
-  toggle_eggs: 'eggs', toggle_eggs_num: 'eggs',
+};
+
+const COUNTER_FIELDS = { eggs: 'egg_count', chicks: 'chick_count' };
+const COUNTER_LABELS = { eggs: 'eggs', chicks: 'chicks' };
+// Letter and number bindings both focus the same count box.
+const COUNTER_ACTIONS = {
+  count_eggs: 'eggs', count_eggs_num: 'eggs',
+  count_chicks: 'chicks', count_chicks_num: 'chicks',
 };
 
 const state = {
@@ -488,6 +498,9 @@ function showCurrent() {
   for (const [field, column] of Object.entries(TOGGLE_FIELDS)) {
     setToggle(field, row[column] === 'yes');
   }
+  for (const [field, column] of Object.entries(COUNTER_FIELDS)) {
+    setCount(field, row[column] ?? '');
+  }
   updateChip(row);
   renderNestLabels();
   prefetchUpcoming();
@@ -500,6 +513,34 @@ function setToggle(field, on) {
   node.setAttribute('aria-pressed', String(on));
 }
 const toggleOn = field => el.toggles[field].getAttribute('aria-pressed') === 'true';
+
+/** Show a saved count. Blank stays blank so a skipped row doesn't read as 0. */
+function setCount(field, value) {
+  const { input } = el.counters[field];
+  input.value = value === '' || value == null ? '' : String(normalizeCount(value) || 0);
+  refreshCounter(field);
+}
+
+const countOf = field => el.counters[field].input.value;
+
+/** Red until there is at least one, matching how the toggles read. */
+function refreshCounter(field) {
+  const { box, input } = el.counters[field];
+  box.dataset.empty = String(normalizeCount(input.value) === 0);
+}
+
+function renderCounterLabels() {
+  for (const field of Object.keys(COUNTER_FIELDS)) {
+    const letter = keyDisplay(state.keys[`count_${field}`]);
+    const number = keyDisplay(state.keys[`count_${field}_num`]);
+    const label = el.counters[field].box.querySelector('.counter-label');
+    label.textContent = '';
+    label.append(
+      COUNTER_LABELS[field] + '  ',
+      Object.assign(document.createElement('span'),
+        { className: 'key', textContent: `(${letter}/${number})` }));
+  }
+}
 
 function renderToggleLabels() {
   for (const field of Object.keys(TOGGLE_FIELDS)) {
@@ -567,7 +608,8 @@ function renderLegend() {
     [keyDisplay(k.notes), 'notes'],
     [`${keyDisplay(k.toggle_structure)}/${keyDisplay(k.toggle_structure_num)}`, 'structure'],
     [`${keyDisplay(k.toggle_anthropogenic)}/${keyDisplay(k.toggle_anthropogenic_num)}`, 'anthro'],
-    [`${keyDisplay(k.toggle_eggs)}/${keyDisplay(k.toggle_eggs_num)}`, 'eggs'],
+    [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
+    [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
     [keyDisplay(k.close), 'close file'],
   ];
   el.legend.textContent = '';
@@ -668,7 +710,8 @@ function commit(nest) {
     nest,
     structure: toggleOn('structure'),
     anthropogenic: toggleOn('anthropogenic'),
-    eggs: toggleOn('eggs'),
+    eggCount: countOf('eggs'),
+    chickCount: countOf('chicks'),
     reviewer: getReviewer(),
     notes: el.notes.value.trim(),
   });
@@ -752,7 +795,8 @@ function showDone() {
     `nest yes: ${s.yes}   ·   nest no: ${s.no}   ·   skipped: ${s.skipped}`;
   el.doneObservations.textContent =
     `human-made structure: ${s.structure}   ·   anthropogenic: ${s.anthropogenic}` +
-    `   ·   eggs: ${s.eggs}`;
+    `   ·   images with eggs: ${s.eggs} (${s.eggTotal} counted)` +
+    `   ·   images with chicks: ${s.chicks} (${s.chickTotal} counted)`;
 
   el.doneSkipped.textContent = s.skipped
     ? `${s.skipped} skipped — use the button below to review them.` : '';
@@ -867,6 +911,32 @@ for (const [node, value] of [[el.nestYes, true], [el.nestNo, false]]) {
   });
 }
 
+/**
+ * Focus a count box and select what's there, so typing replaces the old number
+ * rather than appending to it — pressing E then 3 on a nest already marked 2
+ * should mean three eggs, not twenty-three.
+ */
+function focusCount(field) {
+  const { input } = el.counters[field];
+  input.focus();
+  input.select();
+}
+
+for (const [field, { box, input }] of Object.entries(el.counters)) {
+  box.addEventListener('click', () => focusCount(field));
+  input.addEventListener('input', () => refreshCounter(field));
+  input.addEventListener('keydown', event => {
+    // Enter and Esc both return to the label loop; Esc must not reach the
+    // document handler and close the file mid-count.
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      event.preventDefault();
+      input.blur();
+    }
+    event.stopPropagation();
+  });
+  input.addEventListener('blur', () => refreshCounter(field));
+}
+
 for (const [field, node] of Object.entries(el.toggles)) {
   node.addEventListener('click', () => {
     setToggle(field, !toggleOn(field));
@@ -908,6 +978,8 @@ document.addEventListener('keydown', event => {
   if (action in TOGGLE_ACTIONS) {
     const field = TOGGLE_ACTIONS[action];
     setToggle(field, !toggleOn(field));
+  } else if (action in COUNTER_ACTIONS) {
+    focusCount(COUNTER_ACTIONS[action]);
   } else if (action === 'notes') {
     el.notes.focus();
   } else if (action === 'forward') {
@@ -992,6 +1064,7 @@ el.prefsSave.addEventListener('click', () => {
   capturing = null;
   el.prefs.close();
   renderToggleLabels();
+  renderCounterLabels();
   if (state.catalog) showCurrent();
 });
 
@@ -1000,4 +1073,5 @@ el.prefsWelcome.addEventListener('click', openPrefs);
 // --------------------------------------------------------------------- boot
 renderToggleLabels();
 renderNestLabels();
+renderCounterLabels();
 initWelcome();

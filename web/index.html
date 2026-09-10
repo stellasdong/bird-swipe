@@ -82,7 +82,16 @@
     <span class="chip skip-pill" id="nest-skip" hidden>skipped</span>
     <button class="toggle" id="t-structure" aria-pressed="false" type="button"></button>
     <button class="toggle" id="t-anthropogenic" aria-pressed="false" type="button"></button>
-    <button class="toggle" id="t-eggs" aria-pressed="false" type="button"></button>
+    <div class="counter" id="c-eggs" data-empty="true">
+      <span class="counter-label"></span>
+      <input type="number" id="count-eggs" min="0" step="1" inputmode="numeric"
+             placeholder="0" aria-label="Number of eggs">
+    </div>
+    <div class="counter" id="c-chicks" data-empty="true">
+      <span class="counter-label"></span>
+      <input type="number" id="count-chicks" min="0" step="1" inputmode="numeric"
+             placeholder="0" aria-label="Number of chicks">
+    </div>
   </div>
 
   <div class="media" id="media">

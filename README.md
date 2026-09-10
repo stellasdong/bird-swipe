@@ -96,17 +96,25 @@ Two things that will otherwise trip you up:
 | `↑`       | back to the previous item |
 | `Q` / `1` | toggle **human-made structure** for the current item |
 | `W` / `2` | toggle **anthropogenic material** |
-| `E` / `3` | toggle **eggs present** |
+| `E` / `3` | **count the eggs** — type a number, then `Enter` |
+| `R` / `4` | **count the chicks** — type a number, then `Enter` |
 | `Enter`   | jump to the notes box |
 | `Esc`     | close the file (everything is already saved) |
 
-Each toggle has a letter key and the matching number key, so a number pad works
-too. The three also appear as buttons above the image — **green** when yes,
-**red** when no — and you can click them instead of using the keys. They always
-show what is already saved for that item, so stepping back shows your earlier
-answer rather than a blank slate.
+Each control has a letter key and the matching number key, so a number pad works
+too. They all appear as buttons above the image — **green** when set, **red**
+when not — and you can click them instead of using the keys. They always show
+what is already saved for that item, so stepping back shows your earlier answers
+rather than a blank slate.
 
-Hotkeys are rebindable in **Preferences…**. Reopening a file resumes at the
+**Eggs and chicks are counted, not just flagged.** Pressing `E` (or `R`) puts
+the cursor in that box with the current number selected, so typing replaces it;
+press `Enter` to go back to labeling. A nest can hold both, and both are
+optional — leave a box alone and it records as none seen.
+
+Hotkeys are rebindable in **Preferences…**. (Upgrading from an earlier version
+resets them to the defaults above, because the scheme changed — eggs became a
+count and chicks were added.) Reopening a file resumes at the
 first **un-reviewed** asset (skipped items count as reviewed, so it won't jump
 back to them — but the done screen has a **Review skipped items** button to
 revisit them). Click a video to play/pause it. To add a **note**, press `Enter`
@@ -132,10 +140,24 @@ The `nest/` subfolder is the point of the split: it collects only the
 nest-positive rows across every spreadsheet, so they can be picked up as a
 group. Autosave writes the same two paths inside your autosave folder.
 
-Each row gets the columns `nest_label`, `human_structure`, `anthropogenic`,
-`eggs`, `notes`, `reviewed`, `reviewed_at`, and `reviewer` appended to the
-original ones. Both are keyed by ML catalog number; flipping a row out of
-"nest=yes" removes it from the nest file.
+Each row gets these columns appended to the original ones:
+
+| Column | Meaning |
+|---|---|
+| `nest_label` | `yes` / `no` / `skip` |
+| `human_structure`, `anthropogenic` | `yes` / `no` |
+| `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
+| `egg_count`, `chick_count` | a number |
+| `notes`, `reviewed`, `reviewed_at`, `reviewer` | |
+
+Both files are keyed by ML catalog number; flipping a row out of "nest=yes"
+removes it from the nest file.
+
+> **Reading the counts.** On a reviewed row (`reviewed=TRUE`), a count of `0`
+> means none were seen — the image was looked at. A **blank** count only ever
+> appears on rows that were skipped or never reached, so blank means "not
+> reviewed", never "none". That distinction is what lets a partly-finished
+> spreadsheet be analysed safely.
 
 > **Submit when you finish a spreadsheet.** Without autosave, in-progress work
 > lives only in that browser on that computer: it survives closing the tab,
@@ -246,3 +268,4 @@ pyinstaller packaging/bird_swipe.spec --noconfirm   # build the bundles
 - [ ] M5 — verify against the real OneDrive-synced SharePoint folder
 - [x] M6 — hand finished spreadsheets to a designated SharePoint folder
 - [x] M7 — optional autosave of in-progress work to a local folder
+- [x] M8 — egg and chick counts
