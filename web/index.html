@@ -41,20 +41,34 @@
 
     <div id="folder-info" class="notice info" hidden></div>
 
-    <div id="autosave-offer" class="notice info" hidden>
-      <b>Choose a local folder to save into?</b><br>
-      While you label, your work is kept in this browser. Pick a folder and
-      bird-swipe keeps a copy on disk as you go, and <b>Save local</b> writes
-      the finished files there too — worth doing rather than relying on browser
-      storage alone.
-      <div class="stack" style="margin-top:8px">
-        <button id="autosave-choose" class="primary">Choose local folder…</button>
-        <button id="autosave-skip">Not now</button>
+    <div class="folder-cards">
+      <div class="folder-card">
+        <h3>Local folder</h3>
+        <p class="folder-blurb">
+          A copy on this computer, written as you label. Without one, your work is
+          kept only in this browser.
+        </p>
+        <div class="folder-state" id="autosave-status"></div>
+        <button class="link-btn" id="autosave-off" hidden>Turn off</button>
+        <button id="autosave-choose">Choose local folder…</button>
+      </div>
+
+      <div class="folder-card">
+        <h3>OneDrive folder</h3>
+        <p class="folder-blurb">
+          Your folder in the shared project, so finished spreadsheets reach the
+          rest of the team.
+        </p>
+        <div class="folder-state" id="submit-status"></div>
+        <button class="link-btn" id="onedrive-help-open">Don’t have one? Set it up</button>
+        <button id="onedrive-choose">Choose OneDrive folder…</button>
       </div>
     </div>
 
-    <div id="autosave-status" class="subtitle" style="font-size:12px"></div>
-    <div id="submit-status" class="subtitle" style="font-size:12px"></div>
+    <p class="folder-note">
+      Both are optional. You can open a spreadsheet, label it, and save it to your
+      computer without ever setting up OneDrive.
+    </p>
 
     <div id="resume-block" hidden>
       <p class="subtitle" style="margin-bottom:4px"><b>In progress on this computer</b></p>
@@ -204,6 +218,12 @@
     Pick <b>your own subfolder</b>, not the project folder above it — everyone's
     folders sit side by side and bird-swipe can only show you the folder's name.
   </div>
+  <p class="subtitle" style="font-size:12px;margin:0 0 12px">
+    Stuck, or don't have a folder yet? The <span id="protocol-ref">project
+    protocol</span> covers this step in full, and Mei can set you up.
+    You can carry on without OneDrive in the meantime — label as normal and use
+    <b>Save local</b>.
+  </p>
   <div class="dialog-actions">
     <button id="onedrive-help-close">Close</button>
     <button id="onedrive-help-pick" class="primary">Choose folder…</button>

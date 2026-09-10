@@ -317,6 +317,69 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   word-break: break-all;
 }
 
+/* ------------------------------------------------- folder cards (welcome) */
+/* Deliberately the same object as the done screen's save cards: one bounded
+   block per folder, so neither reads as more required than the other. */
+.folder-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  width: min(700px, 100%);
+  margin-top: 4px;
+}
+.folder-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 300px;
+  padding: 14px 16px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--panel);
+  text-align: left;
+}
+.folder-card h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.folder-blurb {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.folder-state {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+  margin-top: 2px;
+}
+.folder-state .none { color: #fcd34d; }
+.folder-state b { color: var(--text); }
+/* The action sits at the bottom of every card, so the two line up. */
+.folder-card > button:not(.link-btn) { width: 100%; margin-top: auto; min-width: 0; }
+.link-btn {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 0;
+  min-width: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover:not(:disabled) { background: none; color: var(--text); }
+.folder-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 42em;
+}
+
 /* -------------------------------------------------------------- reporting */
 .report-link {
   border: 0;

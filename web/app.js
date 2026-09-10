@@ -19,13 +19,17 @@ import {
   recordError,
 } from './report.js';
 import {
-  ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, autosaveOffered,
-  duplicateKey, getKeys, getReviewer, keyDisplay, setAutosaveOffered, setKeys,
-  setReviewer,
+  ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, duplicateKey,
+  getKeys, getReviewer, keyDisplay, setKeys, setReviewer,
 } from './settings.js';
 
 export const VERSION = '3.0.0';
 const BUILD = '__BUILD__'; // replaced with the short git SHA at deploy time
+
+// Where the written protocol lives. Fill this in and the setup dialog links to
+// it; leave it empty and the dialog names the protocol without linking, so the
+// app never shows a dead link.
+const PROTOCOL_URL = '';
 
 const $ = id => document.getElementById(id);
 
@@ -40,10 +44,11 @@ const el = {
   openExport: $('open-export'),
   prefsWelcome: $('prefs-welcome'),
   folderInfo: $('folder-info'),
-  autosaveOffer: $('autosave-offer'),
   autosaveChoose: $('autosave-choose'),
-  autosaveSkip: $('autosave-skip'),
+  autosaveOff: $('autosave-off'),
   autosaveStatus: $('autosave-status'),
+  onedriveChoose: $('onedrive-choose'),
+  onedriveHelpOpen: $('onedrive-help-open'),
   submitStatus: $('submit-status'),
   submitTarget: $('submit-target'),
   resumeBlock: $('resume-block'),
@@ -221,23 +226,30 @@ async function renderSubmitTarget() {
   const stored = await Folder.restore().catch(() => null);
   const name = stored instanceof Folder ? stored.name : stored?.folder?.name ?? null;
 
-  for (const node of [el.submitStatus, el.submitTarget]) {
-    if (!node) continue;
-    node.textContent = '';
+  // The welcome card carries its own buttons, so its line is state only.
+  if (el.submitStatus) {
+    el.submitStatus.textContent = '';
     if (name) {
-      const strong = document.createElement('b');
-      strong.textContent = `“${name}”`;
-      node.append('OneDrive folder: ', strong, ' ');
-      node.append(smallButton('Change', changeSubmitFolder));
+      el.submitStatus.append('Sending finished work to ', quoted(name), '.');
+      el.onedriveChoose.textContent = 'Change folder';
     } else {
-      const none = document.createElement('span');
-      none.className = 'none';
-      none.textContent = 'not set up yet';
-      node.append('OneDrive folder: ', none, " — you'll choose it the first time. ");
+      el.submitStatus.append(notSet('Not set up'), ' — you can still save to your computer.');
+      el.onedriveChoose.textContent = 'Choose OneDrive folder…';
     }
-    // Always reachable: someone who picked the wrong folder, or whose OneDrive
-    // stopped working, needs the instructions again just as much as a new user.
-    node.append(smallButton('How do I set this up?', () => el.onedriveHelp.showModal()));
+  }
+
+  // The done-screen card sits beside its button, so it carries the small controls.
+  if (el.submitTarget) {
+    el.submitTarget.textContent = '';
+    if (name) {
+      el.submitTarget.append('OneDrive folder: ', quoted(name), ' ');
+      el.submitTarget.append(smallButton('Change', changeSubmitFolder));
+    } else {
+      el.submitTarget.append('OneDrive folder: ', notSet('not set up yet'),
+                             " — you'll choose it the first time. ");
+    }
+    el.submitTarget.append(
+      smallButton('How do I set this up?', () => el.onedriveHelp.showModal()));
   }
 }
 
@@ -277,45 +289,55 @@ async function restoreAutosave() {
   const restored = await Folder.restore({ key: AUTOSAVE_DIR }).catch(() => null);
   if (restored instanceof Folder) {
     state.autosave = restored;
+    renderAutosaveStatus();
   } else if (restored?.needsPermission) {
-    // Re-granting needs a click, so offer one rather than failing silently.
+    // Re-granting needs a click, so the card offers one rather than failing silently.
     renderAutosaveStatus({ needsPermission: true, name: restored.folder.name });
-    return;
-  } else if (!autosaveOffered()) {
-    el.autosaveOffer.hidden = false;
-    return;
+  } else {
+    renderAutosaveStatus();
   }
-  renderAutosaveStatus();
 }
 
+/**
+ * The local-folder card. Both cards state where they stand and carry one
+ * button, so neither folder reads as more required than the other — and the
+ * copy says outright that labeling works with neither.
+ */
 function renderAutosaveStatus(pending = null) {
+  if (!el.autosaveStatus) return;
   el.autosaveStatus.textContent = '';
-  const add = (...nodes) => el.autosaveStatus.append(...nodes);
-  const button = smallButton;
 
   if (pending?.needsPermission) {
-    add(`The local folder “${pending.name}” needs permission again.`,
-        button('Reconnect', async () => {
-          const folder = await Folder.restore({ key: AUTOSAVE_DIR, interactive: true });
-          state.autosave = folder instanceof Folder ? folder : null;
-          if (!state.autosave) await Folder.forget(AUTOSAVE_DIR);
-          renderAutosaveStatus();
-        }));
+    el.autosaveStatus.append(quoted(pending.name), ' needs permission again.');
+    el.autosaveChoose.textContent = 'Reconnect';
+    el.autosaveChoose.dataset.reconnect = 'true';
+    el.autosaveOff.hidden = false;
     return;
   }
+  delete el.autosaveChoose.dataset.reconnect;
+
   if (state.autosave) {
-    add(`Local folder: “${state.autosave.name}” — autosaved as you label.`,
-        button('Change', chooseAutosave),
-        button('Turn off', async () => {
-          await Folder.forget(AUTOSAVE_DIR);
-          state.autosave = null;
-          state.mirror?.setMirror(null);
-          renderAutosaveStatus();
-        }));
+    el.autosaveStatus.append('Saving to ', quoted(state.autosave.name), ' as you label.');
+    el.autosaveChoose.textContent = 'Change folder';
+    el.autosaveOff.hidden = false;
     return;
   }
-  add('Local folder: not set — work is kept in this browser only.',
-      button('Set up', chooseAutosave));
+  el.autosaveStatus.append(notSet('Not set'), ' — work is kept in this browser only.');
+  el.autosaveChoose.textContent = 'Choose local folder…';
+  el.autosaveOff.hidden = true;
+}
+
+function quoted(name) {
+  const b = document.createElement('b');
+  b.textContent = `“${name}”`;
+  return b;
+}
+
+function notSet(text) {
+  const span = document.createElement('span');
+  span.className = 'none';
+  span.textContent = text;
+  return span;
 }
 
 async function chooseAutosave() {
@@ -333,20 +355,33 @@ async function chooseAutosave() {
     }
     state.autosave = folder;
     state.mirror?.setMirror(folder);
-    setAutosaveOffered(true);
-    el.autosaveOffer.hidden = true;
     renderAutosaveStatus();
   } catch (err) {
     showError(el.welcomeError, err.message);
   }
 }
 
-el.autosaveChoose.addEventListener('click', chooseAutosave);
-el.autosaveSkip.addEventListener('click', () => {
-  setAutosaveOffered(true);
-  el.autosaveOffer.hidden = true;
+el.autosaveChoose.addEventListener('click', async () => {
+  if (el.autosaveChoose.dataset.reconnect) {
+    const folder = await Folder.restore({ key: AUTOSAVE_DIR, interactive: true });
+    state.autosave = folder instanceof Folder ? folder : null;
+    if (state.autosave) state.mirror?.setMirror(state.autosave);
+    else await Folder.forget(AUTOSAVE_DIR);
+    renderAutosaveStatus();
+    return;
+  }
+  await chooseAutosave();
+});
+
+el.autosaveOff.addEventListener('click', async () => {
+  await Folder.forget(AUTOSAVE_DIR);
+  state.autosave = null;
+  state.mirror?.setMirror(null);
   renderAutosaveStatus();
 });
+
+el.onedriveChoose.addEventListener('click', changeSubmitFolder);
+el.onedriveHelpOpen.addEventListener('click', () => el.onedriveHelp.showModal());
 
 el.openExport.addEventListener('click', async () => {
   el.welcomeError.hidden = true;
@@ -865,7 +900,6 @@ async function saveLocal() {
       if (!folder) return;
       state.autosave = folder;
       state.mirror?.setMirror(folder);
-      setAutosaveOffered(true);
     }
     await state.writer?.flush();
     const written = await writeFinished(folder);
@@ -1141,6 +1175,20 @@ el.prefsSave.addEventListener('click', () => {
 });
 
 el.prefsWelcome.addEventListener('click', openPrefs);
+
+// Link the protocol only if we have a URL for it — a dead link is worse than
+// naming the document and letting someone ask for it.
+if (PROTOCOL_URL) {
+  const ref = $('protocol-ref');
+  if (ref) {
+    const link = document.createElement('a');
+    link.href = PROTOCOL_URL;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'project protocol';
+    ref.replaceWith(link);
+  }
+}
 
 // --------------------------------------------------------------- reporting
 /**
