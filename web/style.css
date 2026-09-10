@@ -139,6 +139,19 @@ input[type="text"]:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
 .chip.no { background: var(--red); color: #fff; }
 .chip.skip { background: var(--amber); color: #fff; }
 
+/* The nest decision, clickable as well as keyable. Both buttons commit and
+   advance, exactly like the arrow keys; the saved answer stays filled in. */
+.nest-btn {
+  border: 1px solid #444;
+  min-width: 150px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nest-btn:hover { filter: brightness(1.35); }
+#nest-yes[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+#nest-no[aria-pressed="true"]  { background: var(--red);   border-color: var(--red);   color: #fff; }
+.skip-pill { background: var(--amber); color: #fff; min-width: 0; }
+
 .toggle {
   padding: 7px 12px;
   border-radius: 6px;
