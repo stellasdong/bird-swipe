@@ -136,10 +136,8 @@ the note is saved when you press YES/NO.
 
 ## If something goes wrong
 
-There's a **Report a problem** link at the bottom of the labeling screen, next
-to the version number on the welcome screen, and under the save buttons on the
-finished screen (**Trouble saving?**) — which is where a failed save shows up.
-Every one of them turns amber if the app hits an error.
+**⚠ Report a problem** sits at the bottom centre of every screen. It turns amber
+and counts up if the app hits an error — including a failed save.
 
 It asks three short questions — what you were doing, what went wrong, and
 whether it happens again — and all three are required, because the app can

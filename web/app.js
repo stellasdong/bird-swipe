@@ -95,7 +95,7 @@ const el = {
   doneOpenAnother: $('done-open-another'),
 
   reportOpen: $('report-open'),
-  reportLinks: [...document.querySelectorAll('.report-link')],
+  reportLabel: $('report-label'),
   report: $('report'),
   reportDoing: $('report-doing'),
   reportWrong: $('report-wrong'),
@@ -1269,7 +1269,7 @@ for (const node of [el.reportDoing, el.reportWrong, el.reportRepeats]) {
   // Enter inside the dialog must not reach the label loop behind it.
   on(node, 'keydown', event => event.stopPropagation());
 }
-for (const link of el.reportLinks) on(link, 'click', openReport);
+on(el.reportOpen, 'click', openReport);
 on(el.reportClose, 'click', () => el.report.close());
 
 on(el.reportCopy, 'click', async () => {
@@ -1287,8 +1287,8 @@ on(el.reportCopy, 'click', async () => {
 /** Something broke: say so, say the work is safe, and offer to report it. */
 function onCaughtError(err) {
   flagErrors();
-  if (el.reportOpen) {
-    el.reportOpen.textContent = `⚠ Something went wrong — report it (${errorCount()})`;
+  if (el.reportLabel) {
+    el.reportLabel.textContent = `Something went wrong — report it (${errorCount()})`;
   }
   if (state.catalog) {
     alertBanner(`Something went wrong: ${err.message}. Your labeling is still saved — ` +
@@ -1307,7 +1307,10 @@ export function noteHandledError(where, err) {
 }
 
 function flagErrors() {
-  for (const link of el.reportLinks) link.dataset.errors = 'true';
+  if (el.reportOpen) el.reportOpen.dataset.errors = 'true';
+  if (el.reportLabel && errorCount()) {
+    el.reportLabel.textContent = `Something went wrong — report it (${errorCount()})`;
+  }
 }
 
 // --------------------------------------------------------------------- boot
