@@ -48,29 +48,43 @@ It's optional and can be turned on or off any time from the welcome screen. If
 the folder ever goes missing, labeling carries on regardless and you get a
 warning — the browser copy is the one that has to work.
 
-### Setting up the SharePoint folder (once)
+### Setting up the shared folder (once)
 
-Open the shared document library in a browser and click **Sync** (or **Add
-shortcut to OneDrive**). It then shows up as an ordinary folder on your
-computer, and **Send to SharePoint…** writes into it — OneDrive syncs it back up
-for everyone automatically.
+Work for this project goes into the **Macaulay Raptor Nest Project** folder,
+where each researcher has their own designated subfolder. Ask the project lead
+for the link if you don't have it.
+
+1. Open the link and click **Add shortcut to My files**. The folder now appears
+   in your own OneDrive.
+2. Make sure the OneDrive app is installed and signed in with your **TAMU
+   account**, so the folder syncs down to your computer.
+3. Right-click your subfolder → **Always keep on this device**.
 
 In the folder picker it's at:
 
 | | |
 |---|---|
-| **Windows** | `This PC` → `OneDrive - <Your University>` |
-| **macOS** | `Locations` → `<Your University>` (or `~/Library/CloudStorage/OneDrive-<Your University>`) |
+| **Windows** | `This PC` → `OneDrive - Texas A&M University` → `Macaulay Raptor Nest Project` → *your folder* |
+| **macOS** | `Locations` → `OneDrive - Texas A&M University` → `Macaulay Raptor Nest Project` → *your folder* |
+
+**Pick your own subfolder**, not the project folder above it. bird-swipe shows
+which folder it will send to on the welcome screen and again on the done screen
+— check it says your name before you submit, because everyone's folders sit
+side by side and the app can't tell them apart for you.
 
 Two things that will otherwise trip you up:
 
-- **Pick the shared folder itself, not `Documents`, `Desktop`, `Downloads` or
-  your home folder.** Chrome refuses to hand those top-level folders to a web
-  page — you have to choose a folder inside one of them. (Opening the *export*
-  from Downloads is fine; that's a single file, not a folder.)
-- **Right-click the folder → "Always keep on this device."** Otherwise OneDrive
-  may keep files in the cloud only, and the app will refuse to save rather than
-  risk overwriting good data with a partial file.
+- **Chrome won't hand over `Documents`, `Desktop`, `Downloads` or your home
+  folder themselves** — you have to pick a folder inside one of them. Your
+  OneDrive subfolder is fine. (Opening the *export* from Downloads is fine too;
+  that's a single file, not a folder.)
+- **If OneDrive keeps files in the cloud only**, the app will refuse to save
+  rather than risk overwriting good data with a partial file. "Always keep on
+  this device" avoids that.
+
+> After your first submit, open the folder in a browser and check the files
+> actually arrived. Nothing verifies this for you — if you pick a plain local
+> folder by mistake, saving still succeeds and nobody finds out.
 
 ## How to label
 

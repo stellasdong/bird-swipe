@@ -39,6 +39,8 @@ const el = {
   autosaveChoose: $('autosave-choose'),
   autosaveSkip: $('autosave-skip'),
   autosaveStatus: $('autosave-status'),
+  submitStatus: $('submit-status'),
+  submitTarget: $('submit-target'),
   resumeBlock: $('resume-block'),
   fileList: $('file-list'),
   version: $('version'),
@@ -173,7 +175,51 @@ async function initWelcome() {
     return;
   }
   await restoreAutosave();
+  await renderSubmitTarget();
   await refreshResumeList();
+}
+
+// ------------------------------------------------------- submit destination
+/**
+ * Show where finished work will go, before the researcher commits to it.
+ *
+ * Everyone picks their own destination and nothing can verify it is the right
+ * one — the app has no notion of SharePoint, only of a folder someone chose —
+ * so the least it can do is say which folder that is. Note the browser exposes
+ * only the folder's leaf name, so two folders of the same name in different
+ * places look identical here.
+ */
+async function renderSubmitTarget() {
+  const stored = await Folder.restore().catch(() => null);
+  const name = stored instanceof Folder ? stored.name : stored?.folder?.name ?? null;
+
+  for (const node of [el.submitStatus, el.submitTarget]) {
+    if (!node) continue;
+    node.textContent = '';
+    if (name) {
+      const strong = document.createElement('b');
+      strong.textContent = `“${name}”`;
+      node.append('Finished work goes to ', strong, '. ');
+      const change = document.createElement('button');
+      change.textContent = 'Change';
+      change.style.cssText = 'padding:2px 8px;font-size:12px;margin-left:4px';
+      change.addEventListener('click', changeSubmitFolder);
+      node.append(change);
+    } else {
+      node.append("You'll choose where to send finished work the first time you submit.");
+    }
+  }
+}
+
+async function changeSubmitFolder() {
+  try {
+    const folder = await Folder.pick(); // one activation, spent on the picker
+    if (!folder) return;
+    await renderSubmitTarget();
+    showResult?.('info', `Finished work will now go to “${folder.name}”.`);
+  } catch (err) {
+    showError(el.welcomeError, err.message);
+  }
 }
 
 // ----------------------------------------------------------------- autosave
@@ -721,6 +767,7 @@ function showDone() {
     `or ${keyDisplay(state.keys.close)} to close this file.`;
   el.submitResult.hidden = true;
   el.submit.disabled = false;
+  renderSubmitTarget();
   state.writer?.flush();
 }
 
@@ -743,8 +790,9 @@ async function submitToSharePoint() {
       nestText: state.catalog.nest.serialize(),
     });
     showResult('info',
-      `Sent to ${folder.name}: ${written.join(' and ')}. ` +
-      `OneDrive will sync it up to SharePoint shortly.`);
+      `Sent to “${folder.name}”: ${written.join(' and ')}. ` +
+      `OneDrive will sync it up shortly — check the folder online to confirm.`);
+    await renderSubmitTarget();
   } catch (err) {
     showResult('error', `Couldn't send: ${err.message}`);
   } finally {
