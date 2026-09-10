@@ -32,6 +32,7 @@ import {
   Folder, SUBMIT_DIR,
 } from './storage.js';
 import { DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay } from './settings.js';
+import { buildReport, missingAnswers, recordError, clearErrors } from './report.js';
 
 const out = document.getElementById('out');
 let passed = 0, failed = 0;
@@ -506,6 +507,50 @@ group('storage.js — autosave mirroring');
     eq('and turning it off stops writes', folder.writes, ['a']);
     eq('while the browser keeps both', browser.writes, ['a', 'b']);
   }
+}
+
+group('report.js — the problem form');
+{
+  eq('an empty form is missing all three', missingAnswers({}).length, 3);
+  eq('whitespace does not count',
+     missingAnswers({ doing: '   ', wrong: 'x', repeats: 'Sometimes' }),
+     ['what you were doing']);
+  eq('a complete form is accepted',
+     missingAnswers({ doing: 'a', wrong: 'b', repeats: 'Sometimes' }), []);
+  eq('names each missing answer',
+     missingAnswers({ wrong: 'b' }), ['what you were doing', 'whether it happens again']);
+}
+
+group('report.js — the report itself');
+{
+  clearErrors();
+  recordError('save failed', 'Disk unavailable', 'at writeFile\nat saveLocal');
+  const text = buildReport({
+    version: '3.0.0', build: 'abc1234', reviewer: 'Stella Dong',
+    inputName: 'ML__rethaw.csv', position: 'row 4 of 30', saveState: 'saved',
+    localFolder: 'bird-swipe', submitFolder: 'Red-tailed Hawk', progressCount: 2,
+    answers: { doing: 'pressed the right arrow', wrong: 'the photo went black',
+               repeats: 'Every time I try' },
+  });
+
+  check('starts with a ready-made subject line', text.startsWith('Subject: bird-swipe problem —'), text.split('\n')[0]);
+  check('subject summarises what went wrong', text.split('\n')[0].includes('the photo went black'));
+  check('carries all three answers',
+        ['pressed the right arrow', 'the photo went black', 'Every time I try']
+          .every(a => text.includes(a)));
+  check('carries the build', text.includes('abc1234'));
+  check('carries where they were', text.includes('row 4 of 30'));
+  check('carries both folder names',
+        text.includes('bird-swipe') && text.includes('Red-tailed Hawk'));
+  check('carries the captured error and its stack',
+        text.includes('Disk unavailable') && text.includes('at writeFile'));
+  check('short enough to paste into an email', text.length < 4000, `${text.length} chars`);
+
+  clearErrors();
+  const quiet = buildReport({ answers: { doing: 'a', wrong: 'b', repeats: 'Sometimes' } });
+  check('says so when nothing threw', quiet.includes('none captured'));
+  check('an unanswered question is marked, not silently blank',
+        buildReport({ answers: {} }).includes('(not answered)'));
 }
 
 // ------------------------------------------------- real Macaulay export files

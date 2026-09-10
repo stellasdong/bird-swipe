@@ -135,11 +135,16 @@ There's a **Report a problem** link at the bottom of the labeling screen and
 next to the version number on the welcome screen. It turns amber and counts up
 if the app hits an error.
 
-It gathers what makes a problem diagnosable — app version, browser, which
+It asks three short questions — what you were doing, what went wrong, and
+whether it happens again — and all three are required, because the app can
+describe its own state but only you can say what you saw. If an error was
+caught, *what went wrong* is filled in for you.
+
+To that it adds what makes a problem diagnosable: app version, browser, which
 spreadsheet and row, whether the folders are still connected, and the actual
-error — and shows you every line before anything leaves. **Nothing from your
-spreadsheet is included.** Add a sentence about what you were doing, press
-**Copy report**, and paste it to whoever runs the project.
+error with its stack. You see every line before anything leaves, and **nothing
+from your spreadsheet is included**. Press **Copy report** and paste it into an
+email — the first line is a ready-made subject.
 
 If an error does happen, your labeling is still saved: the app says so, and
 carries on.
@@ -223,10 +228,10 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 143 assertions covering the CSV
+Open **http://localhost:8000/web/test.html** — 181 assertions covering the CSV
 parser, the label scheme, resume, the truncation guard, the debounced writer,
-the in-browser progress store, autosave mirroring and the output folder layout,
-plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
+the in-browser progress store, autosave mirroring, the output folder layout and
+the problem report, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
 and the pass/fail count.
 
 ### The folder-access spike
@@ -292,3 +297,4 @@ pyinstaller packaging/bird_swipe.spec --noconfirm   # build the bundles
 - [x] M7 — optional autosave of in-progress work to a local folder
 - [x] M8 — egg and chick counts
 - [x] M9 — save local and save to OneDrive as separate, explicit steps
+- [x] M10 — error catching and a problem report researchers can email

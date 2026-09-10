@@ -60,25 +60,35 @@ export function installErrorHandlers(onError) {
  * exposes a folder's leaf name, never its full path).
  */
 export function buildReport(context = {}) {
+  const a = context.answers ?? {};
+  const subject = `bird-swipe problem — ${firstLine(a.wrong) || 'report'}`;
+
   const lines = [
-    `bird-swipe problem report`,
-    `when      : ${new Date().toISOString()}`,
-    `version   : ${context.version ?? '?'} (${context.build ?? 'dev'})`,
-    `page      : ${location.href.split('?')[0]}`,
-    `browser   : ${navigator.userAgent}`,
-    `screen    : ${window.innerWidth}x${window.innerHeight}`,
-    `online    : ${navigator.onLine}`,
+    `Subject: ${subject}`,
     '',
-    `reviewer  : ${context.reviewer || '(not set)'}`,
-    `file      : ${context.inputName || '(none open)'}`,
-    `position  : ${context.position || '-'}`,
-    `save state: ${context.saveState || '-'}`,
-    `local dir : ${context.localFolder || '(not set)'}`,
-    `onedrive  : ${context.submitFolder || '(not set)'}`,
+    'What I was doing:',
+    indent(a.doing),
+    '',
+    'What went wrong:',
+    indent(a.wrong),
+    '',
+    `Does it happen again: ${a.repeats || '(not answered)'}`,
+    '',
+    '--- diagnostics, please leave this in ---',
+    `when       : ${new Date().toISOString()}`,
+    `version    : ${context.version ?? '?'} (${context.build ?? 'dev'})`,
+    `page       : ${location.href.split('?')[0]}`,
+    `browser    : ${navigator.userAgent}`,
+    `screen     : ${window.innerWidth}x${window.innerHeight}`,
+    `online     : ${navigator.onLine}`,
+    `reviewer   : ${context.reviewer || '(not set)'}`,
+    `file       : ${context.inputName || '(none open)'}`,
+    `position   : ${context.position || '-'}`,
+    `save state : ${context.saveState || '-'}`,
+    `local dir  : ${context.localFolder || '(not set)'}`,
+    `onedrive   : ${context.submitFolder || '(not set)'}`,
     `in progress: ${context.progressCount ?? '?'} spreadsheet(s) held in this browser`,
   ];
-
-  if (context.note) lines.push('', 'what happened:', context.note.trim());
 
   if (recent.length) {
     lines.push('', `errors (most recent first, ${recent.length}):`);
@@ -87,9 +97,26 @@ export function buildReport(context = {}) {
       if (e.detail) lines.push(...e.detail.split('\n').map(l => `      ${l}`));
     }
   } else {
-    lines.push('', 'errors: none captured — the problem may not have thrown.');
+    lines.push('', 'errors: none captured — the problem may not have thrown an error.');
   }
   return lines.join('\n');
+}
+
+const firstLine = text => String(text ?? '').trim().split('\n')[0].slice(0, 70);
+const indent = text => String(text ?? '').trim().split('\n').map(l => '  ' + l).join('\n')
+  || '  (not answered)';
+
+/**
+ * Which required answers are still missing. The diagnostics say what the app
+ * was doing; only the researcher can say what they were doing and what they
+ * expected instead, and without that a report usually can't be acted on.
+ */
+export function missingAnswers(answers = {}) {
+  const missing = [];
+  if (!String(answers.doing ?? '').trim()) missing.push('what you were doing');
+  if (!String(answers.wrong ?? '').trim()) missing.push('what went wrong');
+  if (!String(answers.repeats ?? '').trim()) missing.push('whether it happens again');
+  return missing;
 }
 
 /** Copy text, falling back to a manual selection when the API is unavailable. */

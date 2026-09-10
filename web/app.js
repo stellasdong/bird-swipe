@@ -15,7 +15,8 @@ import {
   TruncatedReadError, ensureReadable, isSupported, mirrorSink, pickExport, readText,
 } from './storage.js';
 import {
-  buildReport, copyText, errorCount, installErrorHandlers, recordError,
+  buildReport, copyText, errorCount, installErrorHandlers, lastError, missingAnswers,
+  recordError,
 } from './report.js';
 import {
   ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, autosaveOffered,
@@ -91,7 +92,9 @@ const el = {
   reportOpen: $('report-open'),
   reportOpenWelcome: $('report-open-welcome'),
   report: $('report'),
-  reportNote: $('report-note'),
+  reportDoing: $('report-doing'),
+  reportWrong: $('report-wrong'),
+  reportRepeats: $('report-repeats'),
   reportText: $('report-text'),
   reportStatus: $('report-status'),
   reportCopy: $('report-copy'),
@@ -1163,18 +1166,48 @@ async function reportContext() {
     submitFolder: (await Folder.restore().catch(() => null))?.name
       ?? (await Folder.restore().catch(() => null))?.folder?.name ?? '',
     progressCount,
-    note: el.reportNote.value,
+    answers: currentAnswers(),
   };
 }
 
+const currentAnswers = () => ({
+  doing: el.reportDoing?.value ?? '',
+  wrong: el.reportWrong?.value ?? '',
+  repeats: el.reportRepeats?.value ?? '',
+});
+
 async function refreshReportText() {
   el.reportText.textContent = buildReport(await reportContext());
+  validateReport();
+}
+
+/**
+ * The diagnostics describe what the app was doing; only the researcher can say
+ * what they were doing and what they saw instead. A report without that usually
+ * can't be acted on, so copying waits until all three are answered.
+ */
+function validateReport() {
+  const missing = missingAnswers(currentAnswers());
+  el.reportCopy.disabled = missing.length > 0;
+  if (!missing.length) {
+    if (el.reportStatus.dataset.role === 'validation') el.reportStatus.hidden = true;
+    return;
+  }
+  el.reportStatus.dataset.role = 'validation';
+  el.reportStatus.className = 'notice warn';
+  el.reportStatus.textContent = `Still to answer: ${missing.join(', ')}.`;
+  el.reportStatus.hidden = false;
 }
 
 async function openReport() {
   el.reportStatus.hidden = true;
+  delete el.reportStatus.dataset.role;
+  // Pre-fill what the app already knows, so a crash needs one sentence, not three.
+  const err = lastError();
+  if (err && !el.reportWrong.value) el.reportWrong.value = err.message;
   await refreshReportText();
   if (!el.report.open) el.report.showModal();
+  (el.reportDoing.value ? el.reportWrong : el.reportDoing).focus();
 }
 
 // Bind defensively: this is the safety net, so a missing control must never be
@@ -1182,7 +1215,12 @@ async function openReport() {
 // didn't apply and the whole module failed to boot.)
 const on = (node, event, handler) => node?.addEventListener(event, handler);
 
-on(el.reportNote, 'input', () => { refreshReportText(); });
+for (const node of [el.reportDoing, el.reportWrong, el.reportRepeats]) {
+  on(node, 'input', () => { refreshReportText(); });
+  on(node, 'change', () => { refreshReportText(); });
+  // Enter inside the dialog must not reach the label loop behind it.
+  on(node, 'keydown', event => event.stopPropagation());
+}
 on(el.reportOpen, 'click', openReport);
 on(el.reportOpenWelcome, 'click', openReport);
 on(el.reportClose, 'click', () => el.report.close());
@@ -1190,9 +1228,11 @@ on(el.reportClose, 'click', () => el.report.close());
 on(el.reportCopy, 'click', async () => {
   const text = el.reportText.textContent;
   const copied = await copyText(text);
+  delete el.reportStatus.dataset.role;
   el.reportStatus.className = `notice ${copied ? 'info' : 'warn'}`;
   el.reportStatus.textContent = copied
-    ? 'Copied. Paste it into an email or message to whoever runs the project.'
+    ? 'Copied. Paste it straight into an email to whoever runs the project — the ' +
+      'first line is a ready-made subject.'
     : "Couldn't copy automatically — select the text above and copy it by hand.";
   el.reportStatus.hidden = false;
 });

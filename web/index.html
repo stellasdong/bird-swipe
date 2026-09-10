@@ -143,14 +143,30 @@
 <!-- ----------------------------------------------------------- reporting -->
 <dialog id="report">
   <h2>Report a problem</h2>
-  <p class="subtitle" style="margin:0 0 10px">
-    Tell us what went wrong, then send the report. It describes what the app was
-    doing — it never includes anything from your spreadsheet.
+  <p class="subtitle" style="margin:0 0 12px">
+    Answer these three, then copy the report and email it to whoever runs the
+    project. It never includes anything from your spreadsheet.
   </p>
-  <textarea id="report-note" style="height:70px"
-            placeholder="What were you doing when it went wrong? (optional, but it helps)"></textarea>
-  <p class="subtitle" style="font-size:12px;margin:10px 0 4px">
-    <b>What will be sent</b> — you can read every line before it goes:
+
+  <label class="field-label" for="report-doing">What were you doing?</label>
+  <textarea id="report-doing" style="height:52px"
+            placeholder="e.g. I pressed the right arrow to save a nest as YES"></textarea>
+
+  <label class="field-label" for="report-wrong">What went wrong?</label>
+  <textarea id="report-wrong" style="height:52px"
+            placeholder="e.g. the photo never loaded and the count stopped going up"></textarea>
+
+  <label class="field-label" for="report-repeats">Does it happen again?</label>
+  <select id="report-repeats">
+    <option value="">— choose one —</option>
+    <option>Every time I try</option>
+    <option>Sometimes</option>
+    <option>It only happened once</option>
+    <option>I haven't tried again</option>
+  </select>
+
+  <p class="subtitle" style="font-size:12px;margin:14px 0 4px">
+    <b>What you'll be copying</b> — read every line before it goes:
   </p>
   <pre id="report-text"></pre>
   <div id="report-status" class="notice" hidden></div>

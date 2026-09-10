@@ -333,6 +333,24 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
 /* Louder once something has actually gone wrong. */
 .report-link[data-errors="true"] { color: #fbbf24; }
 
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  margin: 10px 0 3px;
+}
+#report select {
+  font: inherit;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #0c0c0c;
+  color: var(--text);
+}
+#report select:focus, #report textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
+
 #report-text {
   margin: 0;
   padding: 10px;
