@@ -65,7 +65,10 @@
     </div>
   </div>
 
-  <p class="version">version <span id="version"></span></p>
+  <p class="version">
+    version <span id="version"></span>
+    · <button class="report-link inline" id="report-open-welcome" type="button">Report a problem</button>
+  </p>
 </section>
 
 <!-- --------------------------------------------------------------- label -->
@@ -109,6 +112,7 @@
   </div>
 
   <div class="legend" id="legend"></div>
+  <button class="report-link" id="report-open" type="button" title="Report a crash or problem">⚠ Report a problem</button>
 </section>
 
 <!-- ---------------------------------------------------------------- done -->
@@ -135,6 +139,27 @@
     <button id="done-open-another">Open another spreadsheet…</button>
   </div>
 </section>
+
+<!-- ----------------------------------------------------------- reporting -->
+<dialog id="report">
+  <h2>Report a problem</h2>
+  <p class="subtitle" style="margin:0 0 10px">
+    Tell us what went wrong, then send the report. It describes what the app was
+    doing — it never includes anything from your spreadsheet.
+  </p>
+  <textarea id="report-note" style="height:70px"
+            placeholder="What were you doing when it went wrong? (optional, but it helps)"></textarea>
+  <p class="subtitle" style="font-size:12px;margin:10px 0 4px">
+    <b>What will be sent</b> — you can read every line before it goes:
+  </p>
+  <pre id="report-text"></pre>
+  <div id="report-status" class="notice" hidden></div>
+  <div class="dialog-actions">
+    <button id="report-close">Close</button>
+    <span class="spacer"></span>
+    <button id="report-copy" class="primary">Copy report</button>
+  </div>
+</dialog>
 
 <!-- ------------------------------------------------------ OneDrive setup -->
 <dialog id="onedrive-help">

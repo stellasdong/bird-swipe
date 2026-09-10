@@ -15,6 +15,9 @@ import {
   TruncatedReadError, ensureReadable, isSupported, mirrorSink, pickExport, readText,
 } from './storage.js';
 import {
+  buildReport, copyText, errorCount, installErrorHandlers, recordError,
+} from './report.js';
+import {
   ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, autosaveOffered,
   duplicateKey, getKeys, getReviewer, keyDisplay, setAutosaveOffered, setKeys,
   setReviewer,
@@ -85,6 +88,14 @@ const el = {
   doneHint: $('done-hint'),
   doneOpenAnother: $('done-open-another'),
 
+  reportOpen: $('report-open'),
+  reportOpenWelcome: $('report-open-welcome'),
+  report: $('report'),
+  reportNote: $('report-note'),
+  reportText: $('report-text'),
+  reportStatus: $('report-status'),
+  reportCopy: $('report-copy'),
+  reportClose: $('report-close'),
   prefs: $('prefs'),
   keygrid: $('keygrid'),
   prefsWarning: $('prefs-warning'),
@@ -458,7 +469,7 @@ async function beginLabeling(fileHandle, inputName) {
     },
   });
   state.writer = new DebouncedWriter(state.mirror, inputName, {
-    onError: err => setSaveState('error', err.message),
+    onError: err => { noteHandledError('autosave/progress write failed', err); setSaveState('error', err.message); },
     onStateChange: setSaveState,
   });
 
@@ -859,6 +870,7 @@ async function saveLocal() {
     renderAutosaveStatus();
     renderLocalTarget();
   } catch (err) {
+    noteHandledError('save local failed', err);
     showResult('error', `Couldn't save locally: ${err.message}`);
   } finally {
     el.saveLocal.disabled = false;
@@ -889,6 +901,7 @@ async function saveToOneDrive() {
       `online to confirm it arrived.`);
     await renderSubmitTarget();
   } catch (err) {
+    noteHandledError('save to OneDrive failed', err);
     showResult('error', `Couldn't save to OneDrive: ${err.message}`);
   } finally {
     el.submit.disabled = false;
@@ -1125,6 +1138,92 @@ el.prefsSave.addEventListener('click', () => {
 });
 
 el.prefsWelcome.addEventListener('click', openPrefs);
+
+// --------------------------------------------------------------- reporting
+/**
+ * Gather what makes a report actionable. Names and positions only — never any
+ * cell contents, and folder leaf names are all a browser exposes anyway.
+ */
+async function reportContext() {
+  let progressCount = '?';
+  try {
+    progressCount = (await Progress.list()).length;
+  } catch { /* storage may be blocked */ }
+  return {
+    version: VERSION,
+    build: BUILD.startsWith('__') ? 'dev' : BUILD,
+    reviewer: getReviewer(),
+    inputName: state.inputName,
+    position: state.catalog
+      ? `row ${state.idx + 1} of ${state.catalog.rows.length}` +
+        (state.reviewingSkipped ? ' (reviewing skipped)' : '')
+      : '',
+    saveState: el.saveState.textContent,
+    localFolder: state.autosave?.name ?? '',
+    submitFolder: (await Folder.restore().catch(() => null))?.name
+      ?? (await Folder.restore().catch(() => null))?.folder?.name ?? '',
+    progressCount,
+    note: el.reportNote.value,
+  };
+}
+
+async function refreshReportText() {
+  el.reportText.textContent = buildReport(await reportContext());
+}
+
+async function openReport() {
+  el.reportStatus.hidden = true;
+  await refreshReportText();
+  if (!el.report.open) el.report.showModal();
+}
+
+// Bind defensively: this is the safety net, so a missing control must never be
+// what takes the app down. (It already was once — the welcome link's markup
+// didn't apply and the whole module failed to boot.)
+const on = (node, event, handler) => node?.addEventListener(event, handler);
+
+on(el.reportNote, 'input', () => { refreshReportText(); });
+on(el.reportOpen, 'click', openReport);
+on(el.reportOpenWelcome, 'click', openReport);
+on(el.reportClose, 'click', () => el.report.close());
+
+on(el.reportCopy, 'click', async () => {
+  const text = el.reportText.textContent;
+  const copied = await copyText(text);
+  el.reportStatus.className = `notice ${copied ? 'info' : 'warn'}`;
+  el.reportStatus.textContent = copied
+    ? 'Copied. Paste it into an email or message to whoever runs the project.'
+    : "Couldn't copy automatically — select the text above and copy it by hand.";
+  el.reportStatus.hidden = false;
+});
+
+/** Something broke: say so, say the work is safe, and offer to report it. */
+function onCaughtError(err) {
+  flagErrors();
+  if (el.reportOpen) {
+    el.reportOpen.textContent = `⚠ Something went wrong — report it (${errorCount()})`;
+  }
+  if (state.catalog) {
+    alertBanner(`Something went wrong: ${err.message}. Your labeling is still saved — ` +
+                `use “Report a problem” at the bottom of the screen.`);
+  }
+}
+
+installErrorHandlers(onCaughtError);
+
+// A failed save is the one error the app already handles gracefully, so it
+// never reaches window.onerror — record it too, or reports would omit exactly
+// the failure most worth hearing about.
+export function noteHandledError(where, err) {
+  recordError(where, err?.message ?? String(err), err?.stack ?? '');
+  flagErrors();
+}
+
+function flagErrors() {
+  for (const node of [el.reportOpen, el.reportOpenWelcome]) {
+    if (node) node.dataset.errors = 'true';
+  }
+}
 
 // --------------------------------------------------------------------- boot
 renderToggleLabels();

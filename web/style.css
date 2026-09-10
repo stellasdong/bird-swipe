@@ -317,6 +317,38 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   word-break: break-all;
 }
 
+/* -------------------------------------------------------------- reporting */
+.report-link {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 14px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+.report-link:hover:not(:disabled) { background: none; color: var(--text); text-decoration: underline; }
+.report-link.inline { padding: 0; font-size: 11px; }
+/* Louder once something has actually gone wrong. */
+.report-link[data-errors="true"] { color: #fbbf24; }
+
+#report-text {
+  margin: 0;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  background: #0c0c0c;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--dim);
+}
+
 /* ----------------------------------------------------------------- dialog */
 dialog {
   background: var(--panel);

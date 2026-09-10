@@ -129,6 +129,21 @@ revisit them). Click a video to play/pause it. To add a **note**, press `Enter`
 (or click the Notes box), type, then press `Enter` again to return to labeling —
 the note is saved when you press YES/NO.
 
+## If something goes wrong
+
+There's a **Report a problem** link at the bottom of the labeling screen and
+next to the version number on the welcome screen. It turns amber and counts up
+if the app hits an error.
+
+It gathers what makes a problem diagnosable — app version, browser, which
+spreadsheet and row, whether the folders are still connected, and the actual
+error — and shows you every line before anything leaves. **Nothing from your
+spreadsheet is included.** Add a sentence about what you were doing, press
+**Copy report**, and paste it to whoever runs the project.
+
+If an error does happen, your labeling is still saved: the app says so, and
+carries on.
+
 ## How labels are saved
 
 The original export is never modified. While you label, your work is kept **in
