@@ -10,6 +10,10 @@ const STORE_KEY = 'bird-swipe:settings';
 // Bump when the default hotkey scheme changes shape. Saved bindings from an
 // older scheme are ignored (reset to the new defaults) rather than merged, so
 // stale keys can't collide with reassigned defaults.
+//
+// Adding a *new* action doesn't need a bump: getKeys() merges saved bindings
+// over the defaults, so an action nobody has a saved binding for simply takes
+// its default. Only changing what an existing action means does.
 export const KEYS_VERSION = 3;
 
 // action -> default KeyboardEvent.key. The three observation toggles each have
@@ -28,6 +32,7 @@ export const DEFAULT_KEYS = {
   count_eggs_num: '3',
   count_chicks: 'r',
   count_chicks_num: '4',
+  zoom: 'z',
   close: 'Escape',
 };
 
@@ -47,6 +52,7 @@ export const ACTION_LABELS = {
   count_eggs_num: 'Egg count (number)',
   count_chicks: 'Chick count (letter)',
   count_chicks_num: 'Chick count (number)',
+  zoom: 'Zoom the photo in / out',
   // The desktop app quit here. A web page can't close its own tab, so this
   // closes the file and returns to the welcome screen instead.
   close: 'Close file  (everything is already saved)',

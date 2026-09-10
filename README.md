@@ -111,6 +111,7 @@ Two things that will otherwise trip you up:
 | `W` / `2` | toggle **anthropogenic material** |
 | `E` / `3` | **count the eggs** — type a number, then `Enter` |
 | `R` / `4` | **count the chicks** — type a number, then `Enter` |
+| `Z`       | **zoom** the photo to full size and back — or click it |
 | `Enter`   | jump to the notes box |
 | `Esc`     | close the file (everything is already saved) |
 
@@ -121,9 +122,15 @@ what is already saved for that item, so stepping back shows your earlier answers
 rather than a blank slate.
 
 **Eggs and chicks are counted, not just flagged.** Pressing `E` (or `R`) puts
-the cursor in that box with the current number selected, so typing replaces it;
-press `Enter` to go back to labeling. A nest can hold both, and both are
-optional — leave a box alone and it records as none seen.
+the cursor in that box with the current number selected, so typing replaces it.
+You don't have to press `Enter` first — `→`, `←`, `↑` and `↓` all work straight
+from the box, so counting is `E`, a number, then `→`. A nest can hold both, and
+both are optional; leave a box alone and it records as none seen.
+
+**Zoom in before you count.** Photographs taken from a distance rarely show eggs
+or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
+loads at full resolution — scroll to move around, press `Z` or click again to
+fit.
 
 Hotkeys are rebindable in **Preferences…**. (Upgrading from an earlier version
 resets them to the defaults above, because the scheme changed — eggs became a
@@ -232,7 +239,7 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 181 assertions covering the CSV
+Open **http://localhost:8000/web/test.html** — 182 assertions covering the CSV
 parser, the label scheme, resume, the truncation guard, the debounced writer,
 the in-browser progress store, autosave mirroring, the output folder layout and
 the problem report, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
@@ -302,3 +309,4 @@ pyinstaller packaging/bird_swipe.spec --noconfirm   # build the bundles
 - [x] M8 — egg and chick counts
 - [x] M9 — save local and save to OneDrive as separate, explicit steps
 - [x] M10 — error catching and a problem report researchers can email
+- [x] M11 — zoom, faster counting, and colour-blind-safe toggles

@@ -170,6 +170,15 @@ input[type="text"]:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
 }
 .toggle[aria-pressed="true"] { background: var(--green); }
 .toggle .key { opacity: .75; font-size: 12px; }
+/* The state must be readable without seeing the colour: roughly one man in
+   twelve has a red-green deficiency, and these toggles carried no other signal. */
+.toggle::before {
+  content: "✗";
+  display: inline-block;
+  width: 1.1em;
+  font-weight: 700;
+}
+.toggle[aria-pressed="true"]::before { content: "✓"; }
 
 /* Eggs and chicks are counted, not toggled: the hotkey focuses the box, a
    number goes in, Enter returns to labeling. Green once the count is 1+. */
@@ -224,6 +233,14 @@ input[type="text"]:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   object-fit: contain;
 }
 .media video { cursor: pointer; }
+.media img { cursor: zoom-in; }
+
+/* Zoomed: the full-resolution image at its natural size, and the frame scrolls.
+   Counting eggs in a nest shot from distance needs real magnification, not a
+   picture scaled to fit a laptop. */
+.media.zoomed { align-items: flex-start; justify-content: flex-start; overflow: auto; }
+.media.zoomed img { max-width: none; max-height: none; cursor: zoom-out; }
+
 .media .placeholder { color: #bbb; font-size: 14px; padding: 20px; text-align: center; }
 
 .meta {
