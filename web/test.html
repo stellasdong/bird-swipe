@@ -554,6 +554,43 @@ group('report.js — the report itself');
         buildReport({ answers: {} }).includes('(not answered)'));
 }
 
+// ------------------------------------------------------------ does it boot
+group('the app actually starts');
+{
+  // Twice now a top-level statement has thrown during module evaluation and
+  // taken the whole app down with it — once a null element, once a `const`
+  // touched before its definition. Both were invisible until someone opened the
+  // page. This loads the real index.html and asks whether it came up.
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'position:absolute;left:-9999px;width:1024px;height:768px';
+  const loaded = new Promise(resolve => { frame.onload = resolve; });
+  document.body.appendChild(frame);
+  frame.src = 'index.html';
+  await loaded;
+
+  await new Promise(r => setTimeout(r, 700)); // let the module finish evaluating
+
+  const doc = frame.contentDocument;
+  const bootMarkers = ['open-export', 'autosave-choose', 'onedrive-choose',
+                       'report-open', 'progress', 'notes'];
+  for (const id of bootMarkers) {
+    check(`#${id} exists in the markup`, doc.getElementById(id) !== null);
+  }
+
+  // The one that matters. The markup checks above pass even when the module
+  // throws — only something app.js writes proves evaluation reached the end,
+  // and the version is written by initWelcome() at the very bottom.
+  //
+  // Listening for the error event doesn't work here: by the time the iframe's
+  // load event lets us attach a handler, the module has already thrown. An
+  // assertion that can't fail is worse than none, so this is the check.
+  check('the version was filled in — module evaluation ran to the end',
+        (doc.getElementById('version')?.textContent ?? '').trim().length > 0,
+        `version read "${doc.getElementById('version')?.textContent}"`);
+
+  frame.remove();
+}
+
 // ------------------------------------------------- real Macaulay export files
 group('real export files from test/');
 // Locally this page is /web/test.html; on Pages the app is at the root.
