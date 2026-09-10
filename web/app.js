@@ -35,6 +35,12 @@ const PROTOCOL_URL = '';
 
 const $ = id => document.getElementById(id);
 
+// Bind defensively: a missing control must never be what takes the app down.
+// Defined up here, with the other helpers, because `const` is not hoisted —
+// a listener registered above this line throws before the app can boot, which
+// has now happened twice.
+const on = (node, event, handler) => node?.addEventListener(event, handler);
+
 const el = {
   screens: {
     welcome: $('screen-welcome'), label: $('screen-label'), done: $('screen-done'),
@@ -59,6 +65,16 @@ const el = {
 
   rowTitle: $('row-title'),
   progress: $('progress'),
+  progressTrack: $('progress-track'),
+  progressFill: $('progress-fill'),
+  pace: $('pace'),
+  jump: $('jump'),
+  jumpInput: $('jump-input'),
+  jumpError: $('jump-error'),
+  jumpGo: $('jump-go'),
+  jumpCancel: $('jump-cancel'),
+  jumpUnreviewed: $('jump-unreviewed'),
+  jumpSkipped: $('jump-skipped'),
   saveState: $('save-state'),
   nestYes: $('nest-yes'),
   nestNo: $('nest-no'),
@@ -149,6 +165,7 @@ const state = {
   keys: getKeys(),
   currentId: null,
   zoomed: false,
+  paceLog: [],   // when each item was reviewed this session, for the estimate
 };
 
 // ------------------------------------------------------------------ screens
@@ -560,6 +577,7 @@ function showCurrent() {
   el.progress.textContent =
     `[${state.idx + 1} / ${total}]   reviewed ${stats.reviewed}` +
     (state.reviewingSkipped ? '   ·   reviewing skipped' : '');
+  renderProgress(stats, total);
   document.title = `bird-swipe · [${state.idx + 1}/${total}] · ML ${mlId}`;
 
   showAsset(mlId, row.Format ?? '');
@@ -577,6 +595,44 @@ function showCurrent() {
   prefetchUpcoming();
   resetNotesLabel();
   renderLegend();
+}
+
+/**
+ * The bar tracks *reviewed*, not position: what's left to do, rather than where
+ * the cursor happens to be. Someone stepping back through finished items hasn't
+ * undone any work, and the bar shouldn't say they have.
+ */
+function renderProgress(stats, total) {
+  const pct = total ? (stats.reviewed / total) * 100 : 0;
+  el.progressFill.style.width = `${pct}%`;
+  el.progressTrack.setAttribute('aria-valuenow', Math.round(pct));
+  el.progressTrack.setAttribute('aria-valuetext',
+    `${stats.reviewed} of ${total} reviewed`);
+  el.pace.textContent = remainingEstimate(total - stats.reviewed);
+}
+
+/**
+ * Time left, from the median gap between recent reviews.
+ *
+ * Median rather than mean so one trip to the kettle doesn't wreck the figure,
+ * and nothing is shown until there's enough to be worth saying — a guess from
+ * two data points is worse than silence.
+ */
+function remainingEstimate(itemsLeft) {
+  if (itemsLeft <= 0 || state.paceLog.length < 5) return '';
+  const gaps = state.paceLog.slice(1).map((t, i) => t - state.paceLog[i]).sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)];
+  if (median > 60_000) return ''; // long pauses: they aren't in a rhythm to project
+  const mins = Math.round((median * itemsLeft) / 60_000);
+  if (mins < 1) return 'under a minute left';
+  if (mins < 60) return `about ${mins} min left`;
+  return `about ${Math.floor(mins / 60)} h ${mins % 60} min left`;
+}
+
+/** Called wherever an item becomes reviewed, so the estimate reflects real pace. */
+function notePace() {
+  state.paceLog.push(Date.now());
+  if (state.paceLog.length > 12) state.paceLog.shift();
 }
 
 function setToggle(field, on) {
@@ -682,6 +738,7 @@ function renderLegend() {
     [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
     [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
     [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
+    [keyDisplay(k.jump), 'jump to…'],
     [keyDisplay(k.close), 'close file'],
   ];
   el.legend.textContent = '';
@@ -827,6 +884,7 @@ function commit(nest) {
     notes: el.notes.value.trim(),
   });
   state.writer.schedule(state.catalog);
+  notePace();
   advance();
 }
 
@@ -838,6 +896,7 @@ function forward() {
       notes: el.notes.value.trim(),
     });
     state.writer.schedule(state.catalog);
+    notePace();
   }
   advance();
 }
@@ -1138,7 +1197,7 @@ el.notes.addEventListener('keydown', event => {
 });
 
 document.addEventListener('keydown', event => {
-  if (el.prefs.open) return;
+  if (el.prefs.open || el.jump.open || el.report.open || el.onedriveHelp.open) return;
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
@@ -1166,6 +1225,8 @@ function runLabelAction(action) {
     setToggle(field, !toggleOn(field));
   } else if (action === 'zoom') {
     setZoom(!state.zoomed);
+  } else if (action === 'jump') {
+    openJump();
   } else if (action in COUNTER_ACTIONS) {
     focusCount(COUNTER_ACTIONS[action]);
   } else if (action === 'notes') {
@@ -1274,6 +1335,76 @@ if (PROTOCOL_URL) {
   }
 }
 
+// --------------------------------------------------------------- jump to it
+/**
+ * Reaching a known item used to mean pressing back a hundred times. Accepts a
+ * row number or an ML catalog number, because which one someone has to hand
+ * depends on whether they're looking at the app or the spreadsheet.
+ */
+function openJump() {
+  if (!state.catalog) return;
+  el.jumpError.hidden = true;
+  el.jumpInput.value = '';
+  const skipped = state.catalog.skippedIndices().length;
+  el.jumpSkipped.textContent = skipped
+    ? `First skipped (${skipped})` : 'No skipped items';
+  el.jumpSkipped.disabled = skipped === 0;
+  el.jump.showModal();
+  el.jumpInput.focus();
+}
+
+function goToIndex(index) {
+  state.reviewingSkipped = false;
+  state.reviewHistory = [];
+  state.idx = Math.max(0, Math.min(index, state.catalog.rows.length));
+  el.jump.close();
+  showCurrent();
+}
+
+function resolveJump(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) return { error: 'Type a row number or an ML catalog number.' };
+  if (!/^\d+$/.test(text)) return { error: 'Numbers only — a row number or an ML catalog number.' };
+
+  const total = state.catalog.rows.length;
+  const asRow = Number(text);
+
+  // An ML number search first when it can't be a row: catalog numbers are long,
+  // row numbers are small, so only the small range is ambiguous.
+  const byMl = state.catalog.rows.findIndex(r => String(r[CATALOG_KEY]) === text);
+  if (byMl !== -1) return { index: byMl };
+  if (asRow >= 1 && asRow <= total) return { index: asRow - 1 };
+
+  return {
+    error: asRow > total
+      ? `This spreadsheet has ${total} items, and no ML ${text} in it.`
+      : `No ML ${text} in this spreadsheet.`,
+  };
+}
+
+function submitJump() {
+  const { index, error } = resolveJump(el.jumpInput.value);
+  if (error) {
+    el.jumpError.textContent = error;
+    el.jumpError.hidden = false;
+    return;
+  }
+  goToIndex(index);
+}
+
+on(el.progress, 'click', openJump);
+on(el.jumpGo, 'click', submitJump);
+on(el.jumpCancel, 'click', () => el.jump.close());
+on(el.jumpInput, 'keydown', event => {
+  event.stopPropagation();
+  if (event.key === 'Enter') { event.preventDefault(); submitJump(); }
+});
+on(el.jumpUnreviewed, 'click', () => goToIndex(state.catalog.firstUnreviewed()));
+on(el.jumpSkipped, 'click', () => {
+  const skipped = state.catalog.skippedIndices();
+  if (skipped.length) goToIndex(skipped[0]);
+});
+
 // --------------------------------------------------------------- reporting
 /**
  * Gather what makes a report actionable. Names and positions only — never any
@@ -1341,11 +1472,6 @@ async function openReport() {
   if (!el.report.open) el.report.showModal();
   (el.reportDoing.value ? el.reportWrong : el.reportDoing).focus();
 }
-
-// Bind defensively: this is the safety net, so a missing control must never be
-// what takes the app down. (It already was once — the welcome link's markup
-// didn't apply and the whole module failed to boot.)
-const on = (node, event, handler) => node?.addEventListener(event, handler);
 
 for (const node of [el.reportDoing, el.reportWrong, el.reportRepeats]) {
   on(node, 'input', () => { refreshReportText(); });

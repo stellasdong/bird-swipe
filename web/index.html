@@ -83,8 +83,14 @@
   <div class="bar">
     <span class="title" id="row-title"></span>
     <span class="spacer"></span>
-    <span class="progress" id="progress"></span>
+    <span class="pace" id="pace"></span>
+    <button class="progress" id="progress" type="button"
+            title="Jump to another item"></button>
     <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="progress-track" id="progress-track"
+       role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Reviewed">
+    <div class="progress-fill" id="progress-fill"></div>
   </div>
 
   <div class="chips">
@@ -151,6 +157,27 @@
         title="Report a crash or problem">
   <span class="report-icon" aria-hidden="true">⚠</span><span id="report-label">Report a problem</span>
 </button>
+
+<!-- ---------------------------------------------------------- jump to it -->
+<dialog id="jump">
+  <h2>Jump to an item</h2>
+  <div class="stack" style="align-items:stretch;gap:10px">
+    <div>
+      <label class="field-label" for="jump-input">Row number, or an ML catalog number</label>
+      <input type="text" id="jump-input" inputmode="numeric" autocomplete="off"
+             placeholder="e.g. 87 or 661965337">
+    </div>
+    <div id="jump-error" class="notice error" hidden></div>
+    <div class="jump-shortcuts">
+      <button id="jump-unreviewed" type="button">First un-reviewed</button>
+      <button id="jump-skipped" type="button">First skipped</button>
+    </div>
+  </div>
+  <div class="dialog-actions">
+    <button id="jump-cancel">Cancel</button>
+    <button id="jump-go" class="primary">Go</button>
+  </div>
+</dialog>
 
 <!-- ----------------------------------------------------------- reporting -->
 <dialog id="report">

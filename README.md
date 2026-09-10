@@ -112,6 +112,7 @@ Two things that will otherwise trip you up:
 | `E` / `3` | **count the eggs** — type a number, then `Enter` |
 | `R` / `4` | **count the chicks** — type a number, then `Enter` |
 | `Z`       | **zoom** the photo to full size and back — or click it |
+| `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Enter`   | jump to the notes box |
 | `Esc`     | close the file (everything is already saved) |
 
@@ -131,6 +132,14 @@ both are optional; leave a box alone and it records as none seen.
 or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
 loads at full resolution — scroll to move around, press `Z` or click again to
 fit.
+
+A bar under the header fills as you review, and once you have a rhythm it
+estimates how much longer the spreadsheet will take.
+
+**Jumping around.** `G` (or clicking the `[12 / 194]` readout) takes a row
+number or an ML catalog number, so you can get straight back to something you
+want to change instead of pressing `↑` fifty times. It can also send you to the
+first un-reviewed or first skipped item.
 
 The notes box sits at one line and gives the height to the photo. It opens up
 while you're typing, and stays open on any item that has a note, so stepping
