@@ -214,18 +214,25 @@ async function renderSubmitTarget() {
       const strong = document.createElement('b');
       strong.textContent = `“${name}”`;
       node.append('OneDrive folder: ', strong, ' ');
-      const change = document.createElement('button');
-      change.textContent = 'Change';
-      change.style.cssText = 'padding:2px 8px;font-size:12px;margin-left:4px';
-      change.addEventListener('click', changeSubmitFolder);
-      node.append(change);
+      node.append(smallButton('Change', changeSubmitFolder));
     } else {
       const none = document.createElement('span');
       none.className = 'none';
       none.textContent = 'not set up yet';
-      node.append('OneDrive folder: ', none, " — you'll choose it the first time.");
+      node.append('OneDrive folder: ', none, " — you'll choose it the first time. ");
     }
+    // Always reachable: someone who picked the wrong folder, or whose OneDrive
+    // stopped working, needs the instructions again just as much as a new user.
+    node.append(smallButton('How do I set this up?', () => el.onedriveHelp.showModal()));
   }
+}
+
+function smallButton(label, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = label;
+  b.addEventListener('click', onClick);
+  return b;
 }
 
 async function changeSubmitFolder() {
@@ -233,10 +240,17 @@ async function changeSubmitFolder() {
     const folder = await Folder.pick(); // one activation, spent on the picker
     if (!folder) return;
     await renderSubmitTarget();
-    showResult?.('info', `Finished work will now go to “${folder.name}”.`);
+    announce('info', `OneDrive folder is now “${folder.name}”.`);
   } catch (err) {
-    showError(el.welcomeError, err.message);
+    announce('error', err.message);
   }
+}
+
+/** Report to whichever screen is actually showing. */
+function announce(kind, message) {
+  if (!el.screens.done.hidden) { showResult(kind, message); return; }
+  if (kind === 'error') { showError(el.welcomeError, message); return; }
+  el.welcomeError.hidden = true;
 }
 
 // ----------------------------------------------------------------- autosave
@@ -263,13 +277,7 @@ async function restoreAutosave() {
 function renderAutosaveStatus(pending = null) {
   el.autosaveStatus.textContent = '';
   const add = (...nodes) => el.autosaveStatus.append(...nodes);
-  const button = (label, onClick) => {
-    const b = document.createElement('button');
-    b.textContent = label;
-    b.style.cssText = 'padding:2px 8px;font-size:12px;margin-left:6px';
-    b.addEventListener('click', onClick);
-    return b;
-  };
+  const button = smallButton;
 
   if (pending?.needsPermission) {
     add(`The local folder “${pending.name}” needs permission again.`,
@@ -936,10 +944,9 @@ el.onedriveHelpPick.addEventListener('click', async () => {
     const folder = await Folder.pick(); // SUBMIT_DIR
     if (!folder) return;
     await renderSubmitTarget();
-    showResult('info',
-      `OneDrive folder set to “${folder.name}”. Click Save to OneDrive to send this spreadsheet.`);
+    announce('info', `OneDrive folder set to “${folder.name}”.`);
   } catch (err) {
-    showResult('error', err.message);
+    announce('error', err.message);
   }
 });
 
