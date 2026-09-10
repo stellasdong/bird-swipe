@@ -298,7 +298,11 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   font-size: 11px;
   margin-left: 4px;
   vertical-align: baseline;
+  /* .stack sets min-width on its buttons for the big welcome actions; these
+     small inline controls must not inherit it or they stack as full-width bars. */
+  min-width: 0;
 }
+#autosave-status, #submit-status { max-width: 44em; }
 .save-dest b { color: var(--text); }
 .save-dest .none { color: #fcd34d; }
 
