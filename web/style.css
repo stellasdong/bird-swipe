@@ -122,7 +122,46 @@ input[type="text"]:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
 }
 .title { font-size: 18px; font-weight: 600; }
 .spacer { flex: 1; }
-.progress { color: var(--dim); font-variant-numeric: tabular-nums; }
+/* The readout doubles as the way in to Jump — it is the thing you are already
+   looking at when you decide you want to be somewhere else. */
+.progress {
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: inherit;
+  min-width: 0;
+  cursor: pointer;
+}
+.progress:hover:not(:disabled) {
+  background: var(--panel);
+  border-color: var(--edge);
+  color: var(--text);
+}
+
+.pace { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* Reviewed, not position: what is left to do, rather than where the cursor is. */
+.progress-track {
+  height: 3px;
+  background: var(--edge);
+  flex: 0 0 auto;
+}
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--green);
+  transition: width .18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill { transition: none; }
+}
+
+.jump-shortcuts { display: flex; gap: 8px; flex-wrap: wrap; }
+.jump-shortcuts button { flex: 1 1 auto; font-size: 13px; padding: 6px 10px; }
+#jump input[type="text"] { width: 100%; }
 
 .save-state { font-size: 12px; color: var(--muted); min-width: 6em; text-align: right; }
 .save-state.saving { color: #fcd34d; }

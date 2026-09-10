@@ -33,6 +33,7 @@ export const DEFAULT_KEYS = {
   count_chicks: 'r',
   count_chicks_num: '4',
   zoom: 'z',
+  jump: 'g',
   close: 'Escape',
 };
 
@@ -53,6 +54,7 @@ export const ACTION_LABELS = {
   count_chicks: 'Chick count (letter)',
   count_chicks_num: 'Chick count (number)',
   zoom: 'Zoom the photo in / out',
+  jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this
   // closes the file and returns to the welcome screen instead.
   close: 'Close file  (everything is already saved)',
