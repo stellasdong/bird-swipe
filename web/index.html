@@ -118,11 +118,15 @@
   <p class="row" id="done-observations"></p>
   <p class="row" id="done-skipped"></p>
   <button id="review-skipped" hidden></button>
-  <div class="stack">
-    <button id="save-local">Save local</button>
-    <div id="local-target" class="subtitle" style="font-size:12px"></div>
-    <button id="submit" class="primary">Save to OneDrive</button>
-    <div id="submit-target" class="subtitle" style="font-size:12px"></div>
+  <div class="save-cards">
+    <div class="save-card">
+      <div class="save-dest" id="local-target"></div>
+      <button id="save-local">Save local</button>
+    </div>
+    <div class="save-card">
+      <div class="save-dest" id="submit-target"></div>
+      <button id="submit" class="primary">Save to OneDrive</button>
+    </div>
   </div>
   <div id="submit-result" class="notice" hidden></div>
   <p class="row" id="done-paths"></p>
