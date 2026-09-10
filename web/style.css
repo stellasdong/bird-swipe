@@ -42,7 +42,12 @@ button.primary:hover:not(:disabled) { background: #2563eb; }
 
 a { color: var(--link); }
 
-.screen { height: 100vh; display: flex; flex-direction: column; }
+.screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 30px;   /* room for the fixed report control */
+}
 .centered {
   align-items: center;
   justify-content: center;
@@ -375,38 +380,42 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
 .link-btn:hover:not(:disabled) { background: none; color: var(--text); }
 
 /* -------------------------------------------------------------- reporting */
+/* One control, fixed at the bottom centre of every screen. The screens reserve
+   room for it below, so it never sits over the hotkey legend or the done
+   screen's buttons. */
 .report-link {
-  border: 0;
+  position: fixed;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: none;
   color: var(--muted);
   font-size: 12px;
-  padding: 4px 14px;
-  cursor: pointer;
-  text-align: left;
+  padding: 4px 10px;
   min-width: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.report-link:hover:not(:disabled) { background: none; color: var(--text); text-decoration: underline; }
-.report-link.inline { padding: 0; font-size: 11px; }
-/* Louder once something has actually gone wrong. */
-.report-link[data-errors="true"] { color: #fbbf24; }
-
-.field-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dim);
-  margin: 10px 0 3px;
-}
-#report select {
-  font: inherit;
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #0c0c0c;
+.report-link:hover:not(:disabled) {
+  background: var(--panel);
+  border-color: var(--edge);
   color: var(--text);
 }
-#report select:focus, #report textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
+.report-icon { font-size: 12px; line-height: 1; }
+/* Louder once something has actually gone wrong. */
+.report-link[data-errors="true"] {
+  color: #fbbf24;
+  border-color: #7a5c00;
+  background: #2b2517;
+}
 
 #report-text {
   margin: 0;

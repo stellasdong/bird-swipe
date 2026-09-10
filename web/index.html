@@ -75,10 +75,7 @@
     </div>
   </div>
 
-  <p class="version">
-    version <span id="version"></span>
-    · <button class="report-link inline" id="report-open-welcome" type="button">Report a problem</button>
-  </p>
+  <p class="version">version <span id="version"></span></p>
 </section>
 
 <!-- --------------------------------------------------------------- label -->
@@ -122,7 +119,6 @@
   </div>
 
   <div class="legend" id="legend"></div>
-  <button class="report-link" id="report-open" type="button" title="Report a crash or problem">⚠ Report a problem</button>
 </section>
 
 <!-- ---------------------------------------------------------------- done -->
@@ -143,15 +139,18 @@
     </div>
   </div>
   <div id="submit-result" class="notice" hidden></div>
-  <button class="report-link inline" id="report-open-done" type="button">
-    Trouble saving? Report a problem
-  </button>
   <p class="row" id="done-paths"></p>
   <p class="row" id="done-hint"></p>
   <div class="stack">
     <button id="done-open-another">Open another spreadsheet…</button>
   </div>
 </section>
+
+<!-- One report control for the whole app: same place, same icon, every screen. -->
+<button class="report-link" id="report-open" type="button"
+        title="Report a crash or problem">
+  <span class="report-icon" aria-hidden="true">⚠</span><span id="report-label">Report a problem</span>
+</button>
 
 <!-- ----------------------------------------------------------- reporting -->
 <dialog id="report">
