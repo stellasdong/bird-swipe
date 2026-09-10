@@ -26,17 +26,25 @@ version.
    straight out of your Downloads folder is fine.
 3. Label it. Your progress is saved as you go, so you can close the tab and come
    back — the spreadsheet reappears under **In progress on this computer**.
-4. When you reach the end, click **Send to SharePoint…** and choose the shared
-   folder. Only finished work goes there — nothing half-labeled.
+4. When you reach the end you get two buttons:
+   - **Save local** — writes the finished files into your local bird-swipe
+     folder. Autosave has almost certainly done this already; this is the
+     deliberate end-of-spreadsheet save.
+   - **Save to OneDrive** — writes them into your folder in the shared project,
+     which OneDrive then syncs up. Only finished work goes there — nothing
+     half-labeled.
+
+   Do both. They're independent, and each says which folder it used.
 
 The browser asks permission the first time you pick the folder. Choose **Allow
 on every visit** so later submissions are one click.
 
-### Autosave (recommended)
+### The local folder (recommended)
 
-On first run bird-swipe offers to **autosave a backup copy** to a folder of your
-choosing. Turn it on and every save is written to that folder as well as to the
-browser, so your work survives clearing browsing data or switching browsers.
+On first run bird-swipe offers to pick a **local folder** to save into. Turn it
+on and every save is written to that folder as well as to the browser, so your
+work survives clearing browsing data or switching browsers. **Save local** on
+the done screen writes there too.
 
 Make a folder for it first — e.g. `Documents/bird-swipe` — because Chrome won't
 hand over `Documents` itself. Point it somewhere *other* than the shared
@@ -128,8 +136,8 @@ the browser on your own computer**, plus an autosave folder if you set one up.
 Nothing is shared yet. Keeping the browser copy is what lets you open an export
 straight from Downloads without granting access to any folder.
 
-When you click **Send to SharePoint…**, two files are written into the folder
-you choose:
+**Save local** and **Save to OneDrive** each write the same two files into the
+folder you chose for them:
 
 ```
 labeled/<name>_labeled.csv        all completed entries
@@ -138,7 +146,7 @@ labeled/nest/<name>_nest.csv      only the nest=yes entries
 
 The `nest/` subfolder is the point of the split: it collects only the
 nest-positive rows across every spreadsheet, so they can be picked up as a
-group. Autosave writes the same two paths inside your autosave folder.
+group. Autosave writes the same two paths inside your local folder as you label.
 
 Each row gets these columns appended to the original ones:
 
@@ -159,11 +167,10 @@ removes it from the nest file.
 > reviewed", never "none". That distinction is what lets a partly-finished
 > spreadsheet be analysed safely.
 
-> **Submit when you finish a spreadsheet.** Without autosave, in-progress work
-> lives only in that browser on that computer: it survives closing the tab,
+> **Save when you finish a spreadsheet.** Without a local folder, in-progress
+> work lives only in that browser on that computer: it survives closing the tab,
 > quitting the browser and restarting the machine, but **clearing your browsing
-> data will delete it**. Turning on autosave (above) removes that risk, and the
-> done screen also offers **Download a copy** at any time.
+> data will delete it**. Choosing a local folder (above) removes that risk.
 
 Because each researcher works on their own spreadsheet and submits a finished
 file, two people never write the same file at once. If the app does spot labels
@@ -269,3 +276,4 @@ pyinstaller packaging/bird_swipe.spec --noconfirm   # build the bundles
 - [x] M6 — hand finished spreadsheets to a designated SharePoint folder
 - [x] M7 — optional autosave of in-progress work to a local folder
 - [x] M8 — egg and chick counts
+- [x] M9 — save local and save to OneDrive as separate, explicit steps

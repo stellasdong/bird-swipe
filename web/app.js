@@ -75,8 +75,12 @@ const el = {
   doneSkipped: $('done-skipped'),
   reviewSkipped: $('review-skipped'),
   submit: $('submit'),
-  downloadCopy: $('download-copy'),
+  saveLocal: $('save-local'),
+  localTarget: $('local-target'),
   submitResult: $('submit-result'),
+  onedriveHelp: $('onedrive-help'),
+  onedriveHelpClose: $('onedrive-help-close'),
+  onedriveHelpPick: $('onedrive-help-pick'),
   donePaths: $('done-paths'),
   doneHint: $('done-hint'),
   doneOpenAnother: $('done-open-another'),
@@ -209,14 +213,16 @@ async function renderSubmitTarget() {
     if (name) {
       const strong = document.createElement('b');
       strong.textContent = `“${name}”`;
-      node.append('Finished work goes to ', strong, '. ');
+      node.append(node === el.submitTarget ? 'into ' : 'OneDrive folder: ', strong, ' ');
       const change = document.createElement('button');
       change.textContent = 'Change';
       change.style.cssText = 'padding:2px 8px;font-size:12px;margin-left:4px';
       change.addEventListener('click', changeSubmitFolder);
       node.append(change);
     } else {
-      node.append("You'll choose where to send finished work the first time you submit.");
+      node.append(node === el.submitTarget
+        ? "you'll choose your OneDrive folder the first time"
+        : 'OneDrive folder: not set up yet.');
     }
   }
 }
@@ -265,7 +271,7 @@ function renderAutosaveStatus(pending = null) {
   };
 
   if (pending?.needsPermission) {
-    add(`Autosave to “${pending.name}” needs permission again.`,
+    add(`The local folder “${pending.name}” needs permission again.`,
         button('Reconnect', async () => {
           const folder = await Folder.restore({ key: AUTOSAVE_DIR, interactive: true });
           state.autosave = folder instanceof Folder ? folder : null;
@@ -275,7 +281,7 @@ function renderAutosaveStatus(pending = null) {
     return;
   }
   if (state.autosave) {
-    add(`Autosaving a copy to “${state.autosave.name}”.`,
+    add(`Local folder: “${state.autosave.name}” — autosaved as you label.`,
         button('Change', chooseAutosave),
         button('Turn off', async () => {
           await Folder.forget(AUTOSAVE_DIR);
@@ -285,7 +291,7 @@ function renderAutosaveStatus(pending = null) {
         }));
     return;
   }
-  add('Autosave is off — work is kept in this browser only.',
+  add('Local folder: not set — work is kept in this browser only.',
       button('Set up', chooseAutosave));
 }
 
@@ -811,66 +817,95 @@ function showDone() {
     `or ${keyDisplay(state.keys.close)} to close this file.`;
   el.submitResult.hidden = true;
   el.submit.disabled = false;
+  el.saveLocal.disabled = false;
   renderSubmitTarget();
+  renderLocalTarget();
   state.writer?.flush();
 }
 
-// ------------------------------------------------------------------- submit
+// -------------------------------------------------------------- saving out
 /**
- * Copy the finished files into the designated SharePoint folder. Work in
- * progress never goes there — only a deliberate submit does — so the folder
- * holds completed evaluations and nothing half-done.
+ * Write the finished files into the local folder — the same one autosave uses,
+ * and the same labeled/ + labeled/nest/ shape.
+ *
+ * Autosave has almost certainly written this already; this is the deliberate
+ * end-of-spreadsheet save, and it doubles as the way to set a local folder up
+ * if someone declined the offer on first run.
  */
-async function submitToSharePoint() {
+async function saveLocal() {
+  el.submitResult.hidden = true;
+  el.saveLocal.disabled = true;
+  try {
+    let folder = state.autosave;
+    if (!folder) {
+      folder = await Folder.pick(AUTOSAVE_DIR); // one activation, on the picker
+      if (!folder) return;
+      state.autosave = folder;
+      state.mirror?.setMirror(folder);
+      setAutosaveOffered(true);
+    }
+    await state.writer?.flush();
+    const written = await writeFinished(folder);
+    showResult('info', `Saved locally to “${folder.name}”: ${written.join(' and ')}.`);
+    renderAutosaveStatus();
+    renderLocalTarget();
+  } catch (err) {
+    showResult('error', `Couldn't save locally: ${err.message}`);
+  } finally {
+    el.saveLocal.disabled = false;
+  }
+}
+
+/**
+ * Write the finished files into the OneDrive folder, so they sync up to the
+ * shared project. If no folder has been chosen yet we can't tell whether
+ * OneDrive is even installed — a web page can't see the filesystem — so we show
+ * the setup instructions instead of an unexplained folder picker.
+ */
+async function saveToOneDrive() {
   el.submitResult.hidden = true;
   el.submit.disabled = true;
   try {
-    const folder = await acquireSubmitFolder();
-    if (!folder) return; // cancelled, or told the user what to do next
+    const stored = await Folder.restore(); // no activation used
+    if (!stored) { el.onedriveHelp.showModal(); return; } // never set up
+
+    const folder = await resolveFolder(stored);
+    if (!folder) return; // told the user what to do next
 
     await state.writer?.flush();
-    const written = await folder.writeOutputs(state.inputName, {
-      labeledText: state.catalog.labeled.serialize(),
-      nestText: state.catalog.nest.serialize(),
-    });
+    const written = await writeFinished(folder);
     showResult('info',
-      `Sent to “${folder.name}”: ${written.join(' and ')}. ` +
-      `OneDrive will sync it up shortly — check the folder online to confirm.`);
+      `Saved to “${folder.name}”: ${written.join(' and ')}. ` +
+      `OneDrive will sync it to the shared project shortly — open the folder ` +
+      `online to confirm it arrived.`);
     await renderSubmitTarget();
   } catch (err) {
-    showResult('error', `Couldn't send: ${err.message}`);
+    showResult('error', `Couldn't save to OneDrive: ${err.message}`);
   } finally {
     el.submit.disabled = false;
   }
 }
 
 /**
- * Get the folder to submit into, spending the click's transient activation on
- * exactly one thing.
- *
- * Both requestPermission() and showDirectoryPicker() require transient
- * activation, and the first *consumes* it — so calling one then the other in a
- * single click makes the second throw SecurityError every time. Activation also
- * expires a few seconds after the click, which is why nothing slow (a flush, a
- * folder write) may run before this.
+ * Turn a restored handle into a usable folder, spending the click's transient
+ * activation on at most one thing. Both requestPermission() and the pickers
+ * need that activation and the first consumes it, so they can never be chained
+ * within a single click.
  */
-async function acquireSubmitFolder() {
-  const stored = await Folder.restore(); // reads IndexedDB; uses no activation
-
-  if (stored instanceof Folder) return stored; // still granted, nothing to spend
-
-  if (stored?.needsPermission) {
-    // Spend the activation re-granting the remembered folder, and stop there.
-    if (await stored.folder.requestPermission()) return stored.folder;
-    await Folder.forget();
-    showResult('warn',
-      `Access to “${stored.folder.name}” wasn't granted, so it has been forgotten. ` +
-      `Click Send to SharePoint again to choose a folder.`);
-    return null;
-  }
-
-  return await Folder.pick(); // nothing remembered — spend it on the picker
+async function resolveFolder(stored) {
+  if (stored instanceof Folder) return stored;
+  if (await stored.folder.requestPermission()) return stored.folder;
+  await Folder.forget();
+  showResult('warn',
+    `Access to “${stored.folder.name}” wasn't granted, so it has been forgotten. ` +
+    `Click Save to OneDrive again to choose a folder.`);
+  return null;
 }
+
+const writeFinished = folder => folder.writeOutputs(state.inputName, {
+  labeledText: state.catalog.labeled.serialize(),
+  nestText: state.catalog.nest.serialize(),
+});
 
 function showResult(kind, message) {
   el.submitResult.className = `notice ${kind}`;
@@ -878,25 +913,30 @@ function showResult(kind, message) {
   el.submitResult.hidden = false;
 }
 
-/** Escape hatch: save the finished files without granting any folder access. */
-function downloadCopy() {
-  const files = [
-    [labeledName(state.inputName), state.catalog.labeled.serialize()],
-    [nestName(state.inputName), state.catalog.nest.serialize()],
-  ];
-  for (const [name, text] of files) {
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-  }
-  showResult('info', `Downloaded ${files.map(f => f[0]).join(' and ')}.`);
+function renderLocalTarget() {
+  el.localTarget.textContent = state.autosave
+    ? `into “${state.autosave.name}” — autosaved as you go`
+    : "you'll choose a folder the first time";
 }
 
-el.submit.addEventListener('click', submitToSharePoint);
-el.downloadCopy.addEventListener('click', downloadCopy);
+// --- the OneDrive setup dialog ---
+el.onedriveHelpClose.addEventListener('click', () => el.onedriveHelp.close());
+el.onedriveHelpPick.addEventListener('click', async () => {
+  el.onedriveHelp.close();
+  try {
+    const folder = await Folder.pick(); // SUBMIT_DIR
+    if (!folder) return;
+    await renderSubmitTarget();
+    showResult('info',
+      `OneDrive folder set to “${folder.name}”. Click Save to OneDrive to send this spreadsheet.`);
+  } catch (err) {
+    showResult('error', err.message);
+  }
+});
+
+el.submit.addEventListener('click', saveToOneDrive);
+el.saveLocal.addEventListener('click', saveLocal);
+
 el.reviewSkipped.addEventListener('click', startReviewSkipped);
 el.doneOpenAnother.addEventListener('click', closeFile);
 

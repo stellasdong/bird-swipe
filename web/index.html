@@ -42,7 +42,7 @@
     <div id="folder-info" class="notice info" hidden></div>
 
     <div id="autosave-offer" class="notice info" hidden>
-      <b>Autosave a backup copy?</b><br>
+      <b>Choose a local folder to save into?</b><br>
       While you label, your work is kept in this browser. Pick a folder and
       bird-swipe will also keep a copy of it on disk as you go — worth doing if
       you'd rather not rely on browser storage alone.
@@ -117,10 +117,11 @@
   <p class="row" id="done-observations"></p>
   <p class="row" id="done-skipped"></p>
   <button id="review-skipped" hidden></button>
-  <div id="submit-target" class="subtitle" style="font-size:13px"></div>
   <div class="stack">
-    <button id="submit" class="primary">Send to SharePoint…</button>
-    <button id="download-copy">Download a copy</button>
+    <button id="save-local">Save local</button>
+    <div id="local-target" class="subtitle" style="font-size:12px"></div>
+    <button id="submit" class="primary">Save to OneDrive</button>
+    <div id="submit-target" class="subtitle" style="font-size:12px"></div>
   </div>
   <div id="submit-result" class="notice" hidden></div>
   <p class="row" id="done-paths"></p>
@@ -129,6 +130,36 @@
     <button id="done-open-another">Open another spreadsheet…</button>
   </div>
 </section>
+
+<!-- ------------------------------------------------------ OneDrive setup -->
+<dialog id="onedrive-help">
+  <h2>Set up your OneDrive folder</h2>
+  <p class="subtitle" style="margin:0 0 10px">
+    bird-swipe saves into a folder on this computer. OneDrive is what carries it
+    up to the shared project. Do this once:
+  </p>
+  <ol style="margin:0 0 14px; padding-left:20px; line-height:1.7">
+    <li>Install <b>OneDrive</b> and sign in with your <b>university account</b>.</li>
+    <li>Open the shared project link in a browser and click
+        <b>Add shortcut to My files</b> (or right-click the folder under
+        <b>Shared</b> in OneDrive). Ask the project lead for the link.</li>
+    <li>Wait for it to sync. In Finder it appears under
+        <b>OneDrive – &lt;Your University&gt;</b>; on Windows, under
+        <b>This PC → OneDrive – &lt;Your University&gt;</b>.</li>
+    <li>Find <b>your own subfolder</b> inside the project folder — make one if
+        it isn't there yet, and check with the project lead what to call it.</li>
+    <li>Right-click your folder → <b>Always keep on this device</b>, so files
+        aren't left in the cloud only.</li>
+  </ol>
+  <div class="notice warn" style="margin-bottom:12px">
+    Pick <b>your own subfolder</b>, not the project folder above it — everyone's
+    folders sit side by side and bird-swipe can only show you the folder's name.
+  </div>
+  <div class="dialog-actions">
+    <button id="onedrive-help-close">Close</button>
+    <button id="onedrive-help-pick" class="primary">Choose folder…</button>
+  </div>
+</dialog>
 
 <!-- --------------------------------------------------------- preferences -->
 <dialog id="prefs">
