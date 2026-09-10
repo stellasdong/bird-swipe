@@ -213,16 +213,17 @@ async function renderSubmitTarget() {
     if (name) {
       const strong = document.createElement('b');
       strong.textContent = `“${name}”`;
-      node.append(node === el.submitTarget ? 'into ' : 'OneDrive folder: ', strong, ' ');
+      node.append('OneDrive folder: ', strong, ' ');
       const change = document.createElement('button');
       change.textContent = 'Change';
       change.style.cssText = 'padding:2px 8px;font-size:12px;margin-left:4px';
       change.addEventListener('click', changeSubmitFolder);
       node.append(change);
     } else {
-      node.append(node === el.submitTarget
-        ? "you'll choose your OneDrive folder the first time"
-        : 'OneDrive folder: not set up yet.');
+      const none = document.createElement('span');
+      none.className = 'none';
+      none.textContent = 'not set up yet';
+      node.append('OneDrive folder: ', none, " — you'll choose it the first time.");
     }
   }
 }
@@ -914,9 +915,17 @@ function showResult(kind, message) {
 }
 
 function renderLocalTarget() {
-  el.localTarget.textContent = state.autosave
-    ? `into “${state.autosave.name}” — autosaved as you go`
-    : "you'll choose a folder the first time";
+  el.localTarget.textContent = '';
+  if (state.autosave) {
+    const strong = document.createElement('b');
+    strong.textContent = `“${state.autosave.name}”`;
+    el.localTarget.append('Local folder: ', strong, ' — autosaved as you label.');
+    return;
+  }
+  const none = document.createElement('span');
+  none.className = 'none';
+  none.textContent = 'not set yet';
+  el.localTarget.append('Local folder: ', none, " — you'll choose it the first time.");
 }
 
 // --- the OneDrive setup dialog ---
