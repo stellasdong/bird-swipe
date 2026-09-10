@@ -18,25 +18,29 @@ version.
 > your computer, so labels couldn't be saved. Edge is already on every Windows
 > PC; on a Mac, install Chrome once.
 
-### First run
+### Labeling a spreadsheet
 
 1. Type **your name**. It goes in the `reviewer` column so labels can be traced
    back to whoever made them.
-2. Click **Choose folder…** and pick the folder holding your Macaulay exports.
-   Your browser will ask permission once — choose **Allow on every visit** so it
-   doesn't ask again.
-3. Pick a species export from the list that appears, and start labeling.
+2. Click **Open a spreadsheet…** and pick the Macaulay export you downloaded —
+   straight out of your Downloads folder is fine.
+3. Label it. Your progress is saved in the browser as you go, so you can close
+   the tab and come back; the spreadsheet reappears under **In progress on this
+   computer**.
+4. When you reach the end, click **Send to SharePoint…** and choose the shared
+   folder. Only finished work goes there — nothing half-labeled.
 
-Next time you open the app, click **Reconnect** and you're straight back in.
+The browser asks permission the first time you pick the folder. Choose **Allow
+on every visit** so later submissions are one click.
 
-### Choosing the shared SharePoint folder
+### Setting up the SharePoint folder (once)
 
-If the lab's exports live in a SharePoint document library, open it in a browser
-first and click **Sync** (or **Add shortcut to OneDrive**). It then shows up as
-an ordinary folder on your computer, and bird-swipe writes into it like any
-other folder — your labels sync back up for everyone automatically.
+Open the shared document library in a browser and click **Sync** (or **Add
+shortcut to OneDrive**). It then shows up as an ordinary folder on your
+computer, and **Send to SharePoint…** writes into it — OneDrive syncs it back up
+for everyone automatically.
 
-In the folder picker, that folder is at:
+In the folder picker it's at:
 
 | | |
 |---|---|
@@ -45,12 +49,13 @@ In the folder picker, that folder is at:
 
 Two things that will otherwise trip you up:
 
-- **Pick the project folder itself, not `Documents`, `Desktop`, `Downloads` or
+- **Pick the shared folder itself, not `Documents`, `Desktop`, `Downloads` or
   your home folder.** Chrome refuses to hand those top-level folders to a web
-  page — you have to choose a folder inside one of them.
+  page — you have to choose a folder inside one of them. (Opening the *export*
+  from Downloads is fine; that's a single file, not a folder.)
 - **Right-click the folder → "Always keep on this device."** Otherwise OneDrive
-  may keep the files in the cloud only, and the app will refuse to save rather
-  than risk overwriting good data with a partial file.
+  may keep files in the cloud only, and the app will refuse to save rather than
+  risk overwriting good data with a partial file.
 
 ## How to label
 
@@ -81,28 +86,33 @@ the note is saved when you press YES/NO.
 
 ## How labels are saved
 
-The original export is never modified. Labels are written live into a `labeled/`
-folder inside the folder you chose:
+The original export is never modified. While you label, your work is kept **in
+the browser on your own computer** — nothing is written to disk and nothing is
+shared yet. That's what lets you open an export straight from Downloads without
+granting access to any folder.
+
+When you click **Send to SharePoint…**, two files are written into the folder
+you choose:
 
 ```
-<your folder>/labeled/<name>_labeled.csv     all completed entries
-<your folder>/labeled/nest/<name>_nest.csv   only the nest=yes entries
+<name>_labeled.csv     all completed entries
+<name>_nest.csv        only the nest=yes entries
 ```
 
 Each row gets the columns `nest_label`, `human_structure`, `anthropogenic`,
 `eggs`, `notes`, `reviewed`, `reviewed_at`, and `reviewer` appended to the
-original ones. Both files are keyed by ML catalog number; flipping a row out of
+original ones. Both are keyed by ML catalog number; flipping a row out of
 "nest=yes" removes it from the nest file.
 
-A small but important note on **who edits what**: the app rewrites these whole
-files as you go, so **two people should not label the same export at the same
-time** — the second person's save would overwrite the first person's. Give each
-researcher their own species file. If the app spots labels from someone else in
-a file you open, it will warn you.
+> **Submit when you finish a spreadsheet.** In-progress work lives only in that
+> browser on that computer. It survives closing the tab, quitting the browser
+> and restarting the machine — but **clearing your browsing data will delete
+> it**, and it isn't backed up anywhere. The done screen also offers
+> **Download a copy** if you'd rather save the files yourself.
 
-Saves are batched about a second apart rather than on every keystroke, so a
-shared folder isn't uploading on every swipe. The header shows `saved` once your
-work is on disk, and anything outstanding is flushed when you close the tab.
+Because each researcher works on their own spreadsheet and submits a finished
+file, two people never write the same file at once. If the app does spot labels
+from someone else in a file you open, it warns you.
 
 ### Your data stays yours
 
@@ -136,19 +146,25 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 115 assertions covering the CSV
-parser, the label scheme, resume, the truncation guard and the debounced writer,
-plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
+Open **http://localhost:8000/web/test.html** — 126 assertions covering the CSV
+parser, the label scheme, resume, the truncation guard, the debounced writer and
+the in-browser progress store, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
 and the pass/fail count.
 
 ### The folder-access spike
 
-**http://localhost:8000/web/spike.html** probes each risky platform behavior in
-isolation: browser support, folder read/write, permission persistence across a
-reload, OneDrive placeholder truncation, and media playback. Run it on a
-university-managed laptop against the real SharePoint folder before rolling the
-app out — enterprise policy can disable local file access for websites, and this
-tells you in a minute.
+**http://localhost:8000/web/spike.html** (or
+[the deployed copy](https://stellasdong.github.io/bird-swipe/spike.html)) probes
+each risky platform behavior in isolation: browser support, folder read/write,
+permission persistence across a reload, OneDrive placeholder truncation, and
+media playback. Run it against the real synced SharePoint folder before rolling
+the app out — chiefly to confirm that a cloud-only file either hydrates or trips
+the truncation guard, and that the picker reaches
+`~/Library/CloudStorage/OneDrive-<Tenant>` on macOS.
+
+Chrome and Edge can also disable local file access by policy
+(`DefaultFileSystemWriteGuardSetting`), but that needs a managed device or a
+managed browser profile — not a concern when researchers use personal laptops.
 
 ### Layout
 
@@ -156,7 +172,7 @@ tells you in a minute.
 web/index.html    the three screens (welcome / label / done)
 web/app.js        label loop, hotkeys, rendering      (was ui/main_window.py)
 web/catalog.js    load, validate, label, resume       (was core/catalog.py)
-web/storage.js    File System Access API + debounced writes
+web/storage.js    file picking, in-browser progress, submit to a folder
 web/csv.js        RFC 4180 parse / serialize
 web/macaulay.js   asset URLs                          (was core/macaulay.py)
 web/settings.js   reviewer name + hotkeys             (was config.py)
@@ -192,5 +208,6 @@ pyinstaller packaging/bird_swipe.spec --noconfirm   # build the bundles
 - [x] M1 — label loop: validate, hotkeys, save-as-you-go, resume; native video
 - [x] M2 — `.xlsx` read/write + photo prefetch for instant swipes
 - [x] M3 — first-run dialog + PyInstaller builds + CI release (Windows/Mac)
-- [x] M4 — static web app: no install, no updates, writes into the shared folder
-- [ ] M5 — verify on a university-managed laptop against the real SharePoint folder
+- [x] M4 — static web app: no install, no updates
+- [ ] M5 — verify against the real OneDrive-synced SharePoint folder
+- [x] M6 — hand finished spreadsheets to a designated SharePoint folder

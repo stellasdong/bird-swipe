@@ -13,36 +13,75 @@
 //     app rewrites whole files, so writing after a short read would replace a
 //     good cloud copy with the truncation. See assertReadLooksComplete.
 
-import { LABELED_DIRNAME, NEST_DIRNAME, labeledName, nestName } from './catalog.js';
+import { labeledName, nestName } from './catalog.js';
 
 const DB_NAME = 'bird-swipe';
+const DB_VERSION = 2;
 const STORE = 'handles';
-const HANDLE_KEY = 'workingDir';
+const PROGRESS = 'progress';
+const HANDLE_KEY = 'submitDir';
 
-export const isSupported = () => typeof window.showDirectoryPicker === 'function';
+export const isSupported = () =>
+  typeof window.showOpenFilePicker === 'function'
+  && typeof window.showDirectoryPicker === 'function';
 
 /** Thrown when a read looks truncated; the caller must not write over it. */
 export class TruncatedReadError extends Error {}
 
 // --- IndexedDB: remember the folder across reloads ---------------------------
-function withStore(mode, fn) {
+function withStore(storeName, mode, fn) {
   return new Promise((resolve, reject) => {
-    const open = indexedDB.open(DB_NAME, 1);
-    open.onupgradeneeded = () => open.result.createObjectStore(STORE);
+    const open = indexedDB.open(DB_NAME, DB_VERSION);
+    open.onupgradeneeded = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(PROGRESS)) db.createObjectStore(PROGRESS);
+    };
     open.onerror = () => reject(open.error);
     open.onsuccess = () => {
       const db = open.result;
-      const tx = db.transaction(STORE, mode);
-      const req = fn(tx.objectStore(STORE));
+      const tx = db.transaction(storeName, mode);
+      const req = fn(tx.objectStore(storeName));
       tx.oncomplete = () => { db.close(); resolve(req?.result); };
       tx.onerror = () => { db.close(); reject(tx.error); };
     };
   });
 }
 
-const rememberHandle = h => withStore('readwrite', s => s.put(h, HANDLE_KEY));
-const recallHandle = () => withStore('readonly', s => s.get(HANDLE_KEY));
-const forgetHandle = () => withStore('readwrite', s => s.delete(HANDLE_KEY));
+/**
+ * Labeling progress, kept in the browser rather than on disk.
+ *
+ * Researchers download their own exports, so the file usually sits in
+ * Downloads — a folder Chromium refuses to hand to a web page. Picking the
+ * single file works, but a file handle gives no access to its parent, so there
+ * is nowhere on disk to put work-in-progress until the researcher chooses where
+ * to submit. Progress therefore lives in IndexedDB, keyed by file name, and only
+ * finished work is written out.
+ *
+ * This exposes writeOutputs() so DebouncedWriter can target it exactly like a
+ * Folder.
+ */
+export const Progress = {
+  async writeOutputs(inputName, { labeledText, nestText }) {
+    await withStore(PROGRESS, 'readwrite', store => store.put({
+      inputName, labeledText, nestText, updatedAt: Date.now(),
+    }, inputName));
+  },
+  load(inputName) {
+    return withStore(PROGRESS, 'readonly', store => store.get(inputName));
+  },
+  async list() {
+    const all = await withStore(PROGRESS, 'readonly', store => store.getAll());
+    return (all ?? []).sort((a, b) => b.updatedAt - a.updatedAt);
+  },
+  remove(inputName) {
+    return withStore(PROGRESS, 'readwrite', store => store.delete(inputName));
+  },
+};
+
+const rememberHandle = h => withStore(STORE, 'readwrite', s => s.put(h, HANDLE_KEY));
+const recallHandle = () => withStore(STORE, 'readonly', s => s.get(HANDLE_KEY));
+const forgetHandle = () => withStore(STORE, 'readwrite', s => s.delete(HANDLE_KEY));
 
 // --- the Files-On-Demand guard ----------------------------------------------
 /**
@@ -119,73 +158,71 @@ export class Folder {
     return state === 'granted';
   }
 
-  /** Spreadsheets sitting directly in the folder, newest name order. */
-  async listExports() {
-    const found = [];
-    for await (const [name, handle] of this.handle.entries()) {
-      if (handle.kind !== 'file') continue;
-      if (!/\.(csv|xlsx|xlsm)$/i.test(name)) continue;
-      if (/_labeled\.|_nest\./i.test(name)) continue; // our own output
-      const file = await handle.getFile();
-      found.push({ name, handle, size: file.size, lastModified: file.lastModified });
-    }
-    found.sort((a, b) => a.name.localeCompare(b.name));
-    return found;
-  }
-
-  /** Read a file's text, refusing a truncated placeholder read. */
-  async readText(fileHandle) {
-    const file = await fileHandle.getFile();
-    const text = await file.text();
-    assertReadLooksComplete(file, text);
-    return text;
-  }
-
-  async _outputDir(create) {
-    const labeled = await this.handle.getDirectoryHandle(LABELED_DIRNAME, { create });
-    const nest = await labeled.getDirectoryHandle(NEST_DIRNAME, { create });
-    return { labeled, nest };
-  }
-
   /**
-   * Existing output for an export, or null for each file that isn't there yet.
-   * A truncated read propagates — the caller must not start labeling over it.
+   * Write the finished files into this folder. Flat, not nested: this is a
+   * submission destination, and the `_labeled` / `_nest` suffixes already say
+   * which is which to whoever collects them.
    */
-  async readOutputs(inputName) {
-    const readIfPresent = async (dir, name) => {
-      try {
-        const fh = await dir.getFileHandle(name);
-        return await this.readText(fh);
-      } catch (err) {
-        if (err.name === 'NotFoundError') return null;
-        throw err;
-      }
-    };
-    let dirs;
-    try {
-      dirs = await this._outputDir(false);
-    } catch (err) {
-      if (err.name === 'NotFoundError') return { labeledText: null, nestText: null };
-      throw err;
-    }
-    return {
-      labeledText: await readIfPresent(dirs.labeled, labeledName(inputName)),
-      nestText: await readIfPresent(dirs.nest, nestName(inputName)),
-    };
-  }
-
-  /** Write both output files. Creates labeled/ and labeled/nest/ as needed. */
   async writeOutputs(inputName, { labeledText, nestText }) {
-    const { labeled, nest } = await this._outputDir(true);
-    await writeFile(labeled, labeledName(inputName), labeledText);
-    await writeFile(nest, nestName(inputName), nestText);
+    await writeFile(this.handle, labeledName(inputName), labeledText);
+    await writeFile(this.handle, nestName(inputName), nestText);
+    return [labeledName(inputName), nestName(inputName)];
   }
 
-  /** Display path for the done screen. */
+  /** Display path for the confirmation message. */
   outputPath(inputName, which = 'labeled') {
-    return which === 'nest'
-      ? `${this.name}/${LABELED_DIRNAME}/${NEST_DIRNAME}/${nestName(inputName)}`
-      : `${this.name}/${LABELED_DIRNAME}/${labeledName(inputName)}`;
+    return `${this.name}/${which === 'nest' ? nestName(inputName) : labeledName(inputName)}`;
+  }
+}
+
+/**
+ * Handles for the exports being worked on, so reopening one is a single
+ * permission click rather than hunting through Downloads again. Kept apart from
+ * the progress records so the debounced writer can put() without a read-modify-
+ * write race.
+ */
+export const ExportHandles = {
+  save(name, handle) {
+    return withStore(STORE, 'readwrite', s => s.put(handle, `export:${name}`));
+  },
+  load(name) {
+    return withStore(STORE, 'readonly', s => s.get(`export:${name}`));
+  },
+  remove(name) {
+    return withStore(STORE, 'readwrite', s => s.delete(`export:${name}`));
+  },
+};
+
+/** Re-grant read access to a stored file handle. Needs a user gesture. */
+export async function ensureReadable(handle) {
+  if (await handle.queryPermission({ mode: 'read' }) === 'granted') return true;
+  return await handle.requestPermission({ mode: 'read' }) === 'granted';
+}
+
+/** Read a file's text, refusing a truncated placeholder read. */
+export async function readText(fileHandle) {
+  const file = await fileHandle.getFile();
+  const text = await file.text();
+  assertReadLooksComplete(file, text);
+  return text;
+}
+
+/** Pick a single Macaulay export. Works from Downloads, which a folder pick can't. */
+export async function pickExport() {
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      id: 'bird-swipe-export',
+      types: [{
+        description: 'Macaulay export',
+        accept: { 'text/csv': ['.csv'], 'application/vnd.ms-excel': ['.csv'] },
+      }],
+      excludeAcceptAllOption: false,
+      multiple: false,
+    });
+    return handle;
+  } catch (err) {
+    if (err.name === 'AbortError') return null;
+    throw describePickerFailure(err);
   }
 }
 

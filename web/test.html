@@ -27,7 +27,9 @@ import {
   Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
   LABEL_COLUMNS, REVIEWED, SKIPPED,
 } from './catalog.js';
-import { assertReadLooksComplete, TruncatedReadError, DebouncedWriter } from './storage.js';
+import {
+  assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress,
+} from './storage.js';
 import { DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay } from './settings.js';
 
 const out = document.getElementById('out');
@@ -316,6 +318,46 @@ group('settings.js — hotkeys');
   eq('a collision is reported', duplicateKey({ ...keys, back: 'ArrowRight' })?.[0], 'ArrowRight');
   eq('arrows display as glyphs', keyDisplay('ArrowRight'), '→');
   eq('letters display uppercase', keyDisplay('q'), 'Q');
+}
+
+group('storage.js — progress kept in the browser');
+{
+  // Researchers download their own exports, so there is no folder to write
+  // in-progress work to until they submit. This store is what stands between
+  // them and losing a session's labeling.
+  const NAME = '__test_progress.csv';
+  await Progress.remove(NAME);
+
+  await Progress.writeOutputs(NAME, { labeledText: 'a\r\n1\r\n', nestText: 'n\r\n' });
+  const first = await Progress.load(NAME);
+  eq('saved labeled text', first.labeledText, 'a\r\n1\r\n');
+  eq('saved nest text', first.nestText, 'n\r\n');
+  eq('keyed by input name', first.inputName, NAME);
+  check('stamped with a time', typeof first.updatedAt === 'number');
+
+  await new Promise(r => setTimeout(r, 12));
+  await Progress.writeOutputs(NAME, { labeledText: 'a\r\n1\r\n2\r\n', nestText: 'n\r\n' });
+  const second = await Progress.load(NAME);
+  eq('a later write replaces the earlier one', second.labeledText, 'a\r\n1\r\n2\r\n');
+  check('and moves updatedAt forward', second.updatedAt > first.updatedAt);
+
+  const listed = await Progress.list();
+  check('list() includes it', listed.some(e => e.inputName === NAME));
+  check('list() is newest first',
+        listed.every((e, i) => i === 0 || listed[i - 1].updatedAt >= e.updatedAt));
+
+  // DebouncedWriter must drive the store exactly as it drives a Folder.
+  const w = new DebouncedWriter(Progress, NAME, { delay: 10 });
+  w.schedule({ labeled: { serialize: () => 'via\r\nwriter\r\n' },
+               nest: { serialize: () => 'n2\r\n' } });
+  await w.flush();
+  w.dispose();
+  const viaWriter = await Progress.load(NAME);
+  eq('DebouncedWriter writes through to the store', viaWriter.labeledText, 'via\r\nwriter\r\n');
+
+  await Progress.remove(NAME);
+  eq('remove() clears it', await Progress.load(NAME), undefined);
+  check('and it leaves the list', !(await Progress.list()).some(e => e.inputName === NAME));
 }
 
 // ------------------------------------------------- real Macaulay export files

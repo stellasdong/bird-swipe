@@ -5,10 +5,13 @@
 // <video> provide all of that natively, so what is left here is the label loop
 // itself.
 
-import { Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError } from './catalog.js';
+import {
+  Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
+} from './catalog.js';
 import { assetPageUrl, photoUrl, videoUrl } from './macaulay.js';
 import {
-  Folder, DebouncedWriter, TruncatedReadError, isSupported,
+  DebouncedWriter, ExportHandles, Folder, Progress, TruncatedReadError,
+  ensureReadable, isSupported, pickExport, readText,
 } from './storage.js';
 import {
   ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, duplicateKey,
@@ -28,13 +31,11 @@ const el = {
   welcomeBody: $('welcome-body'),
   welcomeError: $('welcome-error'),
   reviewer: $('reviewer'),
-  reconnect: $('reconnect'),
-  reconnectName: $('reconnect-name'),
-  chooseFolder: $('choose-folder'),
+  openExport: $('open-export'),
   prefsWelcome: $('prefs-welcome'),
   folderInfo: $('folder-info'),
+  resumeBlock: $('resume-block'),
   fileList: $('file-list'),
-  noFiles: $('no-files'),
   version: $('version'),
 
   rowTitle: $('row-title'),
@@ -60,6 +61,9 @@ const el = {
   doneObservations: $('done-observations'),
   doneSkipped: $('done-skipped'),
   reviewSkipped: $('review-skipped'),
+  submit: $('submit'),
+  downloadCopy: $('download-copy'),
+  submitResult: $('submit-result'),
   donePaths: $('done-paths'),
   doneHint: $('done-hint'),
   doneOpenAnother: $('done-open-another'),
@@ -86,7 +90,7 @@ const TOGGLE_ACTIONS = {
 };
 
 const state = {
-  folder: null,
+  sink: Progress,   // where in-progress work is kept (swapped in dev mode)
   catalog: null,
   inputName: null,
   writer: null,
@@ -109,45 +113,33 @@ function showError(node, message) {
 
 // ------------------------------------------------------------------ dev mode
 /**
- * `?dev=../test/export.csv` loads an export over HTTP into an in-memory folder,
- * so the label loop can be driven without the native folder picker. This
- * mirrors the desktop app's habit of loading a bundled test/ file when run with
- * no arguments (bird_swipe/app.py:_default_input). Writes go nowhere but are
- * logged, and the welcome screen says so.
+ * `?dev=../test/export.csv` loads an export over HTTP and keeps progress in
+ * memory, so the label loop can be driven without the native file picker. This
+ * mirrors the desktop app's habit of opening a bundled test/ file when run with
+ * no arguments (bird_swipe/app.py:_default_input).
  */
-class MemoryFolder {
-  constructor(name) {
-    this.name = name;
-    this.outputs = { labeledText: null, nestText: null };
-    this.writeCount = 0;
-  }
-  async listExports() { return this._exports ?? []; }
-  async readText(handle) { return handle.text; }
-  async readOutputs() { return { ...this.outputs }; }
+const memorySink = {
+  outputs: { labeledText: null, nestText: null },
+  writeCount: 0,
   async writeOutputs(inputName, payload) {
     this.outputs = { ...payload };
     this.writeCount += 1;
-    window.__devOutputs = this.outputs; // inspectable from the console in dev mode
-    console.log(`[dev] write #${this.writeCount} for ${inputName}: ` +
-                `${payload.labeledText.split('\r\n').length - 2} labeled rows`);
-  }
-  outputPath(inputName, which) {
-    return `(dev, not written) ${this.name}/labeled/${which}`;
-  }
-}
+    window.__devOutputs = this.outputs; // inspectable from the console
+    console.log(`[dev] write #${this.writeCount} for ${inputName}`);
+  },
+};
 
 async function startDevMode(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url} -> HTTP ${response.status}`);
   const text = await response.text();
   const name = url.split('/').pop();
-  const folder = new MemoryFolder('dev');
-  folder._exports = [{ name, handle: { text }, size: text.length, lastModified: Date.now() }];
-  state.folder = folder;
+  state.sink = memorySink;
   el.folderInfo.textContent =
-    `Dev mode: ${name} loaded over HTTP. Labels are kept in memory only, not written to disk.`;
+    `Dev mode: ${name} loaded over HTTP. Progress is kept in memory only.`;
   el.folderInfo.hidden = false;
-  await refreshFileList();
+  // A stand-in for a FileSystemFileHandle: readText() only needs getFile().
+  await beginLabeling({ name, getFile: async () => new File([text], name) }, name);
 }
 
 // ------------------------------------------------------------------ welcome
@@ -171,122 +163,124 @@ async function initWelcome() {
     el.welcomeBody.hidden = true;
     return;
   }
-
-  // A stored folder can't be re-permissioned without a click, so offer a button.
-  const restored = await Folder.restore().catch(() => null);
-  if (restored instanceof Folder) {
-    await useFolder(restored);
-  } else if (restored?.needsPermission) {
-    el.reconnectName.textContent = restored.folder.name;
-    el.reconnect.hidden = false;
-  }
+  await refreshResumeList();
 }
 
-el.chooseFolder.addEventListener('click', async () => {
+el.openExport.addEventListener('click', async () => {
   el.welcomeError.hidden = true;
   try {
-    const folder = await Folder.pick();
-    if (folder) await useFolder(folder);
+    const handle = await pickExport();
+    if (!handle) return;
+    await ExportHandles.save(handle.name, handle).catch(() => {}); // non-fatal
+    await beginLabeling(handle, handle.name);
   } catch (err) {
     showError(el.welcomeError, err.message);
   }
 });
 
-el.reconnect.addEventListener('click', async () => {
-  el.welcomeError.hidden = true;
+/** Spreadsheets with unfinished work saved in this browser. */
+async function refreshResumeList() {
+  let entries = [];
   try {
-    const restored = await Folder.restore({ interactive: true });
-    if (restored instanceof Folder) {
-      el.reconnect.hidden = true;
-      await useFolder(restored);
-    } else {
-      showError(el.welcomeError,
-        'Access to that folder was not granted. Choose it again below.');
-      el.reconnect.hidden = true;
-      await Folder.forget();
-    }
-  } catch (err) {
-    showError(el.welcomeError, err.message);
-  }
-});
-
-async function useFolder(folder) {
-  state.folder = folder;
-  el.reconnect.hidden = true;
-  el.folderInfo.textContent = `Labels will be saved into: ${folder.name}/labeled/`;
-  el.folderInfo.hidden = false;
-  await refreshFileList();
-}
-
-async function refreshFileList() {
-  let exports_;
-  try {
-    exports_ = await state.folder.listExports();
-  } catch (err) {
-    showError(el.welcomeError, `Couldn't read that folder: ${err.message}`);
-    return;
-  }
+    entries = await Progress.list();
+  } catch { /* private mode, blocked storage — just offer the picker */ }
+  el.resumeBlock.hidden = entries.length === 0;
   el.fileList.textContent = '';
-  el.noFiles.hidden = exports_.length > 0;
-  el.fileList.hidden = exports_.length === 0;
-  for (const entry of exports_) {
+  for (const entry of entries) {
     const li = document.createElement('li');
     const button = document.createElement('button');
     const name = document.createElement('span');
-    name.textContent = entry.name;
+    name.textContent = entry.inputName;
     const meta = document.createElement('span');
     meta.className = 'meta';
-    meta.textContent = `${(entry.size / 1024).toFixed(0)} KB`;
+    const rows = Math.max(0, entry.labeledText.split('\r\n').length - 2);
+    meta.textContent = `${rows} labeled · ${relativeTime(entry.updatedAt)}`;
     button.append(name, meta);
-    button.addEventListener('click', () => openExport(entry));
+    button.addEventListener('click', () => resumeEntry(entry));
     li.append(button);
     el.fileList.append(li);
   }
 }
 
-// --------------------------------------------------------------- open a file
-async function openExport(entry) {
+function relativeTime(ms) {
+  const mins = Math.round((Date.now() - ms) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+
+/** Reopen a spreadsheet we have progress for, re-granting read access. */
+async function resumeEntry(entry) {
   el.welcomeError.hidden = true;
+  try {
+    const handle = await ExportHandles.load(entry.inputName);
+    if (handle && await ensureReadable(handle)) {
+      await beginLabeling(handle, entry.inputName);
+      return;
+    }
+    // The handle is gone or access was refused — ask for the file again. The
+    // saved labels are keyed by name, so they still apply.
+    const picked = await pickExport();
+    if (!picked) return;
+    if (picked.name !== entry.inputName) {
+      showError(el.welcomeError,
+        `That's ${picked.name}, but the saved progress is for ${entry.inputName}. ` +
+        `Pick that file to carry on, or label this one from the start.`);
+      return;
+    }
+    await ExportHandles.save(picked.name, picked).catch(() => {});
+    await beginLabeling(picked, entry.inputName);
+  } catch (err) {
+    showError(el.welcomeError, err.message);
+  }
+}
+
+// --------------------------------------------------------------- open a file
+async function beginLabeling(fileHandle, inputName) {
   setReviewer(el.reviewer.value);
 
-  let inputText, outputs;
+  let inputText, saved;
   try {
-    inputText = await state.folder.readText(entry.handle);
-    outputs = await state.folder.readOutputs(entry.name);
+    inputText = await readText(fileHandle);
+    saved = await Progress.load(inputName).catch(() => null);
   } catch (err) {
-    // A truncated read is the Files-On-Demand hazard: never write over it.
+    // A truncated read is the Files-On-Demand hazard: never build on it.
     showError(el.welcomeError, err instanceof TruncatedReadError
       ? err.message
-      : `Couldn't open ${entry.name}: ${err.message}`);
+      : `Couldn't open ${inputName}: ${err.message}`);
     return;
   }
 
   let catalog;
   try {
-    ({ catalog } = Catalog.open(entry.name, inputText, outputs));
+    ({ catalog } = Catalog.open(inputName, inputText, {
+      labeledText: saved?.labeledText ?? null,
+      nestText: saved?.nestText ?? null,
+    }));
   } catch (err) {
     showError(el.welcomeError, err instanceof ValidationError
-      ? `${entry.name} doesn't look like a Macaulay export.\n${err.message}`
+      ? `${inputName} doesn't look like a Macaulay export.\n${err.message}`
       : err.message);
     return;
   }
 
   state.catalog = catalog;
-  state.inputName = entry.name;
+  state.inputName = inputName;
   state.idx = catalog.firstUnreviewed();
   state.reviewingSkipped = false;
   state.reviewHistory = [];
   state.writer?.dispose();
-  state.writer = new DebouncedWriter(state.folder, entry.name, {
+  state.writer = new DebouncedWriter(state.sink, inputName, {
     onError: err => setSaveState('error', err.message),
     onStateChange: setSaveState,
   });
 
   const others = catalog.otherReviewers(getReviewer());
   if (others.length) {
-    console.warn(`${entry.name} already has labels from: ${others.join(', ')}`);
-    alertBanner(`Heads up: this export already has labels from ${others.join(', ')}. ` +
-                `Two people labeling one file will overwrite each other.`);
+    alertBanner(`Heads up: this file already has labels from ${others.join(', ')}. ` +
+                `Two people labeling one spreadsheet will overwrite each other.`);
   }
   showCurrent();
 }
@@ -581,7 +575,7 @@ async function closeFile() {
   stopVideo();
   document.title = 'bird-swipe';
   show('welcome');
-  if (state.folder) await refreshFileList();
+  await refreshResumeList();
 }
 
 // -------------------------------------------------------------------- done
@@ -604,25 +598,73 @@ function showDone() {
   el.reviewSkipped.textContent =
     `Review ${s.skipped} skipped item${s.skipped === 1 ? '' : 's'}`;
 
-  el.donePaths.textContent = '';
-  const line = (count, path) => {
-    const div = document.createElement('div');
-    const code = document.createElement('code');
-    code.textContent = path;
-    div.append(`${count} `, code);
-    return div;
-  };
-  el.donePaths.append(
-    line(`${state.catalog.labeled.count()} completed entries saved to`,
-         state.folder.outputPath(state.inputName, 'labeled')),
-    line(`${state.catalog.nest.count()} nests saved to`,
-         state.folder.outputPath(state.inputName, 'nest')));
+  el.donePaths.textContent =
+    `${state.catalog.labeled.count()} completed entries · ${state.catalog.nest.count()} nests`;
   el.doneHint.textContent =
     `Press ${keyDisplay(state.keys.back)} to revisit the last item, ` +
     `or ${keyDisplay(state.keys.close)} to close this file.`;
+  el.submitResult.hidden = true;
+  el.submit.disabled = false;
   state.writer?.flush();
 }
 
+// ------------------------------------------------------------------- submit
+/**
+ * Copy the finished files into the designated SharePoint folder. Work in
+ * progress never goes there — only a deliberate submit does — so the folder
+ * holds completed evaluations and nothing half-done.
+ */
+async function submitToSharePoint() {
+  el.submitResult.hidden = true;
+  el.submit.disabled = true;
+  try {
+    await state.writer?.flush();
+
+    // Reuse the folder if it's still granted; otherwise ask. Both paths are
+    // inside this click, which is the user gesture requestPermission needs.
+    let folder = await Folder.restore({ interactive: true }).catch(() => null);
+    if (!(folder instanceof Folder)) folder = await Folder.pick();
+    if (!folder) { el.submit.disabled = false; return; } // cancelled
+
+    const written = await folder.writeOutputs(state.inputName, {
+      labeledText: state.catalog.labeled.serialize(),
+      nestText: state.catalog.nest.serialize(),
+    });
+    showResult('info',
+      `Sent to ${folder.name}: ${written.join(' and ')}. ` +
+      `OneDrive will sync it up to SharePoint shortly.`);
+  } catch (err) {
+    showResult('error', `Couldn't send: ${err.message}`);
+  } finally {
+    el.submit.disabled = false;
+  }
+}
+
+function showResult(kind, message) {
+  el.submitResult.className = `notice ${kind}`;
+  el.submitResult.textContent = message;
+  el.submitResult.hidden = false;
+}
+
+/** Escape hatch: save the finished files without granting any folder access. */
+function downloadCopy() {
+  const files = [
+    [labeledName(state.inputName), state.catalog.labeled.serialize()],
+    [nestName(state.inputName), state.catalog.nest.serialize()],
+  ];
+  for (const [name, text] of files) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+  showResult('info', `Downloaded ${files.map(f => f[0]).join(' and ')}.`);
+}
+
+el.submit.addEventListener('click', submitToSharePoint);
+el.downloadCopy.addEventListener('click', downloadCopy);
 el.reviewSkipped.addEventListener('click', startReviewSkipped);
 el.doneOpenAnother.addEventListener('click', closeFile);
 

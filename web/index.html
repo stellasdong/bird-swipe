@@ -13,8 +13,8 @@
   <h1>bird-swipe</h1>
   <p class="subtitle">
     Swipe through Macaulay Library nest media and label it fast.
-    Your labels are written straight into the folder you choose — nothing is
-    uploaded anywhere.
+    Open your export, label it, then send the finished file to the shared
+    SharePoint folder. Nothing is uploaded anywhere else.
   </p>
 
   <div id="unsupported" class="notice error" hidden>
@@ -35,16 +35,18 @@
     </p>
 
     <div class="stack">
-      <button id="reconnect" class="primary" hidden>Reconnect “<span id="reconnect-name"></span>”</button>
-      <button id="choose-folder" class="primary">Choose folder…</button>
+      <button id="open-export" class="primary">Open a spreadsheet…</button>
       <button id="prefs-welcome">Preferences…</button>
     </div>
 
     <div id="folder-info" class="notice info" hidden></div>
-    <ul id="file-list" class="file-list" hidden></ul>
-    <div id="no-files" class="notice warn" hidden>
-      No Macaulay exports (<code>.csv</code>) found in that folder. Put a species
-      export in it, then choose it again.
+
+    <div id="resume-block" hidden>
+      <p class="subtitle" style="margin-bottom:4px"><b>In progress on this computer</b></p>
+      <ul id="file-list" class="file-list"></ul>
+      <p class="subtitle" style="font-size:12px">
+        Reopen the same spreadsheet to carry on where you left off.
+      </p>
     </div>
   </div>
 
@@ -90,10 +92,15 @@
   <p class="row" id="done-observations"></p>
   <p class="row" id="done-skipped"></p>
   <button id="review-skipped" hidden></button>
+  <div class="stack">
+    <button id="submit" class="primary">Send to SharePoint…</button>
+    <button id="download-copy">Download a copy</button>
+  </div>
+  <div id="submit-result" class="notice" hidden></div>
   <p class="row" id="done-paths"></p>
   <p class="row" id="done-hint"></p>
   <div class="stack">
-    <button id="done-open-another">Open another export…</button>
+    <button id="done-open-another">Open another spreadsheet…</button>
   </div>
 </section>
 
