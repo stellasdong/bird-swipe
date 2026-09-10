@@ -90,7 +90,7 @@ const el = {
   doneOpenAnother: $('done-open-another'),
 
   reportOpen: $('report-open'),
-  reportOpenWelcome: $('report-open-welcome'),
+  reportLinks: [...document.querySelectorAll('.report-link')],
   report: $('report'),
   reportDoing: $('report-doing'),
   reportWrong: $('report-wrong'),
@@ -1221,8 +1221,7 @@ for (const node of [el.reportDoing, el.reportWrong, el.reportRepeats]) {
   // Enter inside the dialog must not reach the label loop behind it.
   on(node, 'keydown', event => event.stopPropagation());
 }
-on(el.reportOpen, 'click', openReport);
-on(el.reportOpenWelcome, 'click', openReport);
+for (const link of el.reportLinks) on(link, 'click', openReport);
 on(el.reportClose, 'click', () => el.report.close());
 
 on(el.reportCopy, 'click', async () => {
@@ -1260,9 +1259,7 @@ export function noteHandledError(where, err) {
 }
 
 function flagErrors() {
-  for (const node of [el.reportOpen, el.reportOpenWelcome]) {
-    if (node) node.dataset.errors = 'true';
-  }
+  for (const link of el.reportLinks) link.dataset.errors = 'true';
 }
 
 // --------------------------------------------------------------------- boot
