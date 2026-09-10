@@ -444,7 +444,8 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
 /* The action sits at the bottom of every card, so the two line up. */
 .folder-card > button:not(.link-btn) { width: 100%; margin-top: auto; min-width: 0; }
 .link-btn {
-  align-self: flex-start;
+  /* centred over the card's full-width action below it, not pinned left */
+  align-self: center;
   border: 0;
   background: none;
   color: var(--muted);
