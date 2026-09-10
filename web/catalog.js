@@ -22,12 +22,28 @@ export const REQUIRED_COLUMNS = [
 export const CATALOG_KEY = 'ML Catalog Number';
 
 // Columns bird-swipe appends. Order preserved when new to a file.
+//
+// eggs/chicks stay yes/no for continuity with already-labeled files, and are
+// derived from the counts so the two can never disagree. On a reviewed row an
+// unanswered count is written as 0 rather than left blank: the row was looked
+// at, so "none seen" is a real observation. Blank counts therefore only ever
+// appear on rows that were skipped or never reached.
 export const LABEL_COLUMNS = [
-  'nest_label', 'human_structure', 'anthropogenic', 'eggs',
+  'nest_label', 'human_structure', 'anthropogenic',
+  'eggs', 'egg_count', 'chicks', 'chick_count',
   'notes', 'reviewed', 'reviewed_at', 'reviewer',
 ];
 
 export const REVIEWED = 'TRUE';
+
+/**
+ * A count box's contents as a number. Anything unparseable — empty, spaces,
+ * a stray letter — is 0, which on a reviewed row means "looked, saw none".
+ */
+export function normalizeCount(value) {
+  const n = parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 export const SKIPPED = 'skip'; // nest_label value for a skipped-but-reviewed item
 
 export const LABELED_DIRNAME = 'labeled';
@@ -179,13 +195,18 @@ export class Catalog {
 
   // --- labeling -------------------------------------------------------------
   /** Record a decision for row `index`. `nest` is true / false / null. */
-  setLabel(index, { nest, structure, anthropogenic = false, eggs = false,
-                    reviewer = '', notes = '' }) {
+  setLabel(index, { nest, structure, anthropogenic = false,
+                    eggCount = '', chickCount = '', reviewer = '', notes = '' }) {
     const row = this.rows[index];
+    const eggs = normalizeCount(eggCount);
+    const chicks = normalizeCount(chickCount);
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
     row.human_structure = structure ? 'yes' : 'no';
     row.anthropogenic = anthropogenic ? 'yes' : 'no';
-    row.eggs = eggs ? 'yes' : 'no';
+    row.eggs = eggs > 0 ? 'yes' : 'no';
+    row.egg_count = String(eggs);
+    row.chicks = chicks > 0 ? 'yes' : 'no';
+    row.chick_count = String(chicks);
     row.notes = notes;
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
@@ -207,6 +228,9 @@ export class Catalog {
     row.human_structure = ''; // no observations recorded on a skip
     row.anthropogenic = '';
     row.eggs = '';
+    row.egg_count = '';
+    row.chicks = '';
+    row.chick_count = '';
     row.notes = notes;
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
@@ -261,6 +285,9 @@ export class Catalog {
       structure: count(r => r.human_structure === 'yes'),
       anthropogenic: count(r => r.anthropogenic === 'yes'),
       eggs: count(r => r.eggs === 'yes'),
+      chicks: count(r => r.chicks === 'yes'),
+      eggTotal: this.rows.reduce((n, r) => n + normalizeCount(r.egg_count), 0),
+      chickTotal: this.rows.reduce((n, r) => n + normalizeCount(r.chick_count), 0),
     };
   }
 }

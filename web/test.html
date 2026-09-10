@@ -25,7 +25,7 @@
 import { parseRows, parseTable, serializeTable } from './csv.js';
 import {
   Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
-  LABEL_COLUMNS, REVIEWED, SKIPPED,
+  LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
@@ -138,10 +138,14 @@ group('catalog.js — labeling');
   eq('all label columns added', LABEL_COLUMNS.every(c => c in catalog.rows[0]), true);
   eq('starts unreviewed', catalog.firstUnreviewed(), 0);
 
-  catalog.setLabel(0, { nest: true, structure: true, eggs: true, reviewer: 'stella' });
+  catalog.setLabel(0, { nest: true, structure: true, eggCount: '2', chickCount: '',
+                        reviewer: 'stella' });
   eq('nest yes recorded', catalog.rows[0].nest_label, 'yes');
   eq('structure recorded', catalog.rows[0].human_structure, 'yes');
   eq('eggs recorded', catalog.rows[0].eggs, 'yes');
+  eq('egg count recorded', catalog.rows[0].egg_count, '2');
+  eq('no chicks entered means zero, not blank', catalog.rows[0].chick_count, '0');
+  eq('chicks flag follows the count', catalog.rows[0].chicks, 'no');
   eq('anthropogenic defaults to no', catalog.rows[0].anthropogenic, 'no');
   eq('marked reviewed', catalog.rows[0].reviewed, REVIEWED);
   eq('reviewer stamped', catalog.rows[0].reviewer, 'stella');
@@ -158,6 +162,8 @@ group('catalog.js — labeling');
   catalog.setSkip(1, { reviewer: 'stella' });
   eq('skip sets the sentinel', catalog.rows[1].nest_label, SKIPPED);
   eq('skip clears observations', catalog.rows[1].human_structure, '');
+  eq('skip leaves the egg count blank, not zero', catalog.rows[1].egg_count, '');
+  eq('skip leaves the chick count blank', catalog.rows[1].chick_count, '');
   check('skip counts as reviewed', catalog.isReviewed(1));
   check('skip is detectable', catalog.isSkipped(1));
   eq('resume passes over skips', catalog.firstUnreviewed(), 2);
@@ -171,10 +177,45 @@ group('catalog.js — labeling');
   eq('stats skipped', st.skipped, 1);
 }
 
+group('catalog.js — egg and chick counts');
+{
+  eq('a number parses', normalizeCount('3'), 3);
+  eq('blank is zero', normalizeCount(''), 0);
+  eq('whitespace is zero', normalizeCount('   '), 0);
+  eq('nonsense is zero', normalizeCount('abc'), 0);
+  eq('negatives clamp to zero', normalizeCount('-2'), 0);
+  eq('null is zero', normalizeCount(null), 0);
+  eq('a decimal truncates', normalizeCount('2.9'), 2);
+
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+  catalog.setLabel(0, { nest: true, structure: false, eggCount: '4', chickCount: '2' });
+  eq('both counts stored', [catalog.rows[0].egg_count, catalog.rows[0].chick_count],
+     ['4', '2']);
+  eq('both flags follow', [catalog.rows[0].eggs, catalog.rows[0].chicks], ['yes', 'yes']);
+
+  // A nest can hold eggs and chicks at once, and one without the other.
+  catalog.setLabel(1, { nest: true, structure: false, eggCount: '0', chickCount: '3' });
+  eq('chicks without eggs', [catalog.rows[1].eggs, catalog.rows[1].chicks], ['no', 'yes']);
+  eq('zero eggs is recorded as 0', catalog.rows[1].egg_count, '0');
+
+  catalog.setLabel(2, { nest: false, structure: false });
+  eq('an unanswered count on a reviewed row is 0, not blank',
+     [catalog.rows[2].egg_count, catalog.rows[2].chick_count], ['0', '0']);
+  check('so a blank count only ever means not-reviewed',
+        catalog.rows[3].egg_count === '' && !catalog.isReviewed(3));
+
+  const st = catalog.stats();
+  eq('counts images with eggs', st.eggs, 1);
+  eq('counts images with chicks', st.chicks, 2);
+  eq('totals the eggs', st.eggTotal, 4);
+  eq('totals the chicks', st.chickTotal, 5);
+}
+
 group('catalog.js — resume across a reload');
 {
   const first = Catalog.open('s.csv', SAMPLE).catalog;
   first.setLabel(0, { nest: true, structure: false, anthropogenic: true,
+                      eggCount: '3', chickCount: '1',
                       reviewer: 'stella', notes: 'wrong species id' });
   first.setSkip(1, { reviewer: 'stella' });
   const labeledText = first.labeled.serialize();
@@ -183,6 +224,8 @@ group('catalog.js — resume across a reload');
   const { catalog: again } = Catalog.open('s.csv', SAMPLE, { labeledText, nestText });
   eq('label restored', again.rows[0].nest_label, 'yes');
   eq('anthropogenic restored', again.rows[0].anthropogenic, 'yes');
+  eq('egg count restored', again.rows[0].egg_count, '3');
+  eq('chick count restored', again.rows[0].chick_count, '1');
   eq('notes restored', again.rows[0].notes, 'wrong species id');
   eq('skip restored', again.rows[1].nest_label, SKIPPED);
   eq('resumes at the first unreviewed row', again.firstUnreviewed(), 2);
