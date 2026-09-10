@@ -46,7 +46,9 @@ const el = {
   rowTitle: $('row-title'),
   progress: $('progress'),
   saveState: $('save-state'),
-  nestChip: $('nest-chip'),
+  nestYes: $('nest-yes'),
+  nestNo: $('nest-no'),
+  nestSkip: $('nest-skip'),
   toggles: {
     structure: $('t-structure'),
     anthropogenic: $('t-anthropogenic'),
@@ -310,13 +312,22 @@ function relativeTime(ms) {
 async function resumeEntry(entry) {
   el.welcomeError.hidden = true;
   try {
-    const handle = await ExportHandles.load(entry.inputName);
-    if (handle && await ensureReadable(handle)) {
-      await beginLabeling(handle, entry.inputName);
+    const handle = await ExportHandles.load(entry.inputName).catch(() => null);
+
+    // One activation-consuming call per click: either re-grant the remembered
+    // handle, or open the picker — never both (see acquireSubmitFolder).
+    if (handle) {
+      if (await ensureReadable(handle)) {
+        await beginLabeling(handle, entry.inputName);
+        return;
+      }
+      await ExportHandles.remove(entry.inputName).catch(() => {});
+      showError(el.welcomeError,
+        `Access to ${entry.inputName} wasn't granted. Click it again to pick the ` +
+        `file yourself — your saved labels for it are kept.`);
       return;
     }
-    // The handle is gone or access was refused — ask for the file again. The
-    // saved labels are keyed by name, so they still apply.
+
     const picked = await pickExport();
     if (!picked) return;
     if (picked.name !== entry.inputName) {
@@ -432,6 +443,7 @@ function showCurrent() {
     setToggle(field, row[column] === 'yes');
   }
   updateChip(row);
+  renderNestLabels();
   prefetchUpcoming();
   resetNotesLabel();
   renderLegend();
@@ -457,14 +469,15 @@ function renderToggleLabels() {
 
 function updateChip(row) {
   const label = row.nest_label ?? '';
-  const map = {
-    yes: ['nest: YES ✓', 'yes'],
-    no: ['nest: NO ✗', 'no'],
-    [SKIPPED]: ['nest: SKIPPED', 'skip'],
-  };
-  const [text, cls] = map[label] ?? ['nest: — (unlabeled)', ''];
-  el.nestChip.textContent = text;
-  el.nestChip.className = `chip ${cls}`.trim();
+  el.nestYes.setAttribute('aria-pressed', String(label === 'yes'));
+  el.nestNo.setAttribute('aria-pressed', String(label === 'no'));
+  el.nestSkip.hidden = label !== SKIPPED;
+}
+
+/** Labels on the nest buttons follow whatever the keys are bound to. */
+function renderNestLabels() {
+  el.nestYes.textContent = `nest YES ✓  (${keyDisplay(state.keys.nest_yes)})`;
+  el.nestNo.textContent = `nest NO ✗  (${keyDisplay(state.keys.nest_no)})`;
 }
 
 function renderMeta(row) {
@@ -721,14 +734,10 @@ async function submitToSharePoint() {
   el.submitResult.hidden = true;
   el.submit.disabled = true;
   try {
+    const folder = await acquireSubmitFolder();
+    if (!folder) return; // cancelled, or told the user what to do next
+
     await state.writer?.flush();
-
-    // Reuse the folder if it's still granted; otherwise ask. Both paths are
-    // inside this click, which is the user gesture requestPermission needs.
-    let folder = await Folder.restore({ interactive: true }).catch(() => null);
-    if (!(folder instanceof Folder)) folder = await Folder.pick();
-    if (!folder) { el.submit.disabled = false; return; } // cancelled
-
     const written = await folder.writeOutputs(state.inputName, {
       labeledText: state.catalog.labeled.serialize(),
       nestText: state.catalog.nest.serialize(),
@@ -741,6 +750,34 @@ async function submitToSharePoint() {
   } finally {
     el.submit.disabled = false;
   }
+}
+
+/**
+ * Get the folder to submit into, spending the click's transient activation on
+ * exactly one thing.
+ *
+ * Both requestPermission() and showDirectoryPicker() require transient
+ * activation, and the first *consumes* it — so calling one then the other in a
+ * single click makes the second throw SecurityError every time. Activation also
+ * expires a few seconds after the click, which is why nothing slow (a flush, a
+ * folder write) may run before this.
+ */
+async function acquireSubmitFolder() {
+  const stored = await Folder.restore(); // reads IndexedDB; uses no activation
+
+  if (stored instanceof Folder) return stored; // still granted, nothing to spend
+
+  if (stored?.needsPermission) {
+    // Spend the activation re-granting the remembered folder, and stop there.
+    if (await stored.folder.requestPermission()) return stored.folder;
+    await Folder.forget();
+    showResult('warn',
+      `Access to “${stored.folder.name}” wasn't granted, so it has been forgotten. ` +
+      `Click Send to SharePoint again to choose a folder.`);
+    return null;
+  }
+
+  return await Folder.pick(); // nothing remembered — spend it on the picker
 }
 
 function showResult(kind, message) {
@@ -772,6 +809,16 @@ el.reviewSkipped.addEventListener('click', startReviewSkipped);
 el.doneOpenAnother.addEventListener('click', closeFile);
 
 // -------------------------------------------------------------------- input
+// Clicking a nest button does exactly what its arrow key does: commit the
+// decision with the observation toggles as they stand, then advance.
+for (const [node, value] of [[el.nestYes, true], [el.nestNo, false]]) {
+  node.addEventListener('click', () => {
+    if (!state.catalog || state.idx >= state.catalog.rows.length) return;
+    node.blur(); // keep arrow keys with the label loop
+    commit(value);
+  });
+}
+
 for (const [field, node] of Object.entries(el.toggles)) {
   node.addEventListener('click', () => {
     setToggle(field, !toggleOn(field));
@@ -904,4 +951,5 @@ el.prefsWelcome.addEventListener('click', openPrefs);
 
 // --------------------------------------------------------------------- boot
 renderToggleLabels();
+renderNestLabels();
 initWelcome();

@@ -1,11 +1,13 @@
 name: Build apps
 
-# Build the macOS and Windows apps. Runs on every push (so you always know the
-# build is healthy) and, when you push a version tag like v1.0.0, also publishes
-# the apps to a GitHub Release that non-technical users can download.
+# Build the macOS and Windows desktop apps and publish them to a GitHub Release.
+#
+# The web app at https://stellasdong.github.io/bird-swipe/ is how researchers
+# actually run bird-swipe, so this no longer builds on every push: each run
+# spent ~4 minutes producing ~640 MB of bundles nobody downloads. It now runs
+# only on a version tag, or on demand.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 

@@ -29,8 +29,14 @@ npm-debug.log*
 .vscode/
 .idea/
 
-# bird-swipe generated label output (a labeled/ folder beside each CSV)
+# bird-swipe generated label output. The desktop app writes a labeled/ folder
+# beside each CSV; the web app writes the two files flat into whichever folder
+# you submit to, so match those by name too.
 labeled/
+*_labeled.csv
+*_labeled.xlsx
+*_nest.csv
+*_nest.xlsx
 
 # Prototype media (large, keep local)
 proto_video/
