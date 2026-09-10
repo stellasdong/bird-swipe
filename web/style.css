@@ -267,6 +267,17 @@ textarea {
 }
 textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
 
+/* Notes are the exception rather than the rule, so the box sits at one line and
+   gives the rest of the height to the photo. It opens up when it has something
+   in it or you're typing — :placeholder-shown is only true while it's empty —
+   so stepping back to an item never hides a note you already wrote. */
+#notes { height: 34px; transition: height .14s ease; }
+#notes.filled, #notes:focus { height: 74px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #notes { transition: none; }
+}
+
 .legend {
   padding: 7px 14px;
   border-top: 1px solid var(--edge);

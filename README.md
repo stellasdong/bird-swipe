@@ -132,6 +132,10 @@ or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
 loads at full resolution — scroll to move around, press `Z` or click again to
 fit.
 
+The notes box sits at one line and gives the height to the photo. It opens up
+while you're typing, and stays open on any item that has a note, so stepping
+back never hides one.
+
 Hotkeys are rebindable in **Preferences…**. (Upgrading from an earlier version
 resets them to the defaults above, because the scheme changed — eggs became a
 count and chicks were added.) Reopening a file resumes at the

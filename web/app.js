@@ -565,6 +565,7 @@ function showCurrent() {
   showAsset(mlId, row.Format ?? '');
   renderMeta(row);
   el.notes.value = row.notes ?? '';
+  refreshNotesSize();
   for (const [field, column] of Object.entries(TOGGLE_FIELDS)) {
     setToggle(field, row[column] === 'yes');
   }
@@ -1110,6 +1111,20 @@ for (const [field, node] of Object.entries(el.toggles)) {
     node.blur(); // keep arrow keys with the label loop
   });
 }
+
+/**
+ * Notes are the exception, so the box sits at one line and gives the height to
+ * the photo — but it opens whenever it holds something, so stepping back to an
+ * item never hides a note. Driven from here rather than :placeholder-shown,
+ * which doesn't reliably recalculate when the value is set programmatically,
+ * and setting it programmatically is exactly what showing a row does.
+ */
+function refreshNotesSize() {
+  el.notes.classList.toggle('filled', el.notes.value.trim() !== '');
+}
+
+el.notes.addEventListener('input', refreshNotesSize);
+el.notes.addEventListener('blur', refreshNotesSize);
 
 el.notes.addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.shiftKey) { // Enter -> back to the loop
