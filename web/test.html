@@ -28,7 +28,7 @@ import {
   LABEL_COLUMNS, REVIEWED, SKIPPED,
 } from './catalog.js';
 import {
-  assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress,
+  assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
 } from './storage.js';
 import { DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay } from './settings.js';
 
@@ -358,6 +358,67 @@ group('storage.js — progress kept in the browser');
   await Progress.remove(NAME);
   eq('remove() clears it', await Progress.load(NAME), undefined);
   check('and it leaves the list', !(await Progress.list()).some(e => e.inputName === NAME));
+}
+
+group('storage.js — autosave mirroring');
+{
+  const sink = (name, opts = {}) => ({
+    name, writes: [], fail: opts.fail ?? false,
+    async writeOutputs(inputName, payload) {
+      if (this.fail) throw new Error(`${this.name} unavailable`);
+      this.writes.push(payload.labeledText);
+    },
+  });
+  const payload = t => ({ labeledText: t, nestText: 'n' });
+
+  {
+    const browser = sink('browser');
+    const folder = sink('folder');
+    const m = mirrorSink(browser, folder);
+    check('reports that it is mirroring', m.mirroring);
+    await m.writeOutputs('x.csv', payload('a'));
+    eq('browser copy written', browser.writes, ['a']);
+    eq('folder copy written too', folder.writes, ['a']);
+  }
+  {
+    const browser = sink('browser');
+    const m = mirrorSink(browser, null);
+    check('no mirror configured is fine', !m.mirroring);
+    await m.writeOutputs('x.csv', payload('a'));
+    eq('browser copy still written', browser.writes, ['a']);
+  }
+  {
+    // The important one: a broken autosave folder must not stop labeling.
+    const browser = sink('browser');
+    const folder = sink('folder', { fail: true });
+    let reported = null;
+    const m = mirrorSink(browser, folder, { onMirrorError: e => { reported = e; } });
+    let threw = null;
+    try { await m.writeOutputs('x.csv', payload('a')); } catch (e) { threw = e; }
+    eq('a failing autosave does not throw', threw, null);
+    eq('the browser copy still succeeded', browser.writes, ['a']);
+    check('and the failure is reported', reported?.message === 'folder unavailable', reported);
+  }
+  {
+    // A failing browser store is a real error and must propagate.
+    const browser = sink('browser', { fail: true });
+    const m = mirrorSink(browser, sink('folder'));
+    let threw = null;
+    try { await m.writeOutputs('x.csv', payload('a')); } catch (e) { threw = e; }
+    check('a failing browser store does throw', threw !== null, threw);
+  }
+  {
+    const browser = sink('browser');
+    const folder = sink('folder');
+    const m = mirrorSink(browser, null);
+    m.setMirror(folder);
+    await m.writeOutputs('x.csv', payload('a'));
+    eq('a mirror added later is used', folder.writes, ['a']);
+    m.setMirror(null);
+    await m.writeOutputs('x.csv', payload('b'));
+    eq('and turning it off stops writes', folder.writes, ['a']);
+    eq('while the browser keeps both', browser.writes, ['a', 'b']);
+  }
 }
 
 // ------------------------------------------------- real Macaulay export files

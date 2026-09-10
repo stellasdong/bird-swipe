@@ -10,12 +10,13 @@ import {
 } from './catalog.js';
 import { assetPageUrl, photoUrl, videoUrl } from './macaulay.js';
 import {
-  DebouncedWriter, ExportHandles, Folder, Progress, TruncatedReadError,
-  ensureReadable, isSupported, pickExport, readText,
+  AUTOSAVE_DIR, DebouncedWriter, ExportHandles, Folder, Progress,
+  TruncatedReadError, ensureReadable, isSupported, mirrorSink, pickExport, readText,
 } from './storage.js';
 import {
-  ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, duplicateKey,
-  getKeys, getReviewer, keyDisplay, setKeys, setReviewer,
+  ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, autosaveOffered,
+  duplicateKey, getKeys, getReviewer, keyDisplay, setAutosaveOffered, setKeys,
+  setReviewer,
 } from './settings.js';
 
 export const VERSION = '3.0.0';
@@ -34,6 +35,10 @@ const el = {
   openExport: $('open-export'),
   prefsWelcome: $('prefs-welcome'),
   folderInfo: $('folder-info'),
+  autosaveOffer: $('autosave-offer'),
+  autosaveChoose: $('autosave-choose'),
+  autosaveSkip: $('autosave-skip'),
+  autosaveStatus: $('autosave-status'),
   resumeBlock: $('resume-block'),
   fileList: $('file-list'),
   version: $('version'),
@@ -90,7 +95,9 @@ const TOGGLE_ACTIONS = {
 };
 
 const state = {
-  sink: Progress,   // where in-progress work is kept (swapped in dev mode)
+  sink: Progress,       // where in-progress work is kept (swapped in dev mode)
+  autosave: null,       // optional Folder mirrored to as you label
+  mirror: null,         // the composite sink wrapping Progress + autosave
   catalog: null,
   inputName: null,
   writer: null,
@@ -163,8 +170,96 @@ async function initWelcome() {
     el.welcomeBody.hidden = true;
     return;
   }
+  await restoreAutosave();
   await refreshResumeList();
 }
+
+// ----------------------------------------------------------------- autosave
+/**
+ * Optional: mirror in-progress work to a folder on disk as well as to the
+ * browser. Offered once; declining is remembered. Never required, and a
+ * failure here never blocks labeling.
+ */
+async function restoreAutosave() {
+  const restored = await Folder.restore({ key: AUTOSAVE_DIR }).catch(() => null);
+  if (restored instanceof Folder) {
+    state.autosave = restored;
+  } else if (restored?.needsPermission) {
+    // Re-granting needs a click, so offer one rather than failing silently.
+    renderAutosaveStatus({ needsPermission: true, name: restored.folder.name });
+    return;
+  } else if (!autosaveOffered()) {
+    el.autosaveOffer.hidden = false;
+    return;
+  }
+  renderAutosaveStatus();
+}
+
+function renderAutosaveStatus(pending = null) {
+  el.autosaveStatus.textContent = '';
+  const add = (...nodes) => el.autosaveStatus.append(...nodes);
+  const button = (label, onClick) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = 'padding:2px 8px;font-size:12px;margin-left:6px';
+    b.addEventListener('click', onClick);
+    return b;
+  };
+
+  if (pending?.needsPermission) {
+    add(`Autosave to “${pending.name}” needs permission again.`,
+        button('Reconnect', async () => {
+          const folder = await Folder.restore({ key: AUTOSAVE_DIR, interactive: true });
+          state.autosave = folder instanceof Folder ? folder : null;
+          if (!state.autosave) await Folder.forget(AUTOSAVE_DIR);
+          renderAutosaveStatus();
+        }));
+    return;
+  }
+  if (state.autosave) {
+    add(`Autosaving a copy to “${state.autosave.name}”.`,
+        button('Change', chooseAutosave),
+        button('Turn off', async () => {
+          await Folder.forget(AUTOSAVE_DIR);
+          state.autosave = null;
+          state.mirror?.setMirror(null);
+          renderAutosaveStatus();
+        }));
+    return;
+  }
+  add('Autosave is off — work is kept in this browser only.',
+      button('Set up', chooseAutosave));
+}
+
+async function chooseAutosave() {
+  el.welcomeError.hidden = true;
+  try {
+    const folder = await Folder.pick(AUTOSAVE_DIR);
+    if (!folder) return;
+    const submitFolder = await Folder.restore().catch(() => null);
+    if (submitFolder instanceof Folder && await folder.isSameAs(submitFolder)) {
+      showError(el.welcomeError,
+        'That is the folder you submit finished work to. Pick a different one, ' +
+        'so half-labeled files never land there.');
+      await Folder.forget(AUTOSAVE_DIR);
+      return;
+    }
+    state.autosave = folder;
+    state.mirror?.setMirror(folder);
+    setAutosaveOffered(true);
+    el.autosaveOffer.hidden = true;
+    renderAutosaveStatus();
+  } catch (err) {
+    showError(el.welcomeError, err.message);
+  }
+}
+
+el.autosaveChoose.addEventListener('click', chooseAutosave);
+el.autosaveSkip.addEventListener('click', () => {
+  setAutosaveOffered(true);
+  el.autosaveOffer.hidden = true;
+  renderAutosaveStatus();
+});
 
 el.openExport.addEventListener('click', async () => {
   el.welcomeError.hidden = true;
@@ -272,7 +367,15 @@ async function beginLabeling(fileHandle, inputName) {
   state.reviewingSkipped = false;
   state.reviewHistory = [];
   state.writer?.dispose();
-  state.writer = new DebouncedWriter(state.sink, inputName, {
+  state.mirror = mirrorSink(state.sink, state.autosave, {
+    onMirrorError: err => {
+      // The browser copy still succeeded, so this is a warning, not a failure.
+      console.warn('autosave failed:', err);
+      alertBanner(`Autosave to “${state.autosave?.name}” failed (${err.message}). ` +
+                  `Your work is still saved in this browser.`);
+    },
+  });
+  state.writer = new DebouncedWriter(state.mirror, inputName, {
     onError: err => setSaveState('error', err.message),
     onStateChange: setSaveState,
   });

@@ -24,14 +24,29 @@ version.
    back to whoever made them.
 2. Click **Open a spreadsheet…** and pick the Macaulay export you downloaded —
    straight out of your Downloads folder is fine.
-3. Label it. Your progress is saved in the browser as you go, so you can close
-   the tab and come back; the spreadsheet reappears under **In progress on this
-   computer**.
+3. Label it. Your progress is saved as you go, so you can close the tab and come
+   back — the spreadsheet reappears under **In progress on this computer**.
 4. When you reach the end, click **Send to SharePoint…** and choose the shared
    folder. Only finished work goes there — nothing half-labeled.
 
 The browser asks permission the first time you pick the folder. Choose **Allow
 on every visit** so later submissions are one click.
+
+### Autosave (recommended)
+
+On first run bird-swipe offers to **autosave a backup copy** to a folder of your
+choosing. Turn it on and every save is written to that folder as well as to the
+browser, so your work survives clearing browsing data or switching browsers.
+
+Make a folder for it first — e.g. `Documents/bird-swipe` — because Chrome won't
+hand over `Documents` itself. Point it somewhere *other* than the shared
+SharePoint folder; the app will refuse if you pick the same one, so half-labeled
+files never land where finished work goes. (Pointing it at a personal OneDrive
+folder is a fine way to get an off-machine backup.)
+
+It's optional and can be turned on or off any time from the welcome screen. If
+the folder ever goes missing, labeling carries on regardless and you get a
+warning — the browser copy is the one that has to work.
 
 ### Setting up the SharePoint folder (once)
 
@@ -87,9 +102,9 @@ the note is saved when you press YES/NO.
 ## How labels are saved
 
 The original export is never modified. While you label, your work is kept **in
-the browser on your own computer** — nothing is written to disk and nothing is
-shared yet. That's what lets you open an export straight from Downloads without
-granting access to any folder.
+the browser on your own computer**, plus an autosave folder if you set one up.
+Nothing is shared yet. Keeping the browser copy is what lets you open an export
+straight from Downloads without granting access to any folder.
 
 When you click **Send to SharePoint…**, two files are written into the folder
 you choose:
@@ -104,11 +119,11 @@ Each row gets the columns `nest_label`, `human_structure`, `anthropogenic`,
 original ones. Both are keyed by ML catalog number; flipping a row out of
 "nest=yes" removes it from the nest file.
 
-> **Submit when you finish a spreadsheet.** In-progress work lives only in that
-> browser on that computer. It survives closing the tab, quitting the browser
-> and restarting the machine — but **clearing your browsing data will delete
-> it**, and it isn't backed up anywhere. The done screen also offers
-> **Download a copy** if you'd rather save the files yourself.
+> **Submit when you finish a spreadsheet.** Without autosave, in-progress work
+> lives only in that browser on that computer: it survives closing the tab,
+> quitting the browser and restarting the machine, but **clearing your browsing
+> data will delete it**. Turning on autosave (above) removes that risk, and the
+> done screen also offers **Download a copy** at any time.
 
 Because each researcher works on their own spreadsheet and submits a finished
 file, two people never write the same file at once. If the app does spot labels
@@ -146,9 +161,10 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 126 assertions covering the CSV
-parser, the label scheme, resume, the truncation guard, the debounced writer and
-the in-browser progress store, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
+Open **http://localhost:8000/web/test.html** — 138 assertions covering the CSV
+parser, the label scheme, resume, the truncation guard, the debounced writer,
+the in-browser progress store and autosave mirroring, plus round-trips of every
+real export in `test/`. The page title shows a ✓ or ✗
 and the pass/fail count.
 
 ### The folder-access spike
@@ -172,7 +188,7 @@ managed browser profile — not a concern when researchers use personal laptops.
 web/index.html    the three screens (welcome / label / done)
 web/app.js        label loop, hotkeys, rendering      (was ui/main_window.py)
 web/catalog.js    load, validate, label, resume       (was core/catalog.py)
-web/storage.js    file picking, in-browser progress, submit to a folder
+web/storage.js    file picking, progress, autosave mirroring, submit
 web/csv.js        RFC 4180 parse / serialize
 web/macaulay.js   asset URLs                          (was core/macaulay.py)
 web/settings.js   reviewer name + hotkeys             (was config.py)
@@ -211,3 +227,4 @@ pyinstaller packaging/bird_swipe.spec --noconfirm   # build the bundles
 - [x] M4 — static web app: no install, no updates
 - [ ] M5 — verify against the real OneDrive-synced SharePoint folder
 - [x] M6 — hand finished spreadsheets to a designated SharePoint folder
+- [x] M7 — optional autosave of in-progress work to a local folder

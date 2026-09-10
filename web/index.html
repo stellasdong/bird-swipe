@@ -41,6 +41,19 @@
 
     <div id="folder-info" class="notice info" hidden></div>
 
+    <div id="autosave-offer" class="notice info" hidden>
+      <b>Autosave a backup copy?</b><br>
+      While you label, your work is kept in this browser. Pick a folder and
+      bird-swipe will also keep a copy of it on disk as you go — worth doing if
+      you'd rather not rely on browser storage alone.
+      <div class="stack" style="margin-top:8px">
+        <button id="autosave-choose" class="primary">Choose autosave folder…</button>
+        <button id="autosave-skip">Not now</button>
+      </div>
+    </div>
+
+    <div id="autosave-status" class="subtitle" style="font-size:12px"></div>
+
     <div id="resume-block" hidden>
       <p class="subtitle" style="margin-bottom:4px"><b>In progress on this computer</b></p>
       <ul id="file-list" class="file-list"></ul>

@@ -19,7 +19,10 @@ const DB_NAME = 'bird-swipe';
 const DB_VERSION = 2;
 const STORE = 'handles';
 const PROGRESS = 'progress';
-const HANDLE_KEY = 'submitDir';
+
+/** Folder roles. Kept apart so autosave and submit are independent grants. */
+export const SUBMIT_DIR = 'submitDir';
+export const AUTOSAVE_DIR = 'autosaveDir';
 
 export const isSupported = () =>
   typeof window.showOpenFilePicker === 'function'
@@ -79,9 +82,9 @@ export const Progress = {
   },
 };
 
-const rememberHandle = h => withStore(STORE, 'readwrite', s => s.put(h, HANDLE_KEY));
-const recallHandle = () => withStore(STORE, 'readonly', s => s.get(HANDLE_KEY));
-const forgetHandle = () => withStore(STORE, 'readwrite', s => s.delete(HANDLE_KEY));
+const rememberHandle = (key, h) => withStore(STORE, 'readwrite', s => s.put(h, key));
+const recallHandle = key => withStore(STORE, 'readonly', s => s.get(key));
+const forgetHandle = key => withStore(STORE, 'readwrite', s => s.delete(key));
 
 // --- the Files-On-Demand guard ----------------------------------------------
 /**
@@ -107,22 +110,33 @@ export function assertReadLooksComplete(file, text) {
 
 // --- the working folder ------------------------------------------------------
 export class Folder {
-  constructor(handle) {
+  constructor(handle, key) {
     this.handle = handle;
     this.name = handle.name;
+    this.key = key;
   }
 
   /** Prompt for a folder. Returns null if the user cancelled. */
-  static async pick() {
+  static async pick(key = SUBMIT_DIR) {
     let handle;
     try {
-      handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'bird-swipe' });
+      handle = await window.showDirectoryPicker({ mode: 'readwrite', id: key });
     } catch (err) {
       if (err.name === 'AbortError') return null;
       throw describePickerFailure(err);
     }
-    await rememberHandle(handle).catch(() => {}); // non-fatal
-    return new Folder(handle);
+    await rememberHandle(key, handle).catch(() => {}); // non-fatal
+    return new Folder(handle, key);
+  }
+
+  /** True when two folder roles point at the same directory. */
+  async isSameAs(other) {
+    if (!other) return false;
+    try {
+      return await this.handle.isSameEntry(other.handle);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -130,23 +144,23 @@ export class Folder {
    * `interactive` must be true only when called from a user gesture, since
    * requestPermission() needs transient activation.
    */
-  static async restore({ interactive = false } = {}) {
+  static async restore({ key = SUBMIT_DIR, interactive = false } = {}) {
     let handle;
     try {
-      handle = await recallHandle();
+      handle = await recallHandle(key);
     } catch {
       return null;
     }
     if (!handle) return null;
-    const folder = new Folder(handle);
+    const folder = new Folder(handle, key);
     const state = await folder.permission();
     if (state === 'granted') return folder;
     if (!interactive) return { needsPermission: true, folder };
     return (await folder.requestPermission()) ? folder : { needsPermission: true, folder };
   }
 
-  static async forget() {
-    await forgetHandle().catch(() => {});
+  static async forget(key = SUBMIT_DIR) {
+    await forgetHandle(key).catch(() => {});
   }
 
   permission() {
@@ -254,6 +268,30 @@ function describePickerFailure(err) {
       'access for websites.');
   }
   return err;
+}
+
+/**
+ * Write to the browser store always, and mirror to a folder when one is set up.
+ *
+ * The mirror is deliberately best-effort: an unplugged drive or a revoked
+ * permission must never stop someone labeling, so a failure there is reported
+ * and swallowed rather than propagated. The browser store is the one that has
+ * to succeed.
+ */
+export function mirrorSink(primary, secondary, { onMirrorError = null } = {}) {
+  return {
+    get mirroring() { return Boolean(secondary); },
+    setMirror(folder) { secondary = folder; },
+    async writeOutputs(inputName, payload) {
+      await primary.writeOutputs(inputName, payload);
+      if (!secondary) return;
+      try {
+        await secondary.writeOutputs(inputName, payload);
+      } catch (err) {
+        onMirrorError?.(err);
+      }
+    },
+  };
 }
 
 // --- debounced writer --------------------------------------------------------

@@ -135,3 +135,16 @@ export function setReviewer(name) {
   cfg.reviewer = String(name ?? '').trim();
   save(cfg);
 }
+
+// --- autosave ---------------------------------------------------------------
+/**
+ * Whether we've already offered to set up an autosave folder. Offered once on
+ * first run; declining is remembered so nobody gets nagged every session.
+ */
+export const autosaveOffered = () => load().autosave_offered === true;
+
+export function setAutosaveOffered(value = true) {
+  const cfg = load();
+  cfg.autosave_offered = Boolean(value);
+  save(cfg);
+}
