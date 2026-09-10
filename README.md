@@ -39,12 +39,19 @@ version.
 The browser asks permission the first time you pick the folder. Choose **Allow
 on every visit** so later submissions are one click.
 
-### The local folder (recommended)
+### The two folders
 
-On first run bird-swipe offers to pick a **local folder** to save into. Turn it
-on and every save is written to that folder as well as to the browser, so your
-work survives clearing browsing data or switching browsers. **Save local** on
-the done screen writes there too.
+The welcome screen shows a card for each, side by side, and **neither is
+required** — you can open a spreadsheet, label it and save it to your computer
+without ever setting up OneDrive.
+
+**Local folder** — a copy on this computer, written as you label. Without one,
+your work is kept only in the browser. **Save local** on the done screen writes
+there too.
+
+**OneDrive folder** — your folder in the shared project, so finished
+spreadsheets reach the team. If you don't have one yet, **Don't have one? Set it
+up** opens the instructions, which also point at this protocol and at Mei.
 
 Make a folder for it first — e.g. `Documents/bird-swipe` — because Chrome won't
 hand over `Documents` itself. Point it somewhere *other* than the shared
