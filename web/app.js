@@ -9,7 +9,9 @@ import {
   Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
   normalizeCount,
 } from './catalog.js';
-import { assetPageUrl, photoUrl, videoUrl } from './macaulay.js';
+import {
+  PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, photoUrl, videoUrl,
+} from './macaulay.js';
 import {
   AUTOSAVE_DIR, DebouncedWriter, ExportHandles, Folder, Progress,
   TruncatedReadError, ensureReadable, isSupported, mirrorSink, pickExport, readText,
@@ -123,6 +125,9 @@ const TOGGLE_ACTIONS = {
   toggle_anthropogenic: 'anthropogenic', toggle_anthropogenic_num: 'anthropogenic',
 };
 
+// Navigation actions that may be triggered from inside a count box.
+const ESCAPES_COUNT_BOX = new Set(['nest_yes', 'nest_no', 'forward', 'back']);
+
 const COUNTER_FIELDS = { eggs: 'egg_count', chicks: 'chick_count' };
 const COUNTER_LABELS = { eggs: 'eggs', chicks: 'chicks' };
 // Letter and number bindings both focus the same count box.
@@ -143,6 +148,7 @@ const state = {
   reviewHistory: [],       // breadcrumb of visited items in that pass
   keys: getKeys(),
   currentId: null,
+  zoomed: false,
 };
 
 // ------------------------------------------------------------------ screens
@@ -674,6 +680,7 @@ function renderLegend() {
     [`${keyDisplay(k.toggle_anthropogenic)}/${keyDisplay(k.toggle_anthropogenic_num)}`, 'anthro'],
     [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
     [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
+    [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
     [keyDisplay(k.close), 'close file'],
   ];
   el.legend.textContent = '';
@@ -694,6 +701,7 @@ function renderLegend() {
 // -------------------------------------------------------------------- media
 function showAsset(mlId, format) {
   state.currentId = mlId;
+  setZoom(false);
   stopVideo();
   if (format === 'Video') {
     stopPhoto();
@@ -717,8 +725,12 @@ function showAsset(mlId, format) {
  * paint the previous bird over the current one — the same stale-result guard
  * the Qt version needed (media_view.py:120).
  */
-const photoIsCurrent = () =>
-  state.currentId !== null && el.photo.getAttribute('src') === photoUrl(state.currentId);
+const photoIsCurrent = () => {
+  if (state.currentId === null) return false;
+  const src = el.photo.getAttribute('src');
+  return src === photoUrl(state.currentId, PHOTO_SIZE_DEFAULT)
+      || src === photoUrl(state.currentId, PHOTO_SIZE_HIGH);
+};
 
 function stopPhoto() {
   el.photo.hidden = true;
@@ -737,6 +749,40 @@ el.photo.addEventListener('error', () => {
   el.mediaPlaceholder.textContent = `Couldn't load ML ${state.currentId}. Check your connection.`;
 });
 el.video.addEventListener('loadeddata', () => { el.mediaPlaceholder.hidden = true; });
+/**
+ * Swap between the fit-to-window image and the full-resolution one.
+ *
+ * Counting eggs or chicks in a nest photographed from distance needs real
+ * magnification — the CDN serves a 2400px copy, and until now the app only ever
+ * asked for 1200. Zoomed, the image sits at its natural size and the frame
+ * scrolls.
+ */
+function setZoom(on, origin = null) {
+  const row = state.catalog?.rows[state.idx];
+  if (on && (!row || row.Format === 'Video')) return; // photos only
+  state.zoomed = Boolean(on);
+  el.media.classList.toggle('zoomed', state.zoomed);
+  renderLegend(); // the legend is the one cue that stays put while the image scrolls
+
+  if (!state.currentId) return;
+  const wanted = photoUrl(state.currentId, state.zoomed ? PHOTO_SIZE_HIGH : PHOTO_SIZE_DEFAULT);
+  if (el.photo.getAttribute('src') !== wanted) el.photo.src = wanted;
+  if (!state.zoomed) { el.media.scrollTop = 0; el.media.scrollLeft = 0; return; }
+
+  // Keep whatever they clicked under the pointer, rather than jumping to a corner.
+  requestAnimationFrame(() => {
+    const frame = el.media.getBoundingClientRect();
+    const fx = origin ? (origin.x - frame.left) / frame.width : 0.5;
+    const fy = origin ? (origin.y - frame.top) / frame.height : 0.5;
+    el.media.scrollLeft = fx * el.media.scrollWidth - frame.width / 2;
+    el.media.scrollTop = fy * el.media.scrollHeight - frame.height / 2;
+  });
+}
+
+el.photo.addEventListener('click', event => {
+  setZoom(!state.zoomed, { x: event.clientX, y: event.clientY });
+});
+
 el.video.addEventListener('click', () => {
   if (el.video.paused) el.video.play().catch(() => {}); else el.video.pause();
 });
@@ -1037,6 +1083,21 @@ for (const [field, { box, input }] of Object.entries(el.counters)) {
     if (event.key === 'Enter' || event.key === 'Escape') {
       event.preventDefault();
       input.blur();
+      event.stopPropagation();
+      return;
+    }
+
+    // Let the navigation keys work from inside the box, so counting doesn't
+    // cost an extra keystroke: E, 3, → instead of E, 3, Enter, →. Only
+    // non-printable keys qualify, so digits still type even if someone has
+    // rebound an action to one.
+    const action = actionForEvent(event, state.keys);
+    if (event.key.length > 1 && ESCAPES_COUNT_BOX.has(action)) {
+      event.preventDefault();
+      input.blur();          // commit() reads the value, so blur first
+      event.stopPropagation();
+      runLabelAction(action);
+      return;
     }
     event.stopPropagation();
   });
@@ -1081,13 +1142,21 @@ document.addEventListener('keydown', event => {
   if (state.idx >= state.catalog.rows.length) return; // on the done screen
 
   event.preventDefault();
+  runLabelAction(action);
+});
+
+function runLabelAction(action) {
   if (action in TOGGLE_ACTIONS) {
     const field = TOGGLE_ACTIONS[action];
     setToggle(field, !toggleOn(field));
+  } else if (action === 'zoom') {
+    setZoom(!state.zoomed);
   } else if (action in COUNTER_ACTIONS) {
     focusCount(COUNTER_ACTIONS[action]);
   } else if (action === 'notes') {
     el.notes.focus();
+  } else if (action === 'back') {
+    goBack();
   } else if (action === 'forward') {
     forward();
   } else if (action === 'nest_yes') {
@@ -1095,7 +1164,7 @@ document.addEventListener('keydown', event => {
   } else if (action === 'nest_no') {
     commit(false);
   }
-});
+}
 
 // Last line of defence: the writer flushes on pagehide, but warn if a save is
 // genuinely still outstanding.
