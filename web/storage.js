@@ -13,7 +13,9 @@
 //     app rewrites whole files, so writing after a short read would replace a
 //     good cloud copy with the truncation. See assertReadLooksComplete.
 
-import { labeledName, nestName } from './catalog.js';
+import {
+  LABELED_DIRNAME, NEST_DIRNAME, labeledName, nestName,
+} from './catalog.js';
 
 const DB_NAME = 'bird-swipe';
 const DB_VERSION = 2;
@@ -173,19 +175,27 @@ export class Folder {
   }
 
   /**
-   * Write the finished files into this folder. Flat, not nested: this is a
-   * submission destination, and the `_labeled` / `_nest` suffixes already say
-   * which is which to whoever collects them.
+   * Write both files into this folder, in the same shape the desktop app uses:
+   *
+   *     <folder>/labeled/<name>_labeled.csv
+   *     <folder>/labeled/nest/<name>_nest.csv
+   *
+   * The nest/ subfolder is the point of the split — it collects only the
+   * nest=yes rows, so they can be picked up as a group.
    */
   async writeOutputs(inputName, { labeledText, nestText }) {
-    await writeFile(this.handle, labeledName(inputName), labeledText);
-    await writeFile(this.handle, nestName(inputName), nestText);
-    return [labeledName(inputName), nestName(inputName)];
+    const labeled = await this.handle.getDirectoryHandle(LABELED_DIRNAME, { create: true });
+    const nest = await labeled.getDirectoryHandle(NEST_DIRNAME, { create: true });
+    await writeFile(labeled, labeledName(inputName), labeledText);
+    await writeFile(nest, nestName(inputName), nestText);
+    return [this.outputPath(inputName, 'labeled'), this.outputPath(inputName, 'nest')];
   }
 
   /** Display path for the confirmation message. */
   outputPath(inputName, which = 'labeled') {
-    return `${this.name}/${which === 'nest' ? nestName(inputName) : labeledName(inputName)}`;
+    return which === 'nest'
+      ? `${LABELED_DIRNAME}/${NEST_DIRNAME}/${nestName(inputName)}`
+      : `${LABELED_DIRNAME}/${labeledName(inputName)}`;
   }
 }
 

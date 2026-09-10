@@ -110,9 +110,13 @@ When you click **Send to SharePoint…**, two files are written into the folder
 you choose:
 
 ```
-<name>_labeled.csv     all completed entries
-<name>_nest.csv        only the nest=yes entries
+labeled/<name>_labeled.csv        all completed entries
+labeled/nest/<name>_nest.csv      only the nest=yes entries
 ```
+
+The `nest/` subfolder is the point of the split: it collects only the
+nest-positive rows across every spreadsheet, so they can be picked up as a
+group. Autosave writes the same two paths inside your autosave folder.
 
 Each row gets the columns `nest_label`, `human_structure`, `anthropogenic`,
 `eggs`, `notes`, `reviewed`, `reviewed_at`, and `reviewer` appended to the
@@ -161,10 +165,10 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 138 assertions covering the CSV
+Open **http://localhost:8000/web/test.html** — 143 assertions covering the CSV
 parser, the label scheme, resume, the truncation guard, the debounced writer,
-the in-browser progress store and autosave mirroring, plus round-trips of every
-real export in `test/`. The page title shows a ✓ or ✗
+the in-browser progress store, autosave mirroring and the output folder layout,
+plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
 and the pass/fail count.
 
 ### The folder-access spike

@@ -29,6 +29,7 @@ import {
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
+  Folder, SUBMIT_DIR,
 } from './storage.js';
 import { DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay } from './settings.js';
 
@@ -358,6 +359,49 @@ group('storage.js — progress kept in the browser');
   await Progress.remove(NAME);
   eq('remove() clears it', await Progress.load(NAME), undefined);
   check('and it leaves the list', !(await Progress.list()).some(e => e.inputName === NAME));
+}
+
+group('storage.js — output folder layout');
+{
+  // A stand-in for a FileSystemDirectoryHandle that records the tree it is
+  // asked to build, so the on-disk shape is testable without a real folder.
+  function fakeRoot(name) {
+    const written = new Map();
+    const dir = prefix => ({
+      async getDirectoryHandle(n, { create } = {}) {
+        if (!create) throw Object.assign(new Error('no'), { name: 'NotFoundError' });
+        return dir(`${prefix}${n}/`);
+      },
+      async getFileHandle(n) {
+        return {
+          async createWritable() {
+            return {
+              async write(text) { written.set(prefix + n, text); },
+              async close() {},
+              async abort() {},
+            };
+          },
+        };
+      },
+    });
+    return Object.assign(dir(''), { name, written });
+  }
+
+  const root = fakeRoot('Nest Photos');
+  const folder = new Folder(root, SUBMIT_DIR);
+  const paths = await folder.writeOutputs('ML__rethaw.csv',
+    { labeledText: 'L', nestText: 'N' });
+
+  eq('writes both files nested like the desktop app',
+     [...root.written.keys()].sort(),
+     ['labeled/ML__rethaw_labeled.csv', 'labeled/nest/ML__rethaw_nest.csv']);
+  eq('labeled content', root.written.get('labeled/ML__rethaw_labeled.csv'), 'L');
+  eq('nest content goes to the nest subfolder',
+     root.written.get('labeled/nest/ML__rethaw_nest.csv'), 'N');
+  eq('returns the paths it wrote', paths,
+     ['labeled/ML__rethaw_labeled.csv', 'labeled/nest/ML__rethaw_nest.csv']);
+  eq('outputPath matches what is written',
+     folder.outputPath('ML__rethaw.csv', 'nest'), 'labeled/nest/ML__rethaw_nest.csv');
 }
 
 group('storage.js — autosave mirroring');
