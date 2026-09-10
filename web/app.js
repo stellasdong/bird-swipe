@@ -89,6 +89,8 @@ const el = {
   },
   media: $('media'),
   mediaPlaceholder: $('media-placeholder'),
+  mediaMessage: $('media-message'),
+  mediaRetry: $('media-retry'),
   photo: $('photo'),
   video: $('video'),
   meta: $('meta'),
@@ -166,6 +168,8 @@ const state = {
   currentId: null,
   zoomed: false,
   paceLog: [],   // when each item was reviewed this session, for the estimate
+  wantedSrc: null,  // the media URL currently being asked for
+  attempts: 0,      // how many times this asset has been tried
 };
 
 // ------------------------------------------------------------------ screens
@@ -759,54 +763,75 @@ function renderLegend() {
 // -------------------------------------------------------------------- media
 function showAsset(mlId, format) {
   state.currentId = mlId;
-  setZoom(false);
+  state.attempts = 0;
+  // Reset the zoom *state* without touching src — loadMedia is the only thing
+  // that assigns it. Two owners of el.photo.src raced here, and the loser's URL
+  // no longer matched state.wantedSrc, so every error looked stale and was
+  // swallowed: a broken image sat on "Loading…" for ever.
+  state.zoomed = false;
+  el.media.classList.remove('zoomed');
+  el.media.scrollTop = 0;
+  el.media.scrollLeft = 0;
   stopVideo();
+  loadMedia(format);
+}
+
+/**
+ * (Re)start the fetch for the current asset. Used for first load and retries.
+ *
+ * Retries carry a counter in the query string. Assigning an identical src is a
+ * no-op — the browser doesn't refetch, so no second error ever arrives and the
+ * placeholder sits on "Loading…" for good. The first attempt stays clean so the
+ * CDN cache still does its job.
+ */
+function loadMedia(format = state.catalog?.rows[state.idx]?.Format ?? '') {
+  const mlId = state.currentId;
+  el.mediaRetry.hidden = true;
+  const bust = url => (state.attempts ? `${url}?retry=${state.attempts}` : url);
+
   if (format === 'Video') {
     stopPhoto();
-    el.mediaPlaceholder.hidden = false;
-    el.mediaPlaceholder.textContent = `Loading video ${mlId}…`;
+    state.wantedSrc = bust(videoUrl(mlId));
+    showMessage(`Loading video ${mlId}…`);
     el.video.hidden = false;
-    el.video.src = videoUrl(mlId);
+    el.video.src = state.wantedSrc;
     el.video.play().catch(() => {}); // autoplay may be refused; the click still works
     return;
   }
   el.video.hidden = true;
   el.photo.hidden = true;
+  state.wantedSrc = bust(photoUrl(mlId, state.zoomed ? PHOTO_SIZE_HIGH : PHOTO_SIZE_DEFAULT));
+  showMessage(`Loading ${mlId}…`);
+  el.photo.src = state.wantedSrc;
+}
+
+function showMessage(text, retry = false) {
   el.mediaPlaceholder.hidden = false;
-  el.mediaPlaceholder.textContent = `Loading ${mlId}…`;
-  el.photo.src = photoUrl(mlId);
+  el.mediaMessage.textContent = text;
+  el.mediaRetry.hidden = !retry;
 }
 
 /**
- * True when an <img> event belongs to the asset still on screen. Swiping fast
- * abandons in-flight loads, and a late event from one of those would otherwise
- * paint the previous bird over the current one — the same stale-result guard
- * the Qt version needed (media_view.py:120).
+ * A failed image used to be a dead end: the only way past it was the forward
+ * key, which records a skip — so a patchy connection quietly wrote non-decisions
+ * into the data. One silent retry covers the ordinary blip; after that it asks,
+ * rather than deciding on the researcher's behalf.
  */
-const photoIsCurrent = () => {
-  if (state.currentId === null) return false;
-  const src = el.photo.getAttribute('src');
-  return src === photoUrl(state.currentId, PHOTO_SIZE_DEFAULT)
-      || src === photoUrl(state.currentId, PHOTO_SIZE_HIGH);
-};
-
-function stopPhoto() {
-  el.photo.hidden = true;
-  el.photo.removeAttribute('src'); // cancels the in-flight request
+function mediaFailed(what) {
+  if (state.attempts < 1) {
+    state.attempts += 1;
+    showMessage(`${what} didn't load. Retrying…`);
+    setTimeout(() => { if (state.currentId) loadMedia(); }, 1200);
+    return;
+  }
+  showMessage(
+    `${what} still won't load. Check your connection — the photos come from ` +
+    `Cornell's servers, so this is usually the network rather than the app.`,
+    true);
 }
 
-el.photo.addEventListener('load', () => {
-  if (!photoIsCurrent()) return;
-  el.mediaPlaceholder.hidden = true;
-  el.photo.hidden = false;
-});
-el.photo.addEventListener('error', () => {
-  if (!photoIsCurrent()) return; // an aborted load is not a failure
-  el.photo.hidden = true;
-  el.mediaPlaceholder.hidden = false;
-  el.mediaPlaceholder.textContent = `Couldn't load ML ${state.currentId}. Check your connection.`;
-});
-el.video.addEventListener('loadeddata', () => { el.mediaPlaceholder.hidden = true; });
+on(el.mediaRetry, 'click', () => { state.attempts += 1; loadMedia(); });
+
 /**
  * Swap between the fit-to-window image and the full-resolution one.
  *
@@ -818,13 +843,14 @@ el.video.addEventListener('loadeddata', () => { el.mediaPlaceholder.hidden = tru
 function setZoom(on, origin = null) {
   const row = state.catalog?.rows[state.idx];
   if (on && (!row || row.Format === 'Video')) return; // photos only
+  if (state.zoomed === Boolean(on)) return;
   state.zoomed = Boolean(on);
   el.media.classList.toggle('zoomed', state.zoomed);
   renderLegend(); // the legend is the one cue that stays put while the image scrolls
 
-  if (!state.currentId) return;
-  const wanted = photoUrl(state.currentId, state.zoomed ? PHOTO_SIZE_HIGH : PHOTO_SIZE_DEFAULT);
-  if (el.photo.getAttribute('src') !== wanted) el.photo.src = wanted;
+  state.attempts = 0;
+  loadMedia();    // single owner of el.photo.src
+
   if (!state.zoomed) { el.media.scrollTop = 0; el.media.scrollLeft = 0; return; }
 
   // Keep whatever they clicked under the pointer, rather than jumping to a corner.
@@ -837,6 +863,33 @@ function setZoom(on, origin = null) {
   });
 }
 
+/**
+ * True when an <img> event belongs to the asset still on screen. Swiping fast
+ * abandons in-flight loads, and a late event from one of those would otherwise
+ * paint the previous bird over the current one.
+ */
+const photoIsCurrent = () =>
+  state.wantedSrc !== null && el.photo.getAttribute('src') === state.wantedSrc;
+
+function stopPhoto() {
+  el.photo.hidden = true;
+  el.photo.removeAttribute('src'); // cancels the in-flight request
+}
+
+el.photo.addEventListener('load', () => {
+  if (!photoIsCurrent()) return;
+  el.mediaPlaceholder.hidden = true;
+  el.photo.hidden = false;
+});
+
+el.photo.addEventListener('error', () => {
+  if (!photoIsCurrent()) return; // an aborted load is not a failure
+  el.photo.hidden = true;
+  mediaFailed(`ML ${state.currentId}`);
+});
+
+el.video.addEventListener('loadeddata', () => { el.mediaPlaceholder.hidden = true; });
+
 el.photo.addEventListener('click', event => {
   setZoom(!state.zoomed, { x: event.clientX, y: event.clientY });
 });
@@ -845,9 +898,9 @@ el.video.addEventListener('click', () => {
   if (el.video.paused) el.video.play().catch(() => {}); else el.video.pause();
 });
 el.video.addEventListener('error', () => {
+  if (el.video.getAttribute('src') !== state.wantedSrc) return; // stale
   el.video.hidden = true;
-  el.mediaPlaceholder.hidden = false;
-  el.mediaPlaceholder.textContent = `Couldn't play video ML ${state.currentId}.`;
+  mediaFailed(`Video ML ${state.currentId}`);
 });
 
 function stopVideo() {

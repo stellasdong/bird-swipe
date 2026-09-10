@@ -133,6 +133,10 @@ or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
 loads at full resolution — scroll to move around, press `Z` or click again to
 fit.
 
+If a photo won't load, bird-swipe retries once by itself and then offers a
+**Try again** button — so a patchy connection doesn't push you into skipping an
+item you never actually saw.
+
 A bar under the header fills as you review, and once you have a rhythm it
 estimates how much longer the spreadsheet will take.
 
