@@ -446,10 +446,7 @@ async function refreshExportList() {
     const button = document.createElement('button');
     const name = document.createElement('span');
     name.textContent = entry.name;
-    const meta = document.createElement('span');
-    meta.className = 'meta';
-    meta.textContent = `${Math.max(1, Math.round(entry.size / 1024))} KB`;
-    button.append(name, meta);
+    button.append(name);
     button.addEventListener('click', async () => {
       el.welcomeError.hidden = true;
       try {
