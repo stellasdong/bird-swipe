@@ -59,6 +59,8 @@ const el = {
   onedriveHelpOpen: $('onedrive-help-open'),
   submitStatus: $('submit-status'),
   submitTarget: $('submit-target'),
+  exportsBlock: $('exports-block'),
+  exportsList: $('exports-list'),
   resumeBlock: $('resume-block'),
   fileList: $('file-list'),
   version: $('version'),
@@ -236,6 +238,7 @@ async function initWelcome() {
   }
   await restoreAutosave();
   await renderSubmitTarget();
+  await refreshExportList();
   await refreshResumeList();
 }
 
@@ -293,6 +296,7 @@ async function changeSubmitFolder() {
     const folder = await Folder.pick(); // one activation, spent on the picker
     if (!folder) return;
     await renderSubmitTarget();
+    await refreshExportList();
     announce('info', `OneDrive folder is now “${folder.name}”.`);
   } catch (err) {
     announce('error', err.message);
@@ -421,6 +425,44 @@ el.openExport.addEventListener('click', async () => {
     showError(el.welcomeError, err.message);
   }
 });
+
+/**
+ * The exports waiting in the OneDrive folder — where the spreadsheets to review
+ * now come from, rather than each researcher's Downloads. Silent when there is
+ * no folder yet or nothing in it; "Open a spreadsheet…" still covers a file
+ * from anywhere.
+ */
+async function refreshExportList() {
+  let entries = [];
+  try {
+    const stored = await Folder.restore();
+    if (stored instanceof Folder) entries = await stored.listExports();
+  } catch { /* no access yet, or the folder went away — the picker still works */ }
+
+  el.exportsBlock.hidden = entries.length === 0;
+  el.exportsList.textContent = '';
+  for (const entry of entries) {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    const name = document.createElement('span');
+    name.textContent = entry.name;
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = `${Math.max(1, Math.round(entry.size / 1024))} KB`;
+    button.append(name, meta);
+    button.addEventListener('click', async () => {
+      el.welcomeError.hidden = true;
+      try {
+        await ExportHandles.save(entry.name, entry.handle).catch(() => {});
+        await beginLabeling(entry.handle, entry.name);
+      } catch (err) {
+        showError(el.welcomeError, err.message);
+      }
+    });
+    li.append(button);
+    el.exportsList.append(li);
+  }
+}
 
 /** Spreadsheets with unfinished work saved in this browser. */
 async function refreshResumeList() {
@@ -1003,6 +1045,7 @@ async function closeFile() {
   stopVideo();
   document.title = 'bird-swipe';
   show('welcome');
+  await refreshExportList();
   await refreshResumeList();
 }
 
@@ -1153,6 +1196,7 @@ el.onedriveHelpPick.addEventListener('click', async () => {
     const folder = await Folder.pick(); // SUBMIT_DIR
     if (!folder) return;
     await renderSubmitTarget();
+    await refreshExportList();
     announce('info', `OneDrive folder set to “${folder.name}”.`);
   } catch (err) {
     announce('error', err.message);

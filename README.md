@@ -22,11 +22,15 @@ version.
 
 1. Type **your name**. It goes in the `reviewer` column so labels can be traced
    back to whoever made them.
-2. Click **Open a spreadsheet…** and pick the Macaulay export you downloaded —
-   straight out of your Downloads folder is fine.
-3. Label it. Your progress is saved as you go, so you can close the tab and come
+2. Set up your two folders — they're the next thing on the screen, because
+   everything after this depends on them.
+3. The spreadsheets in your OneDrive folder are listed under **Spreadsheets in
+   your OneDrive folder**. Click one to start.
+   (**Open a spreadsheet…** still picks a file from anywhere, if you have one
+   that isn't in the folder yet.)
+4. Label it. Your progress is saved as you go, so you can close the tab and come
    back — the spreadsheet reappears under **In progress on this computer**.
-4. When you reach the end you get two buttons:
+5. When you reach the end you get two buttons:
    - **Save local** — writes the finished files into your local bird-swipe
      folder. Autosave has almost certainly done this already; this is the
      deliberate end-of-spreadsheet save.
@@ -256,7 +260,7 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 182 assertions covering the CSV
+Open **http://localhost:8000/web/test.html** — 195 assertions covering the CSV
 parser, the label scheme, resume, the truncation guard, the debounced writer,
 the in-browser progress store, autosave mirroring, the output folder layout and
 the problem report, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
