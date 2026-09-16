@@ -449,6 +449,40 @@ group('storage.js — output folder layout');
      folder.outputPath('ML__rethaw.csv', 'nest'), 'labeled/nest/ML__rethaw_nest.csv');
 }
 
+group('storage.js — listing exports in a folder');
+{
+  // A folder that already holds a labeled/ tree alongside the exports: the
+  // output must never be offered back as something to label again.
+  const fakeDirWith = entries => ({
+    name: 'Red-tailed Hawk',
+    async *entries() {
+      for (const [n, kind, size] of entries) {
+        yield [n, { kind, getFile: async () => ({ size, lastModified: 0 }) }];
+      }
+    },
+  });
+
+  const folder = new Folder(fakeDirWith([
+    ['ML__rethaw.csv', 'file', 18000],
+    ['ML__caracara.csv', 'file', 88000],
+    ['ML__rethaw_labeled.csv', 'file', 19000],   // our own output
+    ['ML__rethaw_nest.csv', 'file', 12000],      // our own output
+    ['notes.txt', 'file', 100],                  // not a spreadsheet
+    ['old_export.xlsx', 'file', 4000],           // xlsx isn't supported
+    ['labeled', 'directory', 0],                 // the output tree
+  ]), SUBMIT_DIR);
+
+  const found = (await folder.listExports()).map(e => e.name);
+  eq('offers only the real exports', found, ['ML__caracara.csv', 'ML__rethaw.csv']);
+  check('excludes its own labeled output', !found.some(n => n.includes('_labeled')));
+  check('excludes its own nest output', !found.some(n => n.includes('_nest')));
+  check('excludes directories', !found.includes('labeled'));
+  check('sorted by name', found[0] < found[1]);
+
+  const empty = new Folder(fakeDirWith([['labeled', 'directory', 0]]), SUBMIT_DIR);
+  eq('a folder with no exports lists nothing', (await empty.listExports()).length, 0);
+}
+
 group('storage.js — autosave mirroring');
 {
   const sink = (name, opts = {}) => ({

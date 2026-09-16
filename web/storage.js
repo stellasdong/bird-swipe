@@ -175,6 +175,26 @@ export class Folder {
   }
 
   /**
+   * Macaulay exports sitting directly in this folder, newest name first.
+   *
+   * Only the top level is scanned, and our own output is filtered out by name,
+   * so the labeled/ tree written alongside the exports never shows up as
+   * something to label again.
+   */
+  async listExports() {
+    const found = [];
+    for await (const [name, handle] of this.handle.entries()) {
+      if (handle.kind !== 'file') continue;
+      if (!/\.csv$/i.test(name)) continue;
+      if (/_labeled\.csv$|_nest\.csv$/i.test(name)) continue;
+      const file = await handle.getFile();
+      found.push({ name, handle, size: file.size, lastModified: file.lastModified });
+    }
+    found.sort((a, b) => a.name.localeCompare(b.name));
+    return found;
+  }
+
+  /**
    * Write both files into this folder, in the same shape the desktop app uses:
    *
    *     <folder>/labeled/<name>_labeled.csv
