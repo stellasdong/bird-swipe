@@ -453,11 +453,17 @@ group('storage.js — listing exports in a folder');
 {
   // A folder that already holds a labeled/ tree alongside the exports: the
   // output must never be offered back as something to label again.
+  // getFile throws here on purpose: listing must never read file contents, or
+  // it would make OneDrive hydrate cloud-only files the moment a folder is
+  // granted. If someone reintroduces that call, this group fails.
   const fakeDirWith = entries => ({
     name: 'Red-tailed Hawk',
     async *entries() {
-      for (const [n, kind, size] of entries) {
-        yield [n, { kind, getFile: async () => ({ size, lastModified: 0 }) }];
+      for (const [n, kind] of entries) {
+        yield [n, {
+          kind,
+          getFile: async () => { throw new Error('listing must not read files'); },
+        }];
       }
     },
   });

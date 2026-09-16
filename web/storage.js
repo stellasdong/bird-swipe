@@ -187,8 +187,11 @@ export class Folder {
       if (handle.kind !== 'file') continue;
       if (!/\.csv$/i.test(name)) continue;
       if (/_labeled\.csv$|_nest\.csv$/i.test(name)) continue;
-      const file = await handle.getFile();
-      found.push({ name, handle, size: file.size, lastModified: file.lastModified });
+      // Names only. getFile() here would have been for a size label, but on
+      // Windows it can make OneDrive hydrate a cloud-only file — and this runs
+      // the instant a folder is granted, so listing a folder would start pulling
+      // every export down. Nothing is read until someone opens a spreadsheet.
+      found.push({ name, handle });
     }
     found.sort((a, b) => a.name.localeCompare(b.name));
     return found;
