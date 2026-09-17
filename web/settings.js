@@ -5,7 +5,9 @@
 // ("ArrowRight", "q") so the stored value is readable and comparable directly
 // against an event.
 
-const STORE_KEY = 'bird-swipe:settings';
+import { scoped } from './channel.js';
+
+const STORE_KEY = `${scoped('bird-swipe')}:settings`;
 
 // Bump when the default hotkey scheme changes shape. Saved bindings from an
 // older scheme are ignored (reset to the new defaults) rather than merged, so

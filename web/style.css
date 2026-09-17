@@ -533,3 +533,22 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
 .keygrid button { min-width: 120px; padding: 5px 10px; }
 .keygrid button.capturing { background: #1d4ed8; border-color: #1d4ed8; }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+/* ------------------------------------------------------------- dev badge */
+/* The preview at /dev/ and the real app look identical; this is the only
+   thing that tells them apart, so it sits above everything and never scrolls
+   away. Bottom-left, clear of the centred report button. */
+#dev-badge {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 1000;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  pointer-events: none;
+}
