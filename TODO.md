@@ -8,31 +8,51 @@ through labeling.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
 
-**Decided so far:** the new questions appear only on `nest = yes` rows; bird
-present is a plain two-state toggle; natural vs man-made stays the existing
-`human_structure` toggle and substrate is a separate axis; height is out for
-now; nest IDs are parked.
+**Decided so far:** the new questions appear only on `nest = yes` rows, in a
+details panel that marking yes opens — so a nest costs two presses and a
+non-nest stays one; a question that doesn't apply is written `n/a`, never left
+blank; bird present is a plain two-state toggle; natural vs man-made stays the
+existing `human_structure` toggle and substrate is a separate axis; prey is
+multi-select; height is out for now; nest IDs are parked.
 
 ---
 
-## The one thing that affects all of it: nest-only questions
+## The flow — settled, build this first
 
-The new questions only apply where there's a nest, so the controls stay hidden
-until `nest = yes`. That is a change to the swipe itself, and it needs settling
-before any of M12–M14 is built:
+The new questions only apply where there's a nest, so their controls live in a
+**nest details panel** that is visible exactly when the current row is
+`nest = yes`. Marking yes no longer advances on its own — **a nest costs two
+presses, a non-nest stays one**, which is where the volume is.
 
-- Today `→` *is* the answer — it records nest = yes, saves, and advances. If the
-  extra questions only exist on a yes, then `→` can't both open them and move
-  past them. The likely shape: **`→` marks yes and reveals the extra controls;
-  a second `→` saves and advances.** Non-nest images stay a single keypress,
-  which is where the volume is.
-- That makes `←` (no) and `↓` (skip) unchanged — one key, straight on.
-- **Blank gets a third meaning.** Today blank only ever means "not reviewed".
-  On a `nest = no` row these new columns will be blank because they don't
-  apply. Either that's written down as a rule (blank + `nest_label=no` =
-  not applicable), or non-applicable is written explicitly as `n/a`. The second
-  is uglier to read and safer to analyse. Pick one before the first column
-  ships — it's not changeable later without rewriting old files.
+| Key | On an undecided row | On a row already `nest = yes` |
+|---|---|---|
+| `→` | record yes, save, **stay**, open the details panel | save and advance |
+| `←` | record no, save, advance | flip to no (details become `n/a`), save, advance |
+| `↓` | record `skip`, advance | advance, decision untouched |
+| `↑` | previous row | previous row |
+
+- Stepping back onto a `nest = yes` row reopens the panel with its saved
+  answers, the same way the existing toggles already show what's stored.
+- The existing four toggles (structure, anthropogenic, eggs, chicks) **do not
+  move**. They stay where they are, answerable before the decision, and keep
+  writing the values they write today. Only the new questions live in the panel.
+
+### What gets written when a question doesn't apply
+
+`n/a`, explicitly. Every reviewed row then carries a real value in every
+column, so blank keeps its one meaning — not answered — which is what makes a
+partly-finished spreadsheet safe to read. It's the same reasoning that already
+writes `0` rather than blank for "looked, saw none".
+
+| Row | New columns hold |
+|---|---|
+| `nest_label=yes` | the answer, or the field's own "none" value |
+| `nest_label=no` | `n/a` |
+| `nest_label=skip`, or never reached | blank |
+
+Anything reading these files handles three tokens: a value, `n/a`, and blank.
+That is deliberate, and it is the decision hardest to reverse later — old files
+would have to be rewritten.
 
 ## M12 — Bird present / not present
 
@@ -60,25 +80,27 @@ ledge on a building), and so is the reverse.
 - [ ] Keep `human_structure` as the natural/man-made answer. No
       `substrate_kind` column — one question, one column, no way for the two to
       disagree.
-- [ ] Add a substrate list covering both kinds in one list, **not** filtered by
-      the toggle:
-      - natural — tree, cliff, cactus, ground, snag, shrub, …
-      - man-made — utility/telephone pole, building/ledge, tower, bridge,
-        nest box, sign, …
+- [ ] One list covering both kinds, **not** filtered by the toggle. Starting
+      set, deliberately short — the point is that it grows from what people
+      actually type:
+      - natural — branch / twig, tree cavity, cliff or rock ledge, cactus,
+        shrub, ground, snag
+      - man-made — utility pole, building or ledge, tower, bridge,
+        nest box or platform, sign
 - [ ] **Other: type it in**, for anything the list doesn't cover.
 - [ ] Column `substrate` — the term picked, or whatever was typed.
+- [ ] A typed "other" is written to the CSV **verbatim**, and remembered in
+      that browser so it appears in the list next time. The remembered list
+      stays local to the computer: a genuinely shared list would have to live
+      in the OneDrive folder, and two researchers writing it at once is a
+      different job. Settled — build it this way.
 
 **Open questions**
 
-- **Does a typed "other" join the dropdown?** Stella asked for this. Suggested
-  split: the typed text is written to the CSV verbatim, *and* remembered in that
-  browser so it appears in the list next time — but the list stays local to the
-  computer. Otherwise two researchers end up with different dropdowns and the
-  column quietly stops being categorical. If the list is meant to be shared,
-  it has to live in a file in the OneDrive folder, which is a bigger job.
-- What goes in the starting list? The terms above are a guess. Worth fixing the
-  first version with whoever is doing the analysis, because everything typed
-  into "other" is cleanup for them later.
+- Is the starting list right? It's a guess, and "twigs" was the one term Stella
+  offered — read here as *branch / twig*, since twigs are what a nest is made
+  of rather than what it sits on. If nest **material** is also wanted, that's a
+  separate column, not this one.
 - The toggle can still *order* the list — man-made entries first when
   `human_structure` is yes — as long as it never hides the other half. Only
   worth doing if the list gets long.
@@ -89,22 +111,22 @@ ledge on a building), and so is the reverse.
       `yes` / `no`.
 - [ ] If yes, a prey-type list: mammal, bird, reptile, amphibian, fish,
       invertebrate, unidentified.
-- [ ] Columns `provisioning` and `prey_group`.
+- [ ] **Multi-select** — one image can show more than one prey item. Several
+      values in one cell, separated by `;` so a comma never has to be escaped
+      to stay readable.
+- [ ] Columns `provisioning` and `prey_group`. Named *group* rather than
+      *kingdom* because mammal/bird/reptile are classes within one kingdom;
+      confirmed with Stella.
 
 A conditional inside a conditional — the prey list only exists on a nest row
 that's also marked provisioning. Worth building M13's dropdown first and reusing
 it here rather than inventing two.
 
-**Open questions**
+**Later, not now**
 
-- Stella called this "by kingdom", but mammal/bird/reptile are classes, all in
-  one kingdom. `prey_group` keeps the column name accurate without claiming a
-  rank it doesn't have — confirm that's fine, since the column name is what an
-  analyst sees.
-- Can one image show more than one prey item? If so this is a multi-select or a
-  second free-text column, not one value.
-- Does prey ever need to be finer than the class — "rabbit", "snake"? Same
-  "other, type it in" question as M13.
+- Whether prey ever needs to be finer than the class — "rabbit", "snake".
+  Deliberately deferred; the same "other, type it in" mechanism from M13 would
+  cover it if the answer turns out to be yes.
 
 ## M15 — Repeat nests — **parked**
 
@@ -154,14 +176,14 @@ to say so.
 - [ ] **Skip clears observations.** `skip` blanks every observation on the row
       so a skipped row never looks answered. Every new field needs adding to
       that list, or it will carry a stale value onto a skipped row.
-- [ ] **Blank never means "none"** — and now also has to mean "not applicable"
-      on non-nest rows. See the section at the top; this is the decision most
-      likely to be regretted later.
+- [ ] **Blank never means "none"**, and never means "not applicable" either —
+      that's what `n/a` is for. See the flow section at the top; this is the
+      decision most likely to be regretted later.
 - [ ] **Keyboard first.** Two of these want a dropdown. The app's value is that
       it's faster than a spreadsheet — every new control needs a key that opens
       it and a way out that still saves and advances.
 - [ ] **Tests.** `web/test.html` is 195 assertions and the only safety net;
       each new field needs its own — set, restored on resume, cleared on skip,
-      round-tripped through the CSV, and absent on a non-nest row.
+      round-tripped through the CSV, and `n/a` on a non-nest row.
 - [ ] **The done screen and the nest split** read the label columns directly;
       check both still make sense once there are more of them.
