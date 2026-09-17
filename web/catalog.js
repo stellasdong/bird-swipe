@@ -31,7 +31,7 @@ export const CATALOG_KEY = 'ML Catalog Number';
 export const LABEL_COLUMNS = [
   'nest_label', 'human_structure', 'anthropogenic',
   'eggs', 'egg_count', 'chicks', 'chick_count',
-  'bird_present',
+  'bird_present', 'substrate',
   'notes', 'reviewed', 'reviewed_at', 'reviewer',
 ];
 
@@ -43,8 +43,39 @@ export const LABEL_COLUMNS = [
 // spreadsheet stays safe to read: same reasoning as writing 0 rather than
 // blank for "looked, saw none". A reader handles three tokens: a value, n/a,
 // and blank. See TODO.md.
-export const NEST_ONLY_COLUMNS = ['bird_present'];
+export const NEST_ONLY_COLUMNS = ['bird_present', 'substrate'];
 export const NOT_APPLICABLE = 'n/a';
+
+// What the nest or the eggs sit on. Materials (plastic, metal) belong in the
+// same list as branches and ledges because the question is about the surface
+// immediately underneath, not the structure the nest is attached to — that is
+// the separate human_structure toggle, and the two cross freely: natural
+// substrate on a man-made structure is a real combination.
+//
+// Deliberately short. Anything missing is typed in, kept verbatim in the file,
+// and remembered in that browser (see settings.js) so it comes back next time.
+export const SUBSTRATE_OPTIONS = [
+  'branch / twig', 'tree cavity', 'cliff or rock ledge', 'cactus', 'shrub', 'snag',
+  'utility pole', 'building or ledge', 'tower', 'bridge', 'nest box or platform', 'sign',
+  'plastic', 'metal',
+  'none / bare ground',
+];
+
+/**
+ * The list narrowed by what's been typed. Matches at the start of any word come
+ * first, so "br" offers branch and bridge before "nest box", which only holds a
+ * "b" mid-word. `extra` carries the terms this browser has remembered.
+ */
+export function filterSubstrates(query, extra = []) {
+  const all = [...SUBSTRATE_OPTIONS,
+               ...extra.filter(t => t && !SUBSTRATE_OPTIONS.includes(t))];
+  const q = String(query ?? '').trim().toLowerCase();
+  if (!q) return all;
+  const starts = all.filter(
+    t => t.toLowerCase().split(/[^a-z]+/).some(word => word.startsWith(q)));
+  const inside = all.filter(t => !starts.includes(t) && t.toLowerCase().includes(q));
+  return [...starts, ...inside];
+}
 
 export const REVIEWED = 'TRUE';
 
@@ -209,11 +240,17 @@ export class Catalog {
   /** Record a decision for row `index`. `nest` is true / false / null. */
   setLabel(index, { nest, structure, anthropogenic = false,
                     eggCount = '', chickCount = '', birdPresent = false,
-                    reviewer = '', notes = '' }) {
+                    substrate = '', reviewer = '', notes = '' }) {
     const row = this.rows[index];
     const eggs = normalizeCount(eggCount);
     const chicks = normalizeCount(chickCount);
-    const nestOnly = { bird_present: birdPresent ? 'yes' : 'no' };
+    // A toggle has a default ("no" once the row is reviewed); substrate has
+    // none, so an unanswered one stays blank — which still reads as "nobody
+    // answered", exactly as blank does everywhere else.
+    const nestOnly = {
+      bird_present: birdPresent ? 'yes' : 'no',
+      substrate: String(substrate ?? '').trim(),
+    };
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
     row.human_structure = structure ? 'yes' : 'no';
     row.anthropogenic = anthropogenic ? 'yes' : 'no';
@@ -307,6 +344,7 @@ export class Catalog {
       eggs: count(r => r.eggs === 'yes'),
       chicks: count(r => r.chicks === 'yes'),
       birds: count(r => r.bird_present === 'yes'),
+      substrates: count(r => r.substrate && r.substrate !== NOT_APPLICABLE),
       eggTotal: this.rows.reduce((n, r) => n + normalizeCount(r.egg_count), 0),
       chickTotal: this.rows.reduce((n, r) => n + normalizeCount(r.chick_count), 0),
     };

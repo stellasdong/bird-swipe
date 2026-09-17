@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
-The next round of labeling features, from Stella. The flow and M12 are built;
-everything below them is not. [PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes what
+The next round of labeling features, from Stella. The flow, M12 and M13 are
+built; everything below them is not. [PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes what
 the app does today. Each item says where it would land in the code, because
 every one of them adds columns to a file researchers may already be half way
 through labeling.
@@ -67,10 +67,9 @@ It is the panel's first occupant, which is why the flow and this landed
 together: a panel with nothing in it can't be tested, and `n/a` needs a column
 to be written into.
 
-## M13 — Substrate
+## M13 — Substrate — **built**
 
-Hotkey when built: `S` / `6` — the nest-details keys run A, S, D in the order
-they are added.
+Hotkey `S` / `6`. The nest-details keys run A, S, D in the order they are added.
 
 **Two independent questions, not one.** Natural vs man-made is already asked —
 it's the existing `human_structure` toggle, and it stays exactly as it is. What
@@ -78,10 +77,10 @@ the nest is *built on* is a separate axis that can cross it: natural substrate
 on a man-made structure is a real combination (vegetation on a bridge, a mud
 ledge on a building), and so is the reverse.
 
-- [ ] Keep `human_structure` as the natural/man-made answer. No
+- [x] Keep `human_structure` as the natural/man-made answer. No
       `substrate_kind` column — one question, one column, no way for the two to
       disagree.
-- [ ] One list covering both kinds, **not** filtered by the toggle. Starting
+- [x] One list covering both kinds, **not** filtered by the toggle. Starting
       set, deliberately short — the point is that it grows from what people
       actually type:
       - natural — branch / twig, tree cavity, cliff or rock ledge, cactus,
@@ -91,13 +90,16 @@ ledge on a building), and so is the reverse.
       - material — plastic, metal
       - **none / bare ground** — eggs laid straight on the ground, no
         substrate under them at all
-- [ ] **Other: type it in**, for anything the list doesn't cover.
-- [ ] Column `substrate` — the term picked, or whatever was typed.
-- [ ] A typed "other" is written to the CSV **verbatim**, and remembered in
-      that browser so it appears in the list next time. The remembered list
-      stays local to the computer: a genuinely shared list would have to live
-      in the OneDrive folder, and two researchers writing it at once is a
-      different job. Settled — build it this way.
+- [x] **Other: type it in**, for anything the list doesn't cover — no separate
+      control: a filter that matches nothing *is* the other box.
+- [x] Column `substrate` — the term picked, or whatever was typed.
+- [x] A typed "other" is written to the CSV **verbatim**, and remembered in
+      that browser so it appears in the list next time.
+- [x] Keyboard-first picker: `S` opens it, typing narrows it, `Enter` takes the
+      top match, `1`–`9` pick off the unfiltered list. **Nothing is recorded
+      until it's confirmed** — `Esc` or any arrow closes it and leaves the
+      substrate alone, so a half-typed filter can't become an answer. The cost
+      is that arrows don't shortcut out of it the way they do a count box.
 
 `substrate` means **the surface immediately under the nest or the eggs**, which
 is why materials (plastic, metal) sit in the same list as branches and ledges,
@@ -105,19 +107,25 @@ and why "none" is a real answer rather than a blank. Stella's examples are what
 fixed this definition; it needs to reach whoever analyses the column, because
 "substrate" could otherwise be read as the structure the nest is attached to.
 
-**Open questions**
+**Still open**
 
-- Is the starting list right? It's a guess, and "twigs" was the one term Stella
-  offered — read here as *branch / twig*, since twigs are what a nest is made
-  of rather than what it sits on. If nest **material** is also wanted, that's a
-  separate column, not this one.
-- The toggle can still *order* the list — man-made entries first when
+- Is the starting list right? It's a guess. Everything typed into "other" is
+  cleanup for whoever analyses the column, so it's worth a look once a few
+  spreadsheets have been through the app — what people actually type is the
+  best evidence for what the list should hold.
+- If nest **material** is wanted as well as substrate, that's a separate
+  column, not this one.
+- The toggle could *order* the list — man-made entries first when
   `human_structure` is yes — as long as it never hides the other half. Only
   worth doing if the list gets long.
+- The remembered list is per-browser, so two researchers see different
+  suggestions. The file is unaffected (it records the text, never a reference
+  into a list), but a shared list would need a file in the OneDrive folder.
 
-## M14 — Prey provisioning
+## M14 — Prey provisioning — **next**
 
-Hotkey when built: `D` / `7`.
+Hotkey when built: `D` / `7`. The picker built for M13 is the thing to reuse:
+same open/filter/confirm behaviour, but multi-select.
 
 - [ ] Mark whether parents are bringing food to the nest: `provisioning`,
       `yes` / `no`.

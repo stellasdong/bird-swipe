@@ -7,7 +7,7 @@
 
 import {
   Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
-  normalizeCount,
+  normalizeCount, filterSubstrates, NOT_APPLICABLE,
 } from './catalog.js';
 import {
   PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, photoUrl, videoUrl,
@@ -22,7 +22,8 @@ import {
 } from './report.js';
 import {
   ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, duplicateKey,
-  getKeys, getReviewer, keyDisplay, setKeys, setReviewer,
+  getKeys, getReviewer, getRememberedSubstrates, keyDisplay, rememberSubstrate,
+  setKeys, setReviewer,
 } from './settings.js';
 import { IS_DEV } from './channel.js';
 
@@ -90,6 +91,14 @@ const el = {
   },
   nestDetails: $('nest-details'),
   detailsHint: $('details-hint'),
+  substrate: {
+    wrap: $('p-substrate'),
+    button: $('substrate-open'),
+    pop: $('substrate-pop'),
+    filter: $('substrate-filter'),
+    list: $('substrate-list'),
+    foot: $('substrate-foot'),
+  },
   counters: {
     eggs: { box: $('c-eggs'), input: $('count-eggs') },
     chicks: { box: $('c-chicks'), input: $('count-chicks') },
@@ -158,6 +167,8 @@ const TOGGLE_ACTIONS = {
 };
 // Toggles that live in the nest-details panel rather than the main chip row.
 const NEST_ONLY_TOGGLES = new Set(['bird']);
+// Picker actions, also nest-only. Both bindings open the same picker.
+const PICKER_ACTIONS = new Set(['pick_substrate', 'pick_substrate_num']);
 
 // Navigation actions that may be triggered from inside a count box.
 const ESCAPES_COUNT_BOX = new Set(['nest_yes', 'nest_no', 'forward', 'back']);
@@ -186,6 +197,8 @@ const state = {
   paceLog: [],   // when each item was reviewed this session, for the estimate
   wantedSrc: null,  // the media URL currently being asked for
   attempts: 0,      // how many times this asset has been tried
+  substrate: '',    // the current row's substrate, shown on the picker button
+  pickerRows: [],   // what the open picker is currently offering
 };
 
 // ------------------------------------------------------------------ screens
@@ -644,6 +657,8 @@ function showCurrent() {
   for (const [field, column] of Object.entries(COUNTER_FIELDS)) {
     setCount(field, row[column] ?? '');
   }
+  closePicker(); // never carry an open list onto the next item
+  setSubstrate(row.substrate === NOT_APPLICABLE ? '' : (row.substrate ?? ''));
   updateChip(row);
   showNestDetails(row);
   renderNestLabels();
@@ -756,7 +771,112 @@ function showNestDetails(row) {
   if (isNest) {
     el.detailsHint.textContent =
       `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
+    renderSubstrateButton();
   }
+}
+
+
+// ------------------------------------------------------------- the picker
+// Substrate is a value from a list that is meant to grow, so it is answered by
+// typing rather than by memorising a number: S opens it, typing narrows it,
+// Enter or a digit confirms. Nothing is recorded until it is confirmed — a
+// navigation key closes the picker and leaves the substrate exactly as it was,
+// so a half-typed filter can never land in the spreadsheet as a real answer.
+//
+// Digits pick only from the unfiltered list, which is why they are numbered
+// only while the box is empty: once you are typing, a digit is part of what
+// you typed, so a term like "I-35 bridge" stays possible.
+function setSubstrate(value) {
+  state.substrate = String(value ?? '').trim();
+  renderSubstrateButton();
+}
+
+function renderSubstrateButton() {
+  const set = state.substrate !== '';
+  el.substrate.wrap.dataset.empty = String(!set);
+  el.substrate.button.textContent = '';
+  el.substrate.button.append(
+    set ? `substrate: ${state.substrate}  ` : 'substrate  ',
+    Object.assign(document.createElement('span'), {
+      className: 'key',
+      textContent: `(${keyDisplay(state.keys.pick_substrate)}/${keyDisplay(state.keys.pick_substrate_num)})`,
+    }));
+}
+
+const pickerOpen = () => !el.substrate.pop.hidden;
+
+function openPicker() {
+  if (el.nestDetails.hidden) return; // nothing to answer on a non-nest row
+  el.substrate.pop.hidden = false;
+  el.substrate.button.setAttribute('aria-expanded', 'true');
+  el.substrate.filter.value = '';
+  renderPickerList();
+  el.substrate.filter.focus();
+}
+
+function closePicker() {
+  el.substrate.pop.hidden = true;
+  el.substrate.button.setAttribute('aria-expanded', 'false');
+  el.substrate.filter.blur();
+}
+
+function renderPickerList() {
+  const query = el.substrate.filter.value;
+  const numbered = query.trim() === '';
+  state.pickerRows = filterSubstrates(query, getRememberedSubstrates());
+  el.substrate.list.textContent = '';
+
+  state.pickerRows.forEach((term, i) => {
+    const li = document.createElement('li');
+    li.setAttribute('role', 'option');
+    // The first match is what Enter takes; the row already recorded is marked
+    // so stepping back onto a labeled item shows its answer in place.
+    li.setAttribute('aria-selected', String(i === 0 && !numbered));
+    if (numbered && i < 9) {
+      li.append(Object.assign(document.createElement('span'),
+        { className: 'num', textContent: String(i + 1) }));
+    } else {
+      li.append(Object.assign(document.createElement('span'), { className: 'num' }));
+    }
+    li.append(term);
+    if (term === state.substrate) {
+      li.append(Object.assign(document.createElement('span'),
+        { className: 'current', textContent: 'recorded' }));
+    }
+    li.addEventListener('mousedown', event => {
+      event.preventDefault(); // keep focus in the filter box
+      confirmSubstrate(term);
+    });
+    el.substrate.list.append(li);
+  });
+
+  const typed = query.trim();
+  const exact = state.pickerRows.some(t => t.toLowerCase() === typed.toLowerCase());
+  el.substrate.foot.textContent = numbered
+    ? '1–9 pick · type to narrow · Esc closes'
+    : (state.pickerRows.length
+        ? (exact ? 'Enter records it · Esc closes'
+                 : `Enter records “${state.pickerRows[0]}” · Esc closes`)
+        : `Enter adds “${typed}” · Esc closes`);
+}
+
+/** Record a substrate and close. Anything typed is kept for next time. */
+function confirmSubstrate(term) {
+  const value = String(term ?? '').trim();
+  if (!value) return;
+  setSubstrate(value);
+  rememberSubstrate(value); // so the second one is a pick, not retyping
+  closePicker();
+  saveOpenRow();
+}
+
+/**
+ * Keep the file in step with a panel answer. The row is already marked yes —
+ * that is the only way the panel is open — so this re-records it in place
+ * rather than waiting for the reviewer to press → again.
+ */
+function saveOpenRow() {
+  if (state.catalog?.rows[state.idx]?.nest_label === 'yes') commit(true, false);
 }
 
 function updateChip(row) {
@@ -816,6 +936,7 @@ function renderLegend() {
     [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
     [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
     [`${keyDisplay(k.toggle_bird)}/${keyDisplay(k.toggle_bird_num)}`, 'bird'],
+    [`${keyDisplay(k.pick_substrate)}/${keyDisplay(k.pick_substrate_num)}`, 'substrate'],
     [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
     [keyDisplay(k.jump), 'jump to…'],
     [keyDisplay(k.close), 'close file'],
@@ -1014,6 +1135,7 @@ function commit(nest, move = true) {
     eggCount: countOf('eggs'),
     chickCount: countOf('chicks'),
     birdPresent: toggleOn('bird'),
+    substrate: state.substrate,
     reviewer: getReviewer(),
     notes: el.notes.value.trim(),
   });
@@ -1133,7 +1255,7 @@ function showDone() {
     `nest yes: ${s.yes}   ·   nest no: ${s.no}   ·   skipped: ${s.skipped}`;
   el.doneObservations.textContent =
     `human-made structure: ${s.structure}   ·   anthropogenic: ${s.anthropogenic}` +
-    `   ·   bird visible: ${s.birds}` +
+    `   ·   bird visible: ${s.birds}   ·   substrate recorded: ${s.substrates}` +
     `   ·   images with eggs: ${s.eggs} (${s.eggTotal} counted)` +
     `   ·   images with chicks: ${s.chicks} (${s.chickTotal} counted)`;
 
@@ -1334,10 +1456,60 @@ for (const [field, { box, input }] of Object.entries(el.counters)) {
   input.addEventListener('blur', () => refreshCounter(field));
 }
 
+
+// The picker's own keys. The filter box has focus while it is open, so the
+// document handler ignores everything — these are the only keys that matter.
+el.substrate.button.addEventListener('click', () => {
+  if (pickerOpen()) closePicker(); else openPicker();
+});
+
+el.substrate.filter.addEventListener('input', renderPickerList);
+
+el.substrate.filter.addEventListener('keydown', event => {
+  event.stopPropagation(); // never let a filter keystroke reach the label loop
+
+  if (event.key === 'Escape') { // close, recording nothing
+    event.preventDefault();
+    closePicker();
+    return;
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const typed = el.substrate.filter.value.trim();
+    // The first match is the offer; with no matches at all, what was typed is
+    // the answer — that is the "other, type it in" path, and it needs no
+    // separate control.
+    confirmSubstrate(state.pickerRows[0] && typed ? state.pickerRows[0]
+                     : (typed || state.pickerRows[0]));
+    return;
+  }
+
+  // Digits pick, but only from the unnumbered full list: once there is a
+  // filter, a digit is part of what is being typed.
+  if (/^[1-9]$/.test(event.key) && el.substrate.filter.value.trim() === '') {
+    const pick = state.pickerRows[Number(event.key) - 1];
+    if (pick) {
+      event.preventDefault();
+      confirmSubstrate(pick);
+    }
+    return;
+  }
+
+  // A navigation key does its usual job and leaves the substrate alone.
+  const action = actionForEvent(event, state.keys);
+  if (event.key.length > 1 && ESCAPES_COUNT_BOX.has(action)) {
+    event.preventDefault();
+    closePicker();
+    runLabelAction(action);
+  }
+});
+
 for (const [field, node] of Object.entries(el.toggles)) {
   node.addEventListener('click', () => {
     setToggle(field, !toggleOn(field));
     node.blur(); // keep arrow keys with the label loop
+    if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
   });
 }
 
@@ -1368,6 +1540,7 @@ el.notes.addEventListener('keydown', event => {
 
 document.addEventListener('keydown', event => {
   if (el.prefs.open || el.jump.open || el.report.open || el.onedriveHelp.open) return;
+  if (pickerOpen()) return; // the picker owns the keyboard while it is open
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
@@ -1396,6 +1569,9 @@ function runLabelAction(action) {
     // hidden, so flipping it would set a value nobody can see.
     if (NEST_ONLY_TOGGLES.has(field) && el.nestDetails.hidden) return;
     setToggle(field, !toggleOn(field));
+    if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
+  } else if (PICKER_ACTIONS.has(action)) {
+    openPicker();
   } else if (action === 'zoom') {
     setZoom(!state.zoomed);
   } else if (action === 'jump') {

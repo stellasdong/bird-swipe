@@ -124,6 +124,22 @@
   <div class="chips nest-details" id="nest-details" hidden>
     <span class="details-label">nest details</span>
     <button class="toggle" id="t-bird" aria-pressed="false" type="button"></button>
+
+    <!-- Substrate: a value, not a toggle. The button shows what's recorded and
+         opens the picker; the picker is keyboard-first, so the list narrows as
+         you type and nothing is set until you confirm it. -->
+    <div class="picker" id="p-substrate" data-empty="true">
+      <button class="picker-btn" id="substrate-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="substrate-pop" hidden>
+        <input type="text" id="substrate-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Substrate — type to narrow the list">
+        <ul class="picker-list" id="substrate-list" role="listbox"></ul>
+        <div class="picker-foot" id="substrate-foot"></div>
+      </div>
+    </div>
+
     <span class="details-hint" id="details-hint"></span>
   </div>
 

@@ -574,3 +574,79 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
   color: var(--dim);
 }
 .details-hint { font-size: 12px; color: var(--dim); }
+
+/* ------------------------------------------------------------ the picker */
+/* Substrate records a value rather than a state, so it reads like the count
+   boxes — red until answered — but opens a keyboard-first list instead of
+   taking a number. */
+.picker { position: relative; }
+.picker-btn {
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--green);
+  color: #fff;
+  min-width: 260px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.picker[data-empty="true"] .picker-btn { background: var(--red); }
+.picker-btn .key { opacity: .75; font-size: 12px; }
+.picker-btn::before {
+  content: "✓";
+  display: inline-block;
+  width: 1.1em;
+  font-weight: 700;
+}
+.picker[data-empty="true"] .picker-btn::before { content: "✗"; }
+
+/* Above the photo, and wide enough to read a long term without wrapping. */
+.picker-pop {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 320px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .6);
+}
+.picker-pop input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--edge);
+  background: #111;
+  color: var(--text);
+  font: inherit;
+}
+.picker-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.picker-list li {
+  display: flex;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.picker-list li[aria-selected="true"] { background: var(--green); }
+.picker-list li:hover { background: #2a2a2a; }
+.picker-list li[aria-selected="true"]:hover { background: var(--green); }
+.picker-list .num { color: var(--dim); min-width: 1.2em; font-size: 12px; }
+.picker-list .current { margin-left: auto; color: var(--dim); font-size: 11px; }
+.picker-foot {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--edge);
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.5;
+}

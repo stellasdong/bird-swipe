@@ -39,6 +39,8 @@ export const DEFAULT_KEYS = {
   // Q W E R, with 5 onwards mirroring them on the number pad.
   toggle_bird: 'a',
   toggle_bird_num: '5',
+  pick_substrate: 's',
+  pick_substrate_num: '6',
   zoom: 'z',
   jump: 'g',
   close: 'Escape',
@@ -62,6 +64,8 @@ export const ACTION_LABELS = {
   count_chicks_num: 'Chick count (number)',
   toggle_bird: 'Bird visible — nest details (letter)',
   toggle_bird_num: 'Bird visible — nest details (number)',
+  pick_substrate: 'Substrate — nest details (letter)',
+  pick_substrate_num: 'Substrate — nest details (number)',
   zoom: 'Zoom the photo in / out',
   jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this
@@ -157,3 +161,39 @@ export function setReviewer(name) {
   save(cfg);
 }
 
+
+// --- remembered substrate terms ---------------------------------------------
+// A substrate typed into "other" is written to the spreadsheet verbatim and
+// remembered here, so the second cactus ledge is a pick rather than retyping.
+//
+// Deliberately per-browser. A list shared between researchers would have to
+// live in the OneDrive folder, and two people writing it at once is a
+// different job — meanwhile the column stays honest either way, because the
+// file records what was typed, not a reference into some list.
+const REMEMBERED_LIMIT = 40;
+
+export function getRememberedSubstrates() {
+  const v = load().substrates;
+  return Array.isArray(v) ? v.filter(t => typeof t === 'string' && t) : [];
+}
+
+/** Replace the remembered list outright (Preferences, and the tests). */
+export function setRememberedSubstrates(terms) {
+  const cfg = load();
+  cfg.substrates = (Array.isArray(terms) ? terms : [])
+    .map(t => String(t ?? '').trim())
+    .filter(Boolean)
+    .slice(0, REMEMBERED_LIMIT);
+  save(cfg);
+}
+
+/** Most recent first, no duplicates, oldest dropped past the limit. */
+export function rememberSubstrate(term) {
+  const value = String(term ?? '').trim();
+  if (!value) return;
+  const cfg = load();
+  const kept = getRememberedSubstrates().filter(
+    t => t.toLowerCase() !== value.toLowerCase());
+  cfg.substrates = [value, ...kept].slice(0, REMEMBERED_LIMIT);
+  save(cfg);
+}

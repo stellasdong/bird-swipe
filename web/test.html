@@ -26,13 +26,16 @@ import { parseRows, parseTable, serializeTable } from './csv.js';
 import {
   Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
-  NEST_ONLY_COLUMNS, NOT_APPLICABLE,
+  NEST_ONLY_COLUMNS, NOT_APPLICABLE, SUBSTRATE_OPTIONS, filterSubstrates,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
   Folder, SUBMIT_DIR,
 } from './storage.js';
-import { DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay } from './settings.js';
+import {
+  DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay,
+  getRememberedSubstrates, rememberSubstrate, setRememberedSubstrates,
+} from './settings.js';
 import { buildReport, missingAnswers, recordError, clearErrors } from './report.js';
 
 const out = document.getElementById('out');
@@ -187,11 +190,17 @@ group('catalog.js — nest-only questions');
   // readable. See TODO.md.
   const { catalog } = Catalog.open('s.csv', SAMPLE);
 
-  catalog.setLabel(0, { nest: true, structure: false, birdPresent: true });
+  catalog.setLabel(0, { nest: true, structure: false, birdPresent: true,
+                        substrate: 'branch / twig' });
   eq('bird recorded on a nest', catalog.rows[0].bird_present, 'yes');
+  eq('substrate recorded on a nest', catalog.rows[0].substrate, 'branch / twig');
 
   catalog.setLabel(1, { nest: true, structure: false });
   eq('unanswered on a nest is no, not blank', catalog.rows[1].bird_present, 'no');
+  // A toggle has a default; a substrate has none, so unanswered stays blank —
+  // still meaning "nobody answered", never "none". ("none / bare ground" is a
+  // real answer and records as that text.)
+  eq('an unanswered substrate stays blank', catalog.rows[1].substrate, '');
 
   catalog.setLabel(2, { nest: false, structure: false, birdPresent: true });
   eq('a non-nest row is n/a', catalog.rows[2].bird_present, NOT_APPLICABLE);
@@ -199,6 +208,11 @@ group('catalog.js — nest-only questions');
 
   catalog.setSkip(3);
   eq('a skip is blank, not n/a', catalog.rows[3].bird_present, '');
+  eq('a non-nest substrate is n/a too', catalog.rows[2].substrate, NOT_APPLICABLE);
+  eq('substrate is trimmed', (() => {
+    catalog.setLabel(3, { nest: true, structure: false, substrate: '  metal  ' });
+    return catalog.rows[3].substrate;
+  })(), 'metal');
 
   // Flipping a yes to a no has to drop the answer, not leave it standing.
   catalog.setLabel(0, { nest: false, structure: false });
@@ -211,6 +225,39 @@ group('catalog.js — nest-only questions');
   eq('stats counts birds', st.birds, 0);
   catalog.setLabel(0, { nest: true, structure: false, birdPresent: true });
   eq('and follows a re-label', catalog.stats().birds, 1);
+}
+
+group('catalog.js — the substrate list');
+{
+  eq('the starting list is short enough to read', SUBSTRATE_OPTIONS.length <= 20, true);
+  check('it covers bare ground, which is a real answer rather than a blank',
+        SUBSTRATE_OPTIONS.some(t => t.includes('bare ground')));
+  check('and materials, which sit under a nest as much as a branch does',
+        SUBSTRATE_OPTIONS.includes('plastic') && SUBSTRATE_OPTIONS.includes('metal'));
+
+  eq('no filter offers everything', filterSubstrates('').length, SUBSTRATE_OPTIONS.length);
+
+  // "br" has to reach branch and bridge before "nest box or platform", which
+  // only holds a b mid-word — that ordering is what makes Enter safe to trust.
+  const br = filterSubstrates('br');
+  eq('word-start matches come first', br, ['branch / twig', 'bridge']);
+  check('and nothing that lacks the letters', !br.includes('nest box or platform'));
+
+  // "b" starts four terms and sits mid-word in shrub: the starters come first,
+  // which is the ordering that makes the top offer safe to trust.
+  const b = filterSubstrates('b');
+  eq('word-start matches lead', b.slice(0, 4),
+     ['branch / twig', 'building or ledge', 'bridge', 'nest box or platform']);
+  check('mid-word matches still appear, after them', b.indexOf('shrub') > 3);
+
+  eq('case is ignored', filterSubstrates('CACTUS'), ['cactus']);
+  eq('nonsense matches nothing, which is the "other" path',
+     filterSubstrates('zzzz'), []);
+
+  const withExtra = filterSubstrates('cattle', ['cattle panel']);
+  eq('a remembered term is offered', withExtra, ['cattle panel']);
+  eq('a remembered duplicate is not listed twice',
+     filterSubstrates('metal', ['metal']), ['metal']);
 }
 
 group('catalog.js — egg and chick counts');
@@ -252,6 +299,7 @@ group('catalog.js — resume across a reload');
   const first = Catalog.open('s.csv', SAMPLE).catalog;
   first.setLabel(0, { nest: true, structure: false, anthropogenic: true,
                       eggCount: '3', chickCount: '1', birdPresent: true,
+                      substrate: 'cliff or rock ledge',
                       reviewer: 'stella', notes: 'wrong species id' });
   first.setSkip(1, { reviewer: 'stella' });
   const labeledText = first.labeled.serialize();
@@ -263,6 +311,7 @@ group('catalog.js — resume across a reload');
   eq('egg count restored', again.rows[0].egg_count, '3');
   eq('chick count restored', again.rows[0].chick_count, '1');
   eq('bird present restored', again.rows[0].bird_present, 'yes');
+  eq('substrate restored', again.rows[0].substrate, 'cliff or rock ledge');
   eq('notes restored', again.rows[0].notes, 'wrong species id');
   eq('skip restored', again.rows[1].nest_label, SKIPPED);
   eq('resumes at the first unreviewed row', again.firstUnreviewed(), 2);
@@ -400,6 +449,34 @@ group('settings.js — hotkeys');
   eq('a collision is reported', duplicateKey({ ...keys, back: 'ArrowRight' })?.[0], 'ArrowRight');
   eq('arrows display as glyphs', keyDisplay('ArrowRight'), '→');
   eq('letters display uppercase', keyDisplay('q'), 'Q');
+}
+
+group('settings.js — remembered substrates');
+{
+  // Typed terms come back next time, so the second cactus ledge is a pick.
+  // Stored per browser: the file always records the text, never a reference
+  // into a list, so a researcher without the list still reads the column.
+  const before = getRememberedSubstrates();
+  rememberSubstrate('cattle panel');
+  check('a typed term is remembered', getRememberedSubstrates().includes('cattle panel'));
+
+  rememberSubstrate('irrigation pivot');
+  eq('most recent first', getRememberedSubstrates()[0], 'irrigation pivot');
+
+  rememberSubstrate('cattle panel');
+  eq('re-picking moves it to the front, not a duplicate',
+     getRememberedSubstrates().filter(t => t === 'cattle panel').length, 1);
+
+  rememberSubstrate('   ');
+  check('blank is not remembered', !getRememberedSubstrates().includes(''));
+  rememberSubstrate('  spaced  ');
+  check('and terms are trimmed', getRememberedSubstrates().includes('spaced'));
+
+  // Leave the browser as it was found, so running the tests doesn't pollute
+  // the list the app offers. Through the setter, so this keeps working on the
+  // dev preview, where the storage key is scoped differently.
+  setRememberedSubstrates(before);
+  eq('tests clean up after themselves', getRememberedSubstrates(), before);
 }
 
 group('storage.js — progress kept in the browser');

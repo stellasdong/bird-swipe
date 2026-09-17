@@ -116,6 +116,7 @@ Two things that will otherwise trip you up:
 | `E` / `3` | **count the eggs** — type a number, then `Enter` |
 | `R` / `4` | **count the chicks** — type a number, then `Enter` |
 | `A` / `5` | toggle **bird visible** — only on a nest, in the nest details row |
+| `S` / `6` | choose the **substrate** — type to narrow the list, `Enter` records it |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Enter`   | jump to the notes box |
@@ -128,6 +129,24 @@ again saves and moves on. Nothing else changes: `←` (no) and `↓` (next) are
 still a single key, which is where most images go. Stepping back onto a nest
 reopens the row with your answers in it, and the nest-details keys do nothing on
 an image that isn't marked as a nest.
+
+**Substrate — what the nest or the eggs are sitting on.** `S` opens a list;
+typing narrows it, `Enter` records the top match, and `1`–`9` pick straight off
+the unfiltered list. If what you need isn't there, **type it in and press
+`Enter`** — it goes into the spreadsheet exactly as you typed it, and it joins
+the list on this computer so the next one is a pick rather than retyping.
+
+Nothing is recorded until you confirm it: `Esc`, or any of the arrow keys,
+closes the list and leaves the substrate as it was. So a half-typed word can
+never land in the spreadsheet as an answer — but it also means `S`, a few
+letters, `Enter` is the full gesture, and the arrows don't shortcut it the way
+they do out of a count box.
+
+Substrate is the surface **immediately underneath** — which is why `plastic`
+and `metal` sit in the same list as `branch / twig` and `cliff or rock ledge`,
+and why `none / bare ground` is a real answer rather than a blank. It is a
+*separate* question from human-made structure: a nest can sit on natural
+substrate on a man-made structure, and both answers are recorded.
 
 Each control has a letter key and the matching number key, so a number pad works
 too. They all appear as buttons above the image — **green** when set, **red**
@@ -216,6 +235,7 @@ Each row gets these columns appended to the original ones:
 | `nest_label` | `yes` / `no` / `skip` |
 | `human_structure`, `anthropogenic` | `yes` / `no` |
 | `bird_present` | `yes` / `no` on a nest, `n/a` where there is no nest |
+| `substrate` | what the nest or eggs sit on — a term from the list or typed in; `n/a` where there is no nest, blank if nobody answered |
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
 | `egg_count`, `chick_count` | a number |
 | `notes`, `reviewed`, `reviewed_at`, `reviewer` | |
@@ -276,8 +296,9 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 205 assertions covering the CSV
-parser, the label scheme, the nest-only columns, resume, the truncation guard,
+Open **http://localhost:8000/web/test.html** — 228 assertions covering the CSV
+parser, the label scheme, the nest-only columns, the substrate list and its
+filter, resume, the truncation guard,
 the debounced writer,
 the in-browser progress store, autosave mirroring, the output folder layout and
 the problem report, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
@@ -307,7 +328,7 @@ web/catalog.js    load, validate, label, resume       (was core/catalog.py)
 web/storage.js    file picking, progress, autosave mirroring, submit
 web/csv.js        RFC 4180 parse / serialize
 web/macaulay.js   asset URLs                          (was core/macaulay.py)
-web/settings.js   reviewer name + hotkeys             (was config.py)
+web/settings.js   reviewer name, hotkeys, remembered substrates  (was config.py)
 web/channel.js    real app or dev preview, and which storage each gets
 ```
 
