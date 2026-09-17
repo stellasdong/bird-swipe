@@ -35,7 +35,9 @@ export const DEFAULT_KEYS = {
   count_chicks: 'r',
   count_chicks_num: '4',
   // Nest-details questions, only reachable once a row is marked nest = yes.
-  toggle_bird: 'b',
+  // These run A, S, D as they are added — a home-row run left of the existing
+  // Q W E R, with 5 onwards mirroring them on the number pad.
+  toggle_bird: 'a',
   toggle_bird_num: '5',
   zoom: 'z',
   jump: 'g',

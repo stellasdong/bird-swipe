@@ -115,7 +115,7 @@ Two things that will otherwise trip you up:
 | `W` / `2` | toggle **anthropogenic material** |
 | `E` / `3` | **count the eggs** — type a number, then `Enter` |
 | `R` / `4` | **count the chicks** — type a number, then `Enter` |
-| `B` / `5` | toggle **bird visible** — only on a nest, in the nest details row |
+| `A` / `5` | toggle **bird visible** — only on a nest, in the nest details row |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Enter`   | jump to the notes box |

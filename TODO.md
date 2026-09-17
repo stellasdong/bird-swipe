@@ -60,7 +60,7 @@ would have to be rewritten.
 - [x] **Two states**, `yes` / `no`, like the existing toggles: on a reviewed
       row, unanswered means `no`.
 - [x] Column `bird_present`, the first entry in `NEST_ONLY_COLUMNS`.
-- [x] A toggle in the nest-details panel, bound to `B` / `5` — a new action, so
+- [x] A toggle in the nest-details panel, bound to `A` / `5` — a new action, so
       nobody's custom bindings are reset.
 
 It is the panel's first occupant, which is why the flow and this landed
@@ -68,6 +68,9 @@ together: a panel with nothing in it can't be tested, and `n/a` needs a column
 to be written into.
 
 ## M13 — Substrate
+
+Hotkey when built: `S` / `6` — the nest-details keys run A, S, D in the order
+they are added.
 
 **Two independent questions, not one.** Natural vs man-made is already asked —
 it's the existing `human_structure` toggle, and it stays exactly as it is. What
@@ -113,6 +116,8 @@ fixed this definition; it needs to reach whoever analyses the column, because
   worth doing if the list gets long.
 
 ## M14 — Prey provisioning
+
+Hotkey when built: `D` / `7`.
 
 - [ ] Mark whether parents are bringing food to the nest: `provisioning`,
       `yes` / `no`.
