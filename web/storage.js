@@ -16,8 +16,9 @@
 import {
   LABELED_DIRNAME, NEST_DIRNAME, labeledName, nestName,
 } from './catalog.js';
+import { scoped } from './channel.js';
 
-const DB_NAME = 'bird-swipe';
+const DB_NAME = scoped('bird-swipe');
 const DB_VERSION = 2;
 const STORE = 'handles';
 const PROGRESS = 'progress';

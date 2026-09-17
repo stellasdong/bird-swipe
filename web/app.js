@@ -24,6 +24,7 @@ import {
   ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, duplicateKey,
   getKeys, getReviewer, keyDisplay, setKeys, setReviewer,
 } from './settings.js';
+import { IS_DEV } from './channel.js';
 
 export const VERSION = '3.0.0';
 const BUILD = '__BUILD__'; // replaced with the short git SHA at deploy time
@@ -64,6 +65,7 @@ const el = {
   resumeBlock: $('resume-block'),
   fileList: $('file-list'),
   version: $('version'),
+  devBadge: $('dev-badge'),
 
   rowTitle: $('row-title'),
   progress: $('progress'),
@@ -218,6 +220,7 @@ async function startDevMode(url) {
 // ------------------------------------------------------------------ welcome
 async function initWelcome() {
   el.version.textContent = BUILD.startsWith('__') ? VERSION : `${VERSION} (${BUILD})`;
+  if (el.devBadge) el.devBadge.hidden = !IS_DEV;
   el.reviewer.value = getReviewer();
   el.reviewer.addEventListener('change', () => setReviewer(el.reviewer.value));
 
@@ -1511,7 +1514,7 @@ async function reportContext() {
   } catch { /* storage may be blocked */ }
   return {
     version: VERSION,
-    build: BUILD.startsWith('__') ? 'dev' : BUILD,
+    build: (BUILD.startsWith('__') ? 'dev' : BUILD) + (IS_DEV ? ' [dev preview]' : ''),
     reviewer: getReviewer(),
     inputName: state.inputName,
     position: state.catalog

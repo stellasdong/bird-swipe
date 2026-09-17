@@ -1,11 +1,19 @@
 name: Deploy web app
 
-# Publishes the static web app to GitHub Pages on every push to main. This is
-# the whole update mechanism: researchers reload the page and have the current
-# version. There is nothing to download and nothing to install.
+# Publishes the static web app to GitHub Pages. This is the whole update
+# mechanism: researchers reload the page and have the current version. There is
+# nothing to download and nothing to install.
+#
+# One Pages site holds two copies of the app:
+#
+#   /bird-swipe/        <- the main branch. What researchers use.
+#   /bird-swipe/dev/    <- the dev branch. A preview to try things on.
+#
+# Both are rebuilt from their own branch on every run, whichever branch was
+# pushed, so a dev push can never republish a stale main and vice versa.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
@@ -26,19 +34,44 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      # The dev branch may not exist yet; the preview is then simply absent.
+      - uses: actions/checkout@v4
+        id: dev
+        continue-on-error: true
+        with:
+          ref: dev
+          path: dev
 
       - name: Assemble the site
         run: |
-          mkdir -p _site
-          cp -R web/. _site/
-          # Sample exports, so the deployed test page can run against real data.
-          mkdir -p _site/test
-          cp -R test/. _site/test/
-          find _site -name '.DS_Store' -delete
-          # Stamp the build so a support question can be pinned to a commit.
-          sha=$(git rev-parse --short HEAD)
-          sed -i "s/__BUILD__/${sha}/" _site/app.js
-          echo "Built $sha"
+          set -euo pipefail
+
+          # $1 = checkout dir, $2 = destination under _site
+          assemble() {
+            local src="$1" dest="$2"
+            mkdir -p "$dest"
+            cp -R "$src"/web/. "$dest"/
+            # Sample exports, so the deployed test page can run against real data.
+            mkdir -p "$dest"/test
+            cp -R "$src"/test/. "$dest"/test/
+            find "$dest" -name '.DS_Store' -delete
+            # Stamp the build so a support question can be pinned to a commit.
+            local sha
+            sha=$(git -C "$src" rev-parse --short HEAD)
+            sed -i "s/__BUILD__/${sha}/" "$dest"/app.js
+            echo "Built $dest from $sha"
+          }
+
+          assemble main _site
+          if [ -d dev/web ]; then
+            assemble dev _site/dev
+          else
+            echo "No dev branch yet — skipping the preview."
+          fi
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

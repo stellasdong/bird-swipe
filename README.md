@@ -291,6 +291,7 @@ web/storage.js    file picking, progress, autosave mirroring, submit
 web/csv.js        RFC 4180 parse / serialize
 web/macaulay.js   asset URLs                          (was core/macaulay.py)
 web/settings.js   reviewer name + hotkeys             (was config.py)
+web/channel.js    real app or dev preview, and which storage each gets
 ```
 
 No build step and no dependencies — the files that ship are the files in the
@@ -302,6 +303,29 @@ carries no third-party code.
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) publishes `web/` to
 GitHub Pages on every push to `main`; that push *is* the release. One-time
 setup: **Settings → Pages → Source: GitHub Actions**.
+
+### The dev preview
+
+One Pages site carries two copies of the app:
+
+| | |
+|---|---|
+| https://stellasdong.github.io/bird-swipe/ | the `main` branch — what researchers use |
+| https://stellasdong.github.io/bird-swipe/dev/ | the `dev` branch — somewhere to try things |
+
+A push to either branch rebuilds both copies from their own branch, so pushing
+`dev` can never republish a stale `main`. Work goes `dev` → PR → `main`, and
+merging is still what releases it.
+
+The preview is deliberately hard to mistake for the real app: it wears an amber
+**DEV PREVIEW** badge, and — because both copies share one origin, and browser
+storage is scoped to the origin rather than the path — it keeps its settings and
+its in-progress labels under separate names (`bird-swipe-dev`), so trying
+something out there can't touch a real half-labeled spreadsheet. See
+[`web/channel.js`](web/channel.js).
+
+A local server is still the fastest loop, and unaffected by any of this:
+`localhost` is its own origin, so it has its own storage already.
 
 ### The desktop app
 
