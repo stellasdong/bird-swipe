@@ -31,8 +31,20 @@ export const CATALOG_KEY = 'ML Catalog Number';
 export const LABEL_COLUMNS = [
   'nest_label', 'human_structure', 'anthropogenic',
   'eggs', 'egg_count', 'chicks', 'chick_count',
+  'bird_present',
   'notes', 'reviewed', 'reviewed_at', 'reviewer',
 ];
+
+// Questions that only make sense where there is a nest. They are answered in
+// the nest-details panel, which the app opens when a row is marked nest = yes.
+//
+// On a nest = no row they are written NOT_APPLICABLE rather than left blank.
+// That keeps blank meaning one thing — not answered — so a partly-labeled
+// spreadsheet stays safe to read: same reasoning as writing 0 rather than
+// blank for "looked, saw none". A reader handles three tokens: a value, n/a,
+// and blank. See TODO.md.
+export const NEST_ONLY_COLUMNS = ['bird_present'];
+export const NOT_APPLICABLE = 'n/a';
 
 export const REVIEWED = 'TRUE';
 
@@ -196,10 +208,12 @@ export class Catalog {
   // --- labeling -------------------------------------------------------------
   /** Record a decision for row `index`. `nest` is true / false / null. */
   setLabel(index, { nest, structure, anthropogenic = false,
-                    eggCount = '', chickCount = '', reviewer = '', notes = '' }) {
+                    eggCount = '', chickCount = '', birdPresent = false,
+                    reviewer = '', notes = '' }) {
     const row = this.rows[index];
     const eggs = normalizeCount(eggCount);
     const chicks = normalizeCount(chickCount);
+    const nestOnly = { bird_present: birdPresent ? 'yes' : 'no' };
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
     row.human_structure = structure ? 'yes' : 'no';
     row.anthropogenic = anthropogenic ? 'yes' : 'no';
@@ -207,6 +221,11 @@ export class Catalog {
     row.egg_count = String(eggs);
     row.chicks = chicks > 0 ? 'yes' : 'no';
     row.chick_count = String(chicks);
+    // Answered on a nest, n/a without one, blank when there is no decision.
+    for (const col of NEST_ONLY_COLUMNS) {
+      row[col] = nest === true ? (nestOnly[col] ?? '')
+        : nest === false ? NOT_APPLICABLE : '';
+    }
     row.notes = notes;
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
@@ -231,6 +250,7 @@ export class Catalog {
     row.egg_count = '';
     row.chicks = '';
     row.chick_count = '';
+    for (const col of NEST_ONLY_COLUMNS) row[col] = ''; // not answered, not n/a
     row.notes = notes;
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
@@ -286,6 +306,7 @@ export class Catalog {
       anthropogenic: count(r => r.anthropogenic === 'yes'),
       eggs: count(r => r.eggs === 'yes'),
       chicks: count(r => r.chicks === 'yes'),
+      birds: count(r => r.bird_present === 'yes'),
       eggTotal: this.rows.reduce((n, r) => n + normalizeCount(r.egg_count), 0),
       chickTotal: this.rows.reduce((n, r) => n + normalizeCount(r.chick_count), 0),
     };

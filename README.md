@@ -107,7 +107,7 @@ Two things that will otherwise trip you up:
 
 | Key       | Action |
 |-----------|--------|
-| `→`       | nest = **YES** → save + next |
+| `→`       | nest = **YES** → save and open **nest details**; `→` again for the next item |
 | `←`       | nest = **NO** → save + next |
 | `↓`       | next item — an undecided one is recorded as `nest_label=skip` (counts as reviewed) |
 | `↑`       | back to the previous item |
@@ -115,10 +115,19 @@ Two things that will otherwise trip you up:
 | `W` / `2` | toggle **anthropogenic material** |
 | `E` / `3` | **count the eggs** — type a number, then `Enter` |
 | `R` / `4` | **count the chicks** — type a number, then `Enter` |
+| `B` / `5` | toggle **bird visible** — only on a nest, in the nest details row |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Enter`   | jump to the notes box |
 | `Esc`     | close the file (everything is already saved) |
+
+**A nest takes two presses.** Some questions only make sense where there is a
+nest, so `→` now marks nest = YES and *stays on the image*, opening a **nest
+details** row underneath the others with those questions in it. Pressing `→`
+again saves and moves on. Nothing else changes: `←` (no) and `↓` (next) are
+still a single key, which is where most images go. Stepping back onto a nest
+reopens the row with your answers in it, and the nest-details keys do nothing on
+an image that isn't marked as a nest.
 
 Each control has a letter key and the matching number key, so a number pad works
 too. They all appear as buttons above the image — **green** when set, **red**
@@ -206,6 +215,7 @@ Each row gets these columns appended to the original ones:
 |---|---|
 | `nest_label` | `yes` / `no` / `skip` |
 | `human_structure`, `anthropogenic` | `yes` / `no` |
+| `bird_present` | `yes` / `no` on a nest, `n/a` where there is no nest |
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
 | `egg_count`, `chick_count` | a number |
 | `notes`, `reviewed`, `reviewed_at`, `reviewer` | |
@@ -218,6 +228,12 @@ removes it from the nest file.
 > appears on rows that were skipped or never reached, so blank means "not
 > reviewed", never "none". That distinction is what lets a partly-finished
 > spreadsheet be analysed safely.
+
+> **Reading `n/a`.** The nest-details columns only apply where there is a nest,
+> so on a `nest_label=no` row they say `n/a` rather than sitting blank. Blank
+> therefore keeps its single meaning — not answered — and the three values are
+> distinct: an answer, `n/a` (the question didn't apply), and blank (nobody
+> answered it).
 
 > **Save when you finish a spreadsheet.** Without a local folder, in-progress
 > work lives only in that browser on that computer: it survives closing the tab,
@@ -260,8 +276,9 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 195 assertions covering the CSV
-parser, the label scheme, resume, the truncation guard, the debounced writer,
+Open **http://localhost:8000/web/test.html** — 205 assertions covering the CSV
+parser, the label scheme, the nest-only columns, resume, the truncation guard,
+the debounced writer,
 the in-browser progress store, autosave mirroring, the output folder layout and
 the problem report, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
 and the pass/fail count.

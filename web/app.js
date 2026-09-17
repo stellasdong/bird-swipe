@@ -86,7 +86,10 @@ const el = {
   toggles: {
     structure: $('t-structure'),
     anthropogenic: $('t-anthropogenic'),
+    bird: $('t-bird'),
   },
+  nestDetails: $('nest-details'),
+  detailsHint: $('details-hint'),
   counters: {
     eggs: { box: $('c-eggs'), input: $('count-eggs') },
     chicks: { box: $('c-chicks'), input: $('count-chicks') },
@@ -136,16 +139,25 @@ const el = {
   prefsSave: $('prefs-save'),
 };
 
-const TOGGLE_FIELDS = { structure: 'human_structure', anthropogenic: 'anthropogenic' };
+const TOGGLE_FIELDS = {
+  structure: 'human_structure',
+  anthropogenic: 'anthropogenic',
+  bird: 'bird_present',
+};
 const TOGGLE_LABELS = {
   structure: 'human-made structure',
   anthropogenic: 'anthropogenic material',
+  bird: 'bird visible',
 };
 // Both the letter and number binding of a toggle map to the same field.
 const TOGGLE_ACTIONS = {
   toggle_structure: 'structure', toggle_structure_num: 'structure',
   toggle_anthropogenic: 'anthropogenic', toggle_anthropogenic_num: 'anthropogenic',
+  toggle_bird: 'bird',
+  toggle_bird_num: 'bird',
 };
+// Toggles that live in the nest-details panel rather than the main chip row.
+const NEST_ONLY_TOGGLES = new Set(['bird']);
 
 // Navigation actions that may be triggered from inside a count box.
 const ESCAPES_COUNT_BOX = new Set(['nest_yes', 'nest_no', 'forward', 'back']);
@@ -617,13 +629,9 @@ function showCurrent() {
   const row = catalog.rows[state.idx];
   const mlId = row[CATALOG_KEY];
   const total = catalog.rows.length;
-  const stats = catalog.stats();
 
   el.rowTitle.textContent = `${row['Common Name'] ?? ''} · ${row['Scientific Name'] ?? ''}`;
-  el.progress.textContent =
-    `[${state.idx + 1} / ${total}]   reviewed ${stats.reviewed}` +
-    (state.reviewingSkipped ? '   ·   reviewing skipped' : '');
-  renderProgress(stats, total);
+  renderProgressReadout();
   document.title = `bird-swipe · [${state.idx + 1}/${total}] · ML ${mlId}`;
 
   showAsset(mlId, row.Format ?? '');
@@ -637,6 +645,7 @@ function showCurrent() {
     setCount(field, row[column] ?? '');
   }
   updateChip(row);
+  showNestDetails(row);
   renderNestLabels();
   prefetchUpcoming();
   resetNotesLabel();
@@ -727,6 +736,29 @@ function renderToggleLabels() {
   }
 }
 
+/**
+ * The panel is open exactly when the row is a nest, so it can never be
+ * answered for something that isn't one — and a saved yes reopens it with its
+ * answers, the same way the main toggles already show what's stored.
+ */
+function renderProgressReadout() {
+  const total = state.catalog.rows.length;
+  const stats = state.catalog.stats();
+  el.progress.textContent =
+    `[${state.idx + 1} / ${total}]   reviewed ${stats.reviewed}` +
+    (state.reviewingSkipped ? '   ·   reviewing skipped' : '');
+  renderProgress(stats, total);
+}
+
+function showNestDetails(row) {
+  const isNest = (row?.nest_label ?? '') === 'yes';
+  el.nestDetails.hidden = !isNest;
+  if (isNest) {
+    el.detailsHint.textContent =
+      `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
+  }
+}
+
 function updateChip(row) {
   const label = row.nest_label ?? '';
   el.nestYes.setAttribute('aria-pressed', String(label === 'yes'));
@@ -783,6 +815,7 @@ function renderLegend() {
     [`${keyDisplay(k.toggle_anthropogenic)}/${keyDisplay(k.toggle_anthropogenic_num)}`, 'anthro'],
     [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
     [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
+    [`${keyDisplay(k.toggle_bird)}/${keyDisplay(k.toggle_bird_num)}`, 'bird'],
     [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
     [keyDisplay(k.jump), 'jump to…'],
     [keyDisplay(k.close), 'close file'],
@@ -968,23 +1001,61 @@ function prefetchUpcoming(n = 3) {
 }
 
 // ----------------------------------------------------------------- labeling
-function commit(nest) {
+/**
+ * Record the decision for the current row. `move` false keeps us on it — see
+ * nestYes(), where the first press has to stay put so the nest-details panel
+ * can be answered.
+ */
+function commit(nest, move = true) {
   state.catalog.setLabel(state.idx, {
     nest,
     structure: toggleOn('structure'),
     anthropogenic: toggleOn('anthropogenic'),
     eggCount: countOf('eggs'),
     chickCount: countOf('chicks'),
+    birdPresent: toggleOn('bird'),
     reviewer: getReviewer(),
     notes: el.notes.value.trim(),
   });
   state.writer.schedule(state.catalog);
+  if (!move) { // same row, now answerable in more detail
+    const row = state.catalog.rows[state.idx];
+    showNestDetails(row);
+    updateChip(row);
+    renderProgressReadout(); // the row counts as reviewed from this moment
+    return;
+  }
   notePace();
   advance();
 }
 
+/**
+ * Nest = YES. The questions in the nest-details panel only apply where there
+ * is a nest, so the first press commits the yes and *stays*, opening the
+ * panel; the second press moves on. A nest therefore costs two presses and a
+ * non-nest stays one, which is where the volume is. Stepping back onto a row
+ * already marked yes lands in the second state, so → moves on from it.
+ */
+function nestYes() {
+  const alreadyYes = state.catalog.rows[state.idx]?.nest_label === 'yes';
+  commit(true, alreadyYes);
+}
+
+/**
+ * Save the nest-details panel before leaving the row it belongs to. The flow
+ * deliberately parks the reviewer on the row they have just marked yes, so
+ * moving off it with ↓ or ↑ would otherwise throw away an answer they can see
+ * set on the screen. Nothing to do on a row that isn't a nest.
+ */
+function flushNestDetails() {
+  const row = state.catalog?.rows[state.idx];
+  if (row?.nest_label !== 'yes') return;
+  commit(true, false); // same row, saved
+}
+
 /** Advance one item. An undecided item is recorded as a skip on the way out. */
 function forward() {
+  flushNestDetails();
   if (!state.catalog.isReviewed(state.idx)) {
     state.catalog.setSkip(state.idx, {
       reviewer: getReviewer(),
@@ -1014,6 +1085,7 @@ function advance() {
 }
 
 function goBack() {
+  flushNestDetails();
   if (state.reviewingSkipped) {
     // Walk back through items visited this pass — even ones since labeled (so
     // no longer "skip") — via a breadcrumb stack.
@@ -1061,6 +1133,7 @@ function showDone() {
     `nest yes: ${s.yes}   ·   nest no: ${s.no}   ·   skipped: ${s.skipped}`;
   el.doneObservations.textContent =
     `human-made structure: ${s.structure}   ·   anthropogenic: ${s.anthropogenic}` +
+    `   ·   bird visible: ${s.birds}` +
     `   ·   images with eggs: ${s.eggs} (${s.eggTotal} counted)` +
     `   ·   images with chicks: ${s.chicks} (${s.chickTotal} counted)`;
 
@@ -1216,7 +1289,7 @@ for (const [node, value] of [[el.nestYes, true], [el.nestNo, false]]) {
   node.addEventListener('click', () => {
     if (!state.catalog || state.idx >= state.catalog.rows.length) return;
     node.blur(); // keep arrow keys with the label loop
-    commit(value);
+    if (value) nestYes(); else commit(false);
   });
 }
 
@@ -1319,6 +1392,9 @@ document.addEventListener('keydown', event => {
 function runLabelAction(action) {
   if (action in TOGGLE_ACTIONS) {
     const field = TOGGLE_ACTIONS[action];
+    // A nest-details key does nothing until the row is a nest: the panel is
+    // hidden, so flipping it would set a value nobody can see.
+    if (NEST_ONLY_TOGGLES.has(field) && el.nestDetails.hidden) return;
     setToggle(field, !toggleOn(field));
   } else if (action === 'zoom') {
     setZoom(!state.zoomed);
@@ -1333,7 +1409,7 @@ function runLabelAction(action) {
   } else if (action === 'forward') {
     forward();
   } else if (action === 'nest_yes') {
-    commit(true);
+    nestYes();
   } else if (action === 'nest_no') {
     commit(false);
   }

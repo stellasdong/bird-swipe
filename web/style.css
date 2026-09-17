@@ -552,3 +552,25 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
   letter-spacing: .03em;
   pointer-events: none;
 }
+
+/* ---------------------------------------------------------- nest details */
+/* The questions that only apply where there is a nest. Marking nest = yes
+   opens this row without advancing, so it appears under the decision it
+   depends on and is visibly a consequence of it — hence the left rule and the
+   indent rather than a second, equal row of chips. */
+.nest-details {
+  align-items: center;
+  margin: 0 14px 4px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--green);
+  background: #1a1a1a;
+  border-radius: 0 6px 6px 0;
+}
+.details-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.details-hint { font-size: 12px; color: var(--dim); }

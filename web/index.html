@@ -119,6 +119,14 @@
     </div>
   </div>
 
+  <!-- Questions that only apply where there is a nest. Shown exactly when the
+       current row is nest = yes; marking yes opens it without advancing. -->
+  <div class="chips nest-details" id="nest-details" hidden>
+    <span class="details-label">nest details</span>
+    <button class="toggle" id="t-bird" aria-pressed="false" type="button"></button>
+    <span class="details-hint" id="details-hint"></span>
+  </div>
+
   <div class="media" id="media">
     <div class="placeholder" id="media-placeholder">
       <span id="media-message">Loading…</span>

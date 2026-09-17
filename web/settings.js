@@ -34,6 +34,9 @@ export const DEFAULT_KEYS = {
   count_eggs_num: '3',
   count_chicks: 'r',
   count_chicks_num: '4',
+  // Nest-details questions, only reachable once a row is marked nest = yes.
+  toggle_bird: 'b',
+  toggle_bird_num: '5',
   zoom: 'z',
   jump: 'g',
   close: 'Escape',
@@ -55,6 +58,8 @@ export const ACTION_LABELS = {
   count_eggs_num: 'Egg count (number)',
   count_chicks: 'Chick count (letter)',
   count_chicks_num: 'Chick count (number)',
+  toggle_bird: 'Bird visible — nest details (letter)',
+  toggle_bird_num: 'Bird visible — nest details (number)',
   zoom: 'Zoom the photo in / out',
   jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this

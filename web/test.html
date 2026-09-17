@@ -26,6 +26,7 @@ import { parseRows, parseTable, serializeTable } from './csv.js';
 import {
   Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
+  NEST_ONLY_COLUMNS, NOT_APPLICABLE,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
@@ -178,6 +179,40 @@ group('catalog.js — labeling');
   eq('stats skipped', st.skipped, 1);
 }
 
+group('catalog.js — nest-only questions');
+{
+  // The questions that only apply where there is a nest: answered on a yes,
+  // n/a on a no, blank on a skip. Blank therefore still means "not answered"
+  // and never "doesn't apply", which is what keeps a part-labeled file
+  // readable. See TODO.md.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false, birdPresent: true });
+  eq('bird recorded on a nest', catalog.rows[0].bird_present, 'yes');
+
+  catalog.setLabel(1, { nest: true, structure: false });
+  eq('unanswered on a nest is no, not blank', catalog.rows[1].bird_present, 'no');
+
+  catalog.setLabel(2, { nest: false, structure: false, birdPresent: true });
+  eq('a non-nest row is n/a', catalog.rows[2].bird_present, NOT_APPLICABLE);
+  check('n/a is not blank', catalog.rows[2].bird_present !== '');
+
+  catalog.setSkip(3);
+  eq('a skip is blank, not n/a', catalog.rows[3].bird_present, '');
+
+  // Flipping a yes to a no has to drop the answer, not leave it standing.
+  catalog.setLabel(0, { nest: false, structure: false });
+  eq('flipping to no rewrites it as n/a', catalog.rows[0].bird_present, NOT_APPLICABLE);
+
+  eq('every nest-only column is a label column',
+     NEST_ONLY_COLUMNS.every(c => LABEL_COLUMNS.includes(c)), true);
+
+  const st = catalog.stats();
+  eq('stats counts birds', st.birds, 0);
+  catalog.setLabel(0, { nest: true, structure: false, birdPresent: true });
+  eq('and follows a re-label', catalog.stats().birds, 1);
+}
+
 group('catalog.js — egg and chick counts');
 {
   eq('a number parses', normalizeCount('3'), 3);
@@ -216,7 +251,7 @@ group('catalog.js — resume across a reload');
 {
   const first = Catalog.open('s.csv', SAMPLE).catalog;
   first.setLabel(0, { nest: true, structure: false, anthropogenic: true,
-                      eggCount: '3', chickCount: '1',
+                      eggCount: '3', chickCount: '1', birdPresent: true,
                       reviewer: 'stella', notes: 'wrong species id' });
   first.setSkip(1, { reviewer: 'stella' });
   const labeledText = first.labeled.serialize();
@@ -227,6 +262,7 @@ group('catalog.js — resume across a reload');
   eq('anthropogenic restored', again.rows[0].anthropogenic, 'yes');
   eq('egg count restored', again.rows[0].egg_count, '3');
   eq('chick count restored', again.rows[0].chick_count, '1');
+  eq('bird present restored', again.rows[0].bird_present, 'yes');
   eq('notes restored', again.rows[0].notes, 'wrong species id');
   eq('skip restored', again.rows[1].nest_label, SKIPPED);
   eq('resumes at the first unreviewed row', again.firstUnreviewed(), 2);

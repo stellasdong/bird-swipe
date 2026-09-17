@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
-The next round of labeling features, from Stella. Nothing here is built yet.
-[PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes what
+The next round of labeling features, from Stella. The flow and M12 are built;
+everything below them is not. [PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes what
 the app does today. Each item says where it would land in the code, because
 every one of them adds columns to a file researchers may already be half way
 through labeling.
@@ -17,7 +17,7 @@ multi-select; height is out for now; nest IDs are parked.
 
 ---
 
-## The flow — settled, build this first
+## The flow — **built**
 
 The new questions only apply where there's a nest, so their controls live in a
 **nest details panel** that is visible exactly when the current row is
@@ -54,20 +54,18 @@ Anything reading these files handles three tokens: a value, `n/a`, and blank.
 That is deliberate, and it is the decision hardest to reverse later — old files
 would have to be rewritten.
 
-## M12 — Bird present / not present
+## M12 — Bird present / not present — **built**
 
-- [ ] A new per-nest-row observation: is a bird visible in this image?
-- [ ] **Two states**, `yes` / `no`, like the existing toggles: on a reviewed
+- [x] A new per-nest-row observation: is a bird visible in this image?
+- [x] **Two states**, `yes` / `no`, like the existing toggles: on a reviewed
       row, unanswered means `no`.
-- [ ] Column `bird_present`, alongside `human_structure` and `anthropogenic`
-      in `LABEL_COLUMNS`.
-- [ ] A toggle button in the row above the photo, and a hotkey pair (letter +
-      number-pad mirror).
+- [x] Column `bird_present`, the first entry in `NEST_ONLY_COLUMNS`.
+- [x] A toggle in the nest-details panel, bound to `B` / `5` — a new action, so
+      nobody's custom bindings are reset.
 
-**Note.** Free keys are scarce — `Q W E R Z G` are taken and `1`–`4` are the
-number-pad mirrors. Adding this as a *new* action is fine; `getKeys()` merges
-new actions over saved bindings. Reusing an existing key would force a
-`KEYS_VERSION` bump, which resets everyone's custom bindings.
+It is the panel's first occupant, which is why the flow and this landed
+together: a panel with nothing in it can't be tested, and `n/a` needs a column
+to be written into.
 
 ## M13 — Substrate
 
@@ -84,9 +82,12 @@ ledge on a building), and so is the reverse.
       set, deliberately short — the point is that it grows from what people
       actually type:
       - natural — branch / twig, tree cavity, cliff or rock ledge, cactus,
-        shrub, ground, snag
+        shrub, snag
       - man-made — utility pole, building or ledge, tower, bridge,
         nest box or platform, sign
+      - material — plastic, metal
+      - **none / bare ground** — eggs laid straight on the ground, no
+        substrate under them at all
 - [ ] **Other: type it in**, for anything the list doesn't cover.
 - [ ] Column `substrate` — the term picked, or whatever was typed.
 - [ ] A typed "other" is written to the CSV **verbatim**, and remembered in
@@ -94,6 +95,12 @@ ledge on a building), and so is the reverse.
       stays local to the computer: a genuinely shared list would have to live
       in the OneDrive folder, and two researchers writing it at once is a
       different job. Settled — build it this way.
+
+`substrate` means **the surface immediately under the nest or the eggs**, which
+is why materials (plastic, metal) sit in the same list as branches and ledges,
+and why "none" is a real answer rather than a blank. Stella's examples are what
+fixed this definition; it needs to reach whoever analyses the column, because
+"substrate" could otherwise be read as the structure the nest is attached to.
 
 **Open questions**
 
