@@ -120,6 +120,7 @@ Two things that will otherwise trip you up:
 | `A` / `5` | toggle **bird visible** |
 | `S` / `6` | **count the eggs** — type a number, then `Enter` |
 | `D` / `7` | **count the chicks** — type a number, then `Enter` |
+| `F` / `8` | **chick stage** — only once you've counted a chick; press again to change |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Enter`   | jump to the notes box |
@@ -187,9 +188,9 @@ land in the spreadsheet as an answer — but it also means `E`, a few letters,
 out of a count box.
 
 **The keys run in the order the buttons do** — `Q W E R` along the top row,
-then `A S D` on the home row below. One block your left hand covers without
+then `A S D F` on the home row below. One block your left hand covers without
 moving, so the panel can be answered straight down the row rather than
-memorised. The numbers mirror them `1`–`7` in the same order, for a number pad.
+memorised. The numbers mirror them `1`–`8` in the same order, for a number pad.
 
 The order is the order you would describe a nest in: where it is, what it is
 built from, what is in it — and structure comes first because it decides which
@@ -207,6 +208,13 @@ You don't have to press `Enter` first — `→`, `←`, `↑` and `↓` all work
 from the box, so counting is `S`, a number, then `→`. A nest can hold both, and
 both are optional; on a nest, leaving a box alone records as none seen. Off a
 nest they aren't asked at all, and stay blank.
+
+**Chick stage.** Once you've counted at least one chick, a chick-stage button
+appears; press `F` to cycle it. **Early is downy, late is feathered** — the
+definition is on the button so two people draw the line in the same place.
+There's an **unclear** state for a brood you can't call, including one caught
+mid-moult, so you never have to guess. Set the chick count back to zero and the
+button goes away and takes its answer with it.
 
 **Zoom in before you count.** Photographs taken from a distance rarely show eggs
 or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
@@ -289,6 +297,7 @@ Each row gets these columns appended to the original ones:
 | `nest_location` | where the nest **sits** — a term from whichever list `human_structure` selected, or typed in |
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
 | `egg_count`, `chick_count` | a number |
+| `chick_stage` | `early` (downy), `late` (feathered) or `unclear` — only where chicks were counted |
 | `notes`, `reviewed`, `reviewed_at`, `reviewer` | |
 
 **Every column but `nest_label` is nest-only**, and blank wherever there was no

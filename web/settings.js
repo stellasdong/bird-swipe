@@ -52,6 +52,10 @@ export const DEFAULT_KEYS = {
   count_eggs_num: '6',
   count_chicks: 'd',
   count_chicks_num: '7',
+  // Next to the chick count it depends on, completing the Q W E R / A S D F
+  // block. Only reachable when that count is above zero.
+  cycle_chick_stage: 'f',
+  cycle_chick_stage_num: '8',
   zoom: 'z',
   jump: 'g',
   close: 'Escape',
@@ -79,6 +83,8 @@ export const ACTION_LABELS = {
   count_eggs_num: 'Egg count — nest details (number)',
   count_chicks: 'Chick count — nest details (letter)',
   count_chicks_num: 'Chick count — nest details (number)',
+  cycle_chick_stage: 'Chick stage — nest details (letter)',
+  cycle_chick_stage_num: 'Chick stage — nest details (number)',
   zoom: 'Zoom the photo in / out',
   jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this

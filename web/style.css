@@ -601,6 +601,27 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
 }
 .picker[data-empty="true"] .picker-btn::before { content: "✗"; }
 
+/* Chick stage: three states on one key, so it reads like a toggle that counts
+   past two rather than a list. Hidden until the chick count is above zero. */
+.cycle {
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--green);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.cycle[data-empty="true"] { background: var(--red); }
+.cycle .key { opacity: .75; font-size: 12px; }
+.cycle::before {
+  content: "\2713";
+  display: inline-block;
+  width: 1.1em;
+  font-weight: 700;
+}
+.cycle[data-empty="true"]::before { content: "\2717"; }
+
 /* Above the photo, and wide enough to read a long term without wrapping. */
 .picker-pop {
   position: absolute;

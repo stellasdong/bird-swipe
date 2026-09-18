@@ -36,6 +36,7 @@ export const LABEL_COLUMNS = [
   'nest_label', 'human_structure', 'anthropogenic',
   'eggs', 'egg_count', 'chicks', 'chick_count',
   'bird_present', 'substrate', 'anthropogenic_material', 'nest_location',
+  'chick_stage',
   'notes', 'reviewed', 'reviewed_at', 'reviewer',
 ];
 
@@ -54,6 +55,7 @@ export const NEST_ONLY_COLUMNS = [
   'human_structure', 'bird_present',
   'eggs', 'egg_count', 'chicks', 'chick_count',
   'substrate', 'anthropogenic', 'anthropogenic_material', 'nest_location',
+  'chick_stage',
 ];
 
 // Only ever read, never written: files labeled before that change still hold
@@ -132,6 +134,13 @@ export function isListedLocation(term) {
 
 // Several answers in one cell, joined so a comma never has to be escaped to
 // stay readable. The same separator M14 will use for prey.
+// How far along the chicks are, asked only where chicks were counted. Early is
+// downy, late is feathered — Stella's definition, and the split a photograph
+// can actually carry. 'unclear' is a recorded answer, not a blank: it says
+// someone looked and couldn't call it, which is different from nobody having
+// looked, and it is where a mid-moult brood goes rather than forcing a guess.
+export const CHICK_STAGES = ['early', 'late', 'unclear'];
+
 export const MULTI_SEP = '; ';
 
 /** A multi-select cell as a list of terms. Tolerates a plain single value. */
@@ -336,7 +345,7 @@ export class Catalog {
   setLabel(index, { nest, structure,
                     eggCount = '', chickCount = '', birdPresent = false,
                     substrate = '', anthropogenicMaterial = '', nestLocation = '',
-                    reviewer = '', notes = '' }) {
+                    chickStage = '', reviewer = '', notes = '' }) {
     const row = this.rows[index];
     const eggs = normalizeCount(eggCount);
     const chicks = normalizeCount(chickCount);
@@ -362,6 +371,10 @@ export class Catalog {
       anthropogenic: anthropogenic ? 'yes' : 'no',
       anthropogenic_material: anthropogenic,
       nest_location: String(nestLocation ?? '').trim(),
+      // Only meaningful where there are chicks to have a stage. A count edited
+      // back to zero takes the stage with it, so a stale "late" can never sit
+      // under a nest with no chicks in it.
+      chick_stage: chicks > 0 ? String(chickStage ?? '').trim() : '',
     };
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
     // Answered on a nest; blank off one, where the question didn't apply —
@@ -448,6 +461,7 @@ export class Catalog {
       birds: count(r => r.bird_present === 'yes'),
       substrates: count(r => r.substrate && r.substrate !== LEGACY_NOT_APPLICABLE),
       locations: count(r => r.nest_location),
+      chickStages: count(r => r.chick_stage),
       eggTotal: this.rows.reduce((n, r) => n + normalizeCount(r.egg_count), 0),
       chickTotal: this.rows.reduce((n, r) => n + normalizeCount(r.chick_count), 0),
     };

@@ -177,6 +177,13 @@
              placeholder="0" aria-label="Number of chicks">
     </div>
 
+    <!-- Only shown once the chick count is above zero: a stage is a fact about
+         chicks, so asking for one where there are none is asking for a guess.
+         Three states on one key, and the definition rides on the label so two
+         reviewers draw the line in the same place. -->
+    <button class="cycle" id="y-chick-stage" data-empty="true" type="button"
+            hidden></button>
+
     <span class="details-hint" id="details-hint"></span>
   </div>
 

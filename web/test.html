@@ -27,7 +27,7 @@ import {
   Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
   NEST_ONLY_COLUMNS, LEGACY_NOT_APPLICABLE, SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
-  NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS, locationOptions,
+  NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS, locationOptions, CHICK_STAGES,
   isListedLocation, filterTerms, joinTerms, splitTerms,
 } from './catalog.js';
 import {
@@ -350,6 +350,44 @@ group('catalog.js — the structure answer chooses the location list');
         !isListedLocation('cattle panel'));
   check('"other" is not a real location either', !isListedLocation('other'));
   check('and neither is nothing at all', !isListedLocation(''));
+}
+
+group('catalog.js — chick stage');
+{
+  // Early is downy, late is feathered. A stage is a fact about chicks, so it
+  // is only asked where chicks were counted — and 'unclear' is a recorded
+  // answer, not a blank: someone looked and couldn't call it.
+  eq('three states, in cycling order', CHICK_STAGES, ['early', 'late', 'unclear']);
+
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false,
+                        chickCount: '3', chickStage: 'late' });
+  eq('a stage is recorded alongside the count', catalog.rows[0].chick_stage, 'late');
+  eq('and the count still stands', catalog.rows[0].chick_count, '3');
+
+  catalog.setLabel(1, { nest: true, structure: false,
+                        chickCount: '2', chickStage: 'unclear' });
+  eq('unclear is a real answer', catalog.rows[1].chick_stage, 'unclear');
+  check('so it is not blank', catalog.rows[1].chick_stage !== '');
+
+  // The failure mode this has to rule out: a stale stage under a nest whose
+  // chicks were counted and then corrected back to none.
+  catalog.setLabel(0, { nest: true, structure: false,
+                        chickCount: '0', chickStage: 'late' });
+  eq('clearing the count clears the stage', catalog.rows[0].chick_stage, '');
+
+  catalog.setLabel(2, { nest: true, structure: false, chickCount: '4' });
+  eq('chicks with no stage picked is blank, not guessed',
+     catalog.rows[2].chick_stage, '');
+
+  catalog.setLabel(3, { nest: false, structure: false,
+                        chickCount: '2', chickStage: 'early' });
+  eq('and off a nest there is nothing at all', catalog.rows[3].chick_stage, '');
+  check('chick_stage is nest-only', NEST_ONLY_COLUMNS.includes('chick_stage'));
+
+  catalog.setSkip(1);
+  eq('a skip clears it too', catalog.rows[1].chick_stage, '');
 }
 
 group('catalog.js — multi-select cells');

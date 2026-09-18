@@ -9,6 +9,7 @@ import {
   Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
   normalizeCount, filterTerms, joinTerms, splitTerms,
   SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS, locationOptions, isListedLocation,
+  CHICK_STAGES,
 } from './catalog.js';
 import {
   PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, photoUrl, videoUrl,
@@ -91,6 +92,7 @@ const el = {
   },
   nestDetails: $('nest-details'),
   detailsHint: $('details-hint'),
+  chickStage: $('y-chick-stage'),
   // Listed in panel order throughout this file: location, substrate, material.
   pickers: {
     nest_location: {
@@ -202,6 +204,16 @@ const PICKERS = {
   },
 };
 const PICKER_NAMES = Object.keys(PICKERS);
+
+// Chick stage is three states rather than two, so it cycles rather than
+// toggling: blank -> early -> late -> unclear -> blank. The definition rides
+// on the label, because two reviewers drawing the downy/feathered line
+// differently is how this column goes wrong.
+const CHICK_STAGE_TEXT = {
+  early: 'early (downy)',
+  late: 'late (feathered)',
+  unclear: 'unclear',
+};
 // A picker's list and its remembered-terms key can both depend on another
 // answer, so they are resolved when the list is drawn rather than at startup.
 const pickerOptions = name => {
@@ -246,6 +258,7 @@ const state = {
   // The current row's answer to each list question, always held as an array so
   // single- and multi-select differ only in how many entries are allowed.
   picks: Object.fromEntries(PICKER_NAMES.map(name => [name, []])),
+  chickStage: '',   // '', 'early', 'late' or 'unclear'
   openPicker: null, // which picker is showing its list, if any
   pickerRows: [],   // what the open picker is currently offering
 };
@@ -709,6 +722,7 @@ function showCurrent() {
   closePicker(); // never carry an open list onto the next item
   // Legacy 'n/a' is already dropped as the file loads, so these are values or blanks.
   for (const name of PICKER_NAMES) setPick(name, row[name] ?? '');
+  setChickStage(row.chick_stage ?? '');
   updateChip(row);
   showNestDetails(row);
   renderNestLabels();
@@ -846,6 +860,7 @@ function showNestDetails(row) {
     el.detailsHint.textContent =
       `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
     renderPickerButtons();
+    renderChickStage();
   }
 }
 
@@ -895,6 +910,42 @@ function renderPickerButton(name) {
 
 function renderPickerButtons() {
   for (const name of PICKER_NAMES) renderPickerButton(name);
+}
+
+/**
+ * Chick stage, cycled one key at a time. It only exists where chicks were
+ * counted, so the control hides itself when the count is zero and the value
+ * goes with it — catalog.js writes blank there too, so a stale "late" cannot
+ * survive under a nest with no chicks in it.
+ */
+function setChickStage(value) {
+  state.chickStage = CHICK_STAGES.includes(value) ? value : '';
+  renderChickStage();
+}
+
+function cycleChickStage() {
+  if (el.nestDetails.hidden || el.chickStage.hidden) return;
+  const order = ['', ...CHICK_STAGES];
+  const next = order[(order.indexOf(state.chickStage) + 1) % order.length];
+  setChickStage(next);
+  saveOpenRow();
+}
+
+function renderChickStage() {
+  const counted = normalizeCount(countOf('chicks')) > 0;
+  el.chickStage.hidden = !counted;
+  if (!counted && state.chickStage) setChickStage('');
+  el.chickStage.dataset.empty = String(state.chickStage === '');
+  el.chickStage.textContent = '';
+  el.chickStage.append(
+    state.chickStage
+      ? `chick stage: ${CHICK_STAGE_TEXT[state.chickStage]}  `
+      : 'chick stage  ',
+    Object.assign(document.createElement('span'), {
+      className: 'key',
+      textContent: `(${keyDisplay(state.keys.cycle_chick_stage)}`
+        + `/${keyDisplay(state.keys.cycle_chick_stage_num)})`,
+    }));
 }
 
 const pickerOpen = () => state.openPicker !== null;
@@ -1070,6 +1121,8 @@ function renderLegend() {
     [`${keyDisplay(k.toggle_bird)}/${keyDisplay(k.toggle_bird_num)}`, 'bird'],
     [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
     [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
+    [`${keyDisplay(k.cycle_chick_stage)}/${keyDisplay(k.cycle_chick_stage_num)}`,
+     'chick stage'],
     [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
     [keyDisplay(k.jump), 'jump to…'],
     [keyDisplay(k.close), 'close file'],
@@ -1270,6 +1323,7 @@ function commit(nest, move = true) {
     substrate: pickValue('substrate'),
     anthropogenicMaterial: pickValue('anthropogenic_material'),
     nestLocation: pickValue('nest_location'),
+    chickStage: state.chickStage,
     reviewer: getReviewer(),
     notes: el.notes.value.trim(),
   });
@@ -1564,7 +1618,10 @@ function focusCount(field) {
 
 for (const [field, { box, input }] of Object.entries(el.counters)) {
   box.addEventListener('click', () => focusCount(field));
-  input.addEventListener('input', () => refreshCounter(field));
+  input.addEventListener('input', () => {
+    refreshCounter(field);
+    if (field === 'chicks') renderChickStage(); // appears once there is a chick
+  });
   input.addEventListener('keydown', event => {
     // Enter and Esc both return to the label loop; Esc must not reach the
     // document handler and close the file mid-count.
@@ -1589,7 +1646,10 @@ for (const [field, { box, input }] of Object.entries(el.counters)) {
     }
     event.stopPropagation();
   });
-  input.addEventListener('blur', () => refreshCounter(field));
+  input.addEventListener('blur', () => {
+    refreshCounter(field);
+    if (field === 'chicks') renderChickStage();
+  });
 }
 
 
@@ -1644,6 +1704,11 @@ for (const name of PICKER_NAMES) {
     }
   });
 }
+
+el.chickStage.addEventListener('click', () => {
+  cycleChickStage();
+  el.chickStage.blur(); // keep arrow keys with the label loop
+});
 
 for (const [field, node] of Object.entries(el.toggles)) {
   node.addEventListener('click', () => {
@@ -1715,6 +1780,8 @@ function runLabelAction(action) {
     if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
   } else if (action in PICKER_ACTIONS) {
     openPicker(PICKER_ACTIONS[action]);
+  } else if (action === 'cycle_chick_stage' || action === 'cycle_chick_stage_num') {
+    cycleChickStage();
   } else if (action === 'zoom') {
     setZoom(!state.zoomed);
   } else if (action === 'jump') {

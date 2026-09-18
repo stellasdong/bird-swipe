@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
-The next round of labeling features, from Stella. The flow and M12, M13, M17
-and M18 are built; M14 and M16 are next, M15 is parked. [PLAN.md](PLAN.md) is
+The next round of labeling features, from Stella. The flow and M12, M13, M16,
+M17 and M18 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
 the original design; [README.md](README.md) describes what the app does today.
 Each item says where it would land in the code, because every one of them adds
 columns to a file researchers may already be half way through labeling.
@@ -10,14 +10,14 @@ Numbering carries on from the milestones at the bottom of the README (M0–M11).
 
 **Decided so far:** **every observation is nest-only** — the panel that
 marking yes opens holds all of them, so a nest costs two presses and a
-non-nest costs one and records only the decision; a question that didn't apply
-is left **blank**, with `nest_label` saying why; what the nest is made of,
-what man-made material is in it and where it sits are **three separate
-questions** (M17, superseding M13), with substrate multi-select and
-`anthropogenic` derived from the material rather than asked; `human_structure`
-chooses which location list is offered (M18); prey is multi-select; chick
-stage is asked only when chicks were counted, with an unclear/unknown option;
-height is out for now; nest IDs are parked.
+non-nest costs one and records only the decision; a question that didn't
+apply is left **blank**, with `nest_label` saying why; what the nest is made
+of, what man-made material is in it and where it sits are **three separate
+questions** (M17), with substrate multi-select and `anthropogenic` derived
+from the material rather than asked; `human_structure` chooses which location
+list is offered (M18); chick stage is early/late/unclear and only asked where
+chicks were counted (M16); prey is multi-select; height is out for now; nest
+IDs are parked.
 
 ---
 
@@ -159,8 +159,8 @@ fixed this definition; it needs to reach whoever analyses the column, because
 
 ## M14 — Prey provisioning — **next**
 
-Hotkey when built: `F` / `8` — M18 keyed the seven panel questions
-`Q W E R` / `A S D` and `1`–`7`. The multi-select picker
+Hotkey when built: `H` / `9` — `F` / `8` went to chick stage, and `G` is jump.
+The multi-select picker
 M17 built for substrate is the thing to reuse: same open/filter/confirm
 behaviour, same `; `-joined cell, already written and tested.
 
@@ -208,26 +208,28 @@ recordist/date/locality, or is spotting them entirely the reviewer's job?
 Suggesting is a much larger piece of work.
 
 
-## M16 — Chick stage — **next**
+## M16 — Chick stage — **built**
 
-Hotkey when built: `H` / `9` — not `G`, which is jump. **Three states**, so a key that cycles
-early → late → unclear → off rather than a two-way toggle; still one control,
-still one keypress per press, no picker needed.
+Hotkey `F` / `8`, next to the chick count it depends on — which completes the
+`Q W E R` / `A S D F` block. **Three states**, so the key cycles
+blank → early → late → unclear → blank rather than toggling; still one control,
+still one keypress, no picker needed.
 
-- [ ] When chicks are present, record how far along they are:
+- [x] When chicks are present, record how far along they are:
       - **early** — downy
       - **late** — feathered
       - **unclear / unknown** — can't tell from this image
-- [ ] Column `chick_stage`, holding `early`, `late`, `unclear`, or blank.
-- [ ] **The definitions go on the screen**, next to the control — "early =
+- [x] Column `chick_stage`, holding `early`, `late`, `unclear`, or blank.
+- [x] **The definitions go on the screen**, next to the control — "early =
       downy, late = feathered", not just in this file. Two reviewers drawing
       the line differently is the way this column goes wrong, and the labels
-      are short enough to sit in the panel.
-- [ ] **Conditional on the chick count, not on the nest.** The existing chick
+      are short enough to sit in the panel — the button itself reads
+      "chick stage: early (downy)".
+- [x] **Conditional on the chick count, not on the nest.** The existing chick
       counter already answers "are there chicks" — `chick_count > 0`. The stage
       control appears in the nest-details panel only when that count is above
       zero, and disappears if the count is cleared back to zero.
-- [ ] Editing the chick count back to `0` must also blank `chick_stage`, the
+- [x] Editing the chick count back to `0` also blanks `chick_stage`, the
       same way flipping a nest to `no` does. A stale `late` under a zero count
       is the failure mode to test for.
 
@@ -423,6 +425,7 @@ order along the top row:
 | 5 | bird visible | `A` / `5` |
 | 6 | eggs | `S` / `6` |
 | 7 | chicks | `D` / `7` |
+| 8 | chick stage (M16) | `F` / `8` |
 
 - [x] **`Q W E R` then `A S D`** — one block the left hand covers without
       moving. A single run of seven would have reached out to `T Y U`, which is
@@ -434,8 +437,9 @@ order along the top row:
 - [x] Eggs before chicks, the order they happen in.
 - [x] The panel, the legend and the Preferences list are all generated in this
       order too, so nothing can drift out of step with the screen.
-- [x] `r` / `4` is no longer a gap: 1–7 are contiguous, which leaves `8` and
-      `9` for M14 and M16 — `F`, then `H` rather than `G`, which is jump.
+- [x] `r` / `4` is no longer a gap: the numbers are contiguous. M16 went on to
+      take `F` / `8`, completing a `Q W E R` / `A S D F` block; M14 gets
+      `H` / `9`, skipping `G`, which is jump.
 
 **The cost:** every key moved. Nobody is labeling on the dev build yet, so this
 is the moment to do it — but it is the third key change in as many milestones,
@@ -453,6 +457,7 @@ wins over defaults); Preferences → reset moves them to the new scheme.
 - Flipping the toggle twice does not bring the dropped location back. An undo
   would be nice and is not obviously worth the machinery; the term is one
   keypress away in a list that just got shorter.
+
 
 ---
 
