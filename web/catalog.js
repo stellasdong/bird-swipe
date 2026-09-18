@@ -24,51 +24,110 @@ export const CATALOG_KEY = 'ML Catalog Number';
 // Columns bird-swipe appends. Order preserved when new to a file.
 //
 // eggs/chicks stay yes/no for continuity with already-labeled files, and are
-// derived from the counts so the two can never disagree. On a reviewed row an
+// derived from the counts so the two can never disagree. anthropogenic is the
+// same arrangement one step later: it was a toggle until a material list
+// replaced it, and is now derived from anthropogenic_material. On a reviewed row an
 // unanswered count is written as 0 rather than left blank: the row was looked
 // at, so "none seen" is a real observation. Blank counts therefore only ever
 // appear on rows that were skipped or never reached.
 export const LABEL_COLUMNS = [
   'nest_label', 'human_structure', 'anthropogenic',
   'eggs', 'egg_count', 'chicks', 'chick_count',
-  'bird_present', 'substrate',
+  'bird_present', 'substrate', 'anthropogenic_material', 'nest_location',
   'notes', 'reviewed', 'reviewed_at', 'reviewer',
 ];
 
 // Questions that only make sense where there is a nest. They are answered in
 // the nest-details panel, which the app opens when a row is marked nest = yes.
 //
-// On a nest = no row they are written NOT_APPLICABLE rather than left blank.
-// That keeps blank meaning one thing — not answered — so a partly-labeled
-// spreadsheet stays safe to read: same reasoning as writing 0 rather than
-// blank for "looked, saw none". A reader handles three tokens: a value, n/a,
-// and blank. See TODO.md.
-export const NEST_ONLY_COLUMNS = ['bird_present', 'substrate'];
-export const NOT_APPLICABLE = 'n/a';
-
-// What the nest or the eggs sit on. Materials (plastic, metal) belong in the
-// same list as branches and ledges because the question is about the surface
-// immediately underneath, not the structure the nest is attached to — that is
-// the separate human_structure toggle, and the two cross freely: natural
-// substrate on a man-made structure is a real combination.
-//
-// Deliberately short. Anything missing is typed in, kept verbatim in the file,
-// and remembered in that browser (see settings.js) so it comes back next time.
-export const SUBSTRATE_OPTIONS = [
-  'branch / twig', 'tree cavity', 'cliff or rock ledge', 'cactus', 'shrub', 'snag',
-  'utility pole', 'building or ledge', 'tower', 'bridge', 'nest box or platform', 'sign',
-  'plastic', 'metal',
-  'none / bare ground',
+// Off a nest they are left blank. An earlier version wrote 'n/a' there, to
+// keep blank meaning only "not answered"; nest_label already carries that
+// distinction (no / skip / blank), so the filler was doing work the row
+// already did. A reader handles two tokens: a value, or blank — and reads
+// nest_label to learn why it is blank. See TODO.md.
+export const NEST_ONLY_COLUMNS = [
+  'bird_present', 'substrate', 'anthropogenic', 'anthropogenic_material',
+  'nest_location',
 ];
 
+// Only ever read, never written: files labeled before that change still hold
+// it, and it would otherwise come back as a substrate named "n/a".
+export const LEGACY_NOT_APPLICABLE = 'n/a';
+
+/** Blank out a legacy 'n/a' so old files load as though they had been blank. */
+function dropLegacyNotApplicable(row) {
+  for (const col of NEST_ONLY_COLUMNS) {
+    if (row[col] === LEGACY_NOT_APPLICABLE) row[col] = '';
+  }
+}
+
+// Three questions, not one. An earlier version asked a single "what is the
+// nest on?", and its option list gave the game away by mixing branches,
+// bridges, plastic and bare ground. They come apart cleanly:
+//
+//   substrate              what the nest is MADE OF, natural material only
+//   anthropogenic_material what man-made material is in it
+//   nest_location          where the nest physically SITS
+//
+// Each list is deliberately short. Anything missing is typed in, kept verbatim
+// in the file, and remembered in that browser (see settings.js) so it comes
+// back next time — which is also why no list needs an explicit "other" entry:
+// a filter that matches nothing already is the other box.
+
+// Multi-select: a nest is often twigs AND mud AND a fur lining, and making the
+// reviewer choose one would throw away the other two.
+export const SUBSTRATE_OPTIONS = [
+  'twig', 'dried grass', 'mud / clay / feces', 'leaves',
+  'soft / plushy plant material', 'animal fur',
+  'none',
+];
+
+// Single-select. 'other' is listed because naming it is a prompt to look for
+// it, not because the picker needs it.
+export const ANTHROPOGENIC_OPTIONS = ['plastic', 'metal', 'other'];
+
+// Single-select: a nest is in one place. Most of this list is the old
+// substrate list, which is what it had always been describing.
+export const LOCATION_OPTIONS = [
+  'tree', 'cactus', 'shrub', 'snag', 'tree cavity',
+  'ground', 'cliff or rock ledge',
+  'telephone pole', 'building or ledge', 'tower', 'bridge',
+  'nest box or platform', 'sign',
+  'other',
+];
+
+// Several answers in one cell, joined so a comma never has to be escaped to
+// stay readable. The same separator M14 will use for prey.
+export const MULTI_SEP = '; ';
+
+/** A multi-select cell as a list of terms. Tolerates a plain single value. */
+export function splitTerms(value) {
+  return String(value ?? '').split(';').map(t => t.trim()).filter(Boolean);
+}
+
+/** Terms back into a cell: trimmed, de-duplicated case-insensitively, in order. */
+export function joinTerms(terms) {
+  const seen = new Set();
+  const out = [];
+  for (const term of (Array.isArray(terms) ? terms : splitTerms(terms))) {
+    const value = String(term ?? '').trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out.join(MULTI_SEP);
+}
+
 /**
- * The list narrowed by what's been typed. Matches at the start of any word come
- * first, so "br" offers branch and bridge before "nest box", which only holds a
- * "b" mid-word. `extra` carries the terms this browser has remembered.
+ * One of the lists above narrowed by what's been typed. Matches at the start of
+ * any word come first, so "br" offers branch and bridge before "nest box",
+ * which only holds a "b" mid-word. `extra` carries the terms this browser has
+ * remembered.
  */
-export function filterSubstrates(query, extra = []) {
-  const all = [...SUBSTRATE_OPTIONS,
-               ...extra.filter(t => t && !SUBSTRATE_OPTIONS.includes(t))];
+export function filterTerms(options, query, extra = []) {
+  const all = [...options, ...extra.filter(t => t && !options.includes(t))];
   const q = String(query ?? '').trim().toLowerCase();
   if (!q) return all;
   const starts = all.filter(
@@ -223,6 +282,7 @@ export class Catalog {
     }
     for (const row of this.rows) {
       for (const col of LABEL_COLUMNS) if (row[col] === undefined) row[col] = '';
+      dropLegacyNotApplicable(row); // the input may itself be an old labeled file
     }
   }
 
@@ -232,36 +292,46 @@ export class Catalog {
       const prior = this.labeled.get(row[CATALOG_KEY] ?? '');
       if (prior && prior.reviewed === REVIEWED) {
         for (const col of LABEL_COLUMNS) row[col] = prior[col] ?? '';
+        dropLegacyNotApplicable(row);
       }
     }
   }
 
   // --- labeling -------------------------------------------------------------
   /** Record a decision for row `index`. `nest` is true / false / null. */
-  setLabel(index, { nest, structure, anthropogenic = false,
+  setLabel(index, { nest, structure,
                     eggCount = '', chickCount = '', birdPresent = false,
-                    substrate = '', reviewer = '', notes = '' }) {
+                    substrate = '', anthropogenicMaterial = '', nestLocation = '',
+                    reviewer = '', notes = '' }) {
     const row = this.rows[index];
     const eggs = normalizeCount(eggCount);
     const chicks = normalizeCount(chickCount);
-    // A toggle has a default ("no" once the row is reviewed); substrate has
+    const anthropogenic = joinTerms(anthropogenicMaterial);
+    // A toggle has a default ("no" once the row is reviewed); a picker has
     // none, so an unanswered one stays blank — which still reads as "nobody
     // answered", exactly as blank does everywhere else.
+    //
+    // anthropogenic is no longer asked: it is derived from whether a material
+    // was named, the same way eggs is derived from egg_count, so the yes/no
+    // and the detail can never disagree. It was a top-level toggle until the
+    // material list replaced it, and it stays in the file for continuity with
+    // spreadsheets labeled before that.
     const nestOnly = {
       bird_present: birdPresent ? 'yes' : 'no',
-      substrate: String(substrate ?? '').trim(),
+      substrate: joinTerms(substrate),
+      anthropogenic: anthropogenic ? 'yes' : 'no',
+      anthropogenic_material: anthropogenic,
+      nest_location: String(nestLocation ?? '').trim(),
     };
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
     row.human_structure = structure ? 'yes' : 'no';
-    row.anthropogenic = anthropogenic ? 'yes' : 'no';
     row.eggs = eggs > 0 ? 'yes' : 'no';
     row.egg_count = String(eggs);
     row.chicks = chicks > 0 ? 'yes' : 'no';
     row.chick_count = String(chicks);
-    // Answered on a nest, n/a without one, blank when there is no decision.
+    // Answered on a nest; blank off one, where the question didn't apply.
     for (const col of NEST_ONLY_COLUMNS) {
-      row[col] = nest === true ? (nestOnly[col] ?? '')
-        : nest === false ? NOT_APPLICABLE : '';
+      row[col] = nest === true ? (nestOnly[col] ?? '') : '';
     }
     row.notes = notes;
     row.reviewed = REVIEWED;
@@ -282,12 +352,11 @@ export class Catalog {
     const row = this.rows[index];
     row.nest_label = SKIPPED;
     row.human_structure = ''; // no observations recorded on a skip
-    row.anthropogenic = '';
     row.eggs = '';
     row.egg_count = '';
     row.chicks = '';
     row.chick_count = '';
-    for (const col of NEST_ONLY_COLUMNS) row[col] = ''; // not answered, not n/a
+    for (const col of NEST_ONLY_COLUMNS) row[col] = ''; // anthropogenic included
     row.notes = notes;
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
@@ -344,7 +413,8 @@ export class Catalog {
       eggs: count(r => r.eggs === 'yes'),
       chicks: count(r => r.chicks === 'yes'),
       birds: count(r => r.bird_present === 'yes'),
-      substrates: count(r => r.substrate && r.substrate !== NOT_APPLICABLE),
+      substrates: count(r => r.substrate && r.substrate !== LEGACY_NOT_APPLICABLE),
+      locations: count(r => r.nest_location),
       eggTotal: this.rows.reduce((n, r) => n + normalizeCount(r.egg_count), 0),
       chickTotal: this.rows.reduce((n, r) => n + normalizeCount(r.chick_count), 0),
     };

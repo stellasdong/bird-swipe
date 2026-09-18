@@ -28,19 +28,24 @@ export const DEFAULT_KEYS = {
   notes: 'Enter',
   toggle_structure: 'q',
   toggle_structure_num: '1',
-  toggle_anthropogenic: 'w',
-  toggle_anthropogenic_num: '2',
+  // 'w' / '2' deliberately left unbound: the anthropogenic toggle used to live
+  // here before the material list replaced it, and shifting every key below it
+  // up one would break muscle memory for the sake of tidiness.
   count_eggs: 'e',
   count_eggs_num: '3',
   count_chicks: 'r',
   count_chicks_num: '4',
   // Nest-details questions, only reachable once a row is marked nest = yes.
-  // These run A, S, D as they are added — a home-row run left of the existing
-  // Q W E R, with 5 onwards mirroring them on the number pad.
+  // These run A, S, D, F as they are added — a home-row run left of the
+  // existing Q E R, with 5 onwards mirroring them on the number pad.
   toggle_bird: 'a',
   toggle_bird_num: '5',
   pick_substrate: 's',
   pick_substrate_num: '6',
+  pick_anthropogenic: 'd',
+  pick_anthropogenic_num: '7',
+  pick_location: 'f',
+  pick_location_num: '8',
   zoom: 'z',
   jump: 'g',
   close: 'Escape',
@@ -56,16 +61,18 @@ export const ACTION_LABELS = {
   notes: 'Edit notes',
   toggle_structure: 'Human-made structure (letter)',
   toggle_structure_num: 'Human-made structure (number)',
-  toggle_anthropogenic: 'Anthropogenic material (letter)',
-  toggle_anthropogenic_num: 'Anthropogenic material (number)',
   count_eggs: 'Egg count (letter)',
   count_eggs_num: 'Egg count (number)',
   count_chicks: 'Chick count (letter)',
   count_chicks_num: 'Chick count (number)',
   toggle_bird: 'Bird visible — nest details (letter)',
   toggle_bird_num: 'Bird visible — nest details (number)',
-  pick_substrate: 'Substrate — nest details (letter)',
-  pick_substrate_num: 'Substrate — nest details (number)',
+  pick_substrate: 'Substrate / material — nest details (letter)',
+  pick_substrate_num: 'Substrate / material — nest details (number)',
+  pick_anthropogenic: 'Anthropogenic material — nest details (letter)',
+  pick_anthropogenic_num: 'Anthropogenic material — nest details (number)',
+  pick_location: 'Nest location — nest details (letter)',
+  pick_location_num: 'Nest location — nest details (number)',
   zoom: 'Zoom the photo in / out',
   jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this
@@ -162,9 +169,11 @@ export function setReviewer(name) {
 }
 
 
-// --- remembered substrate terms ---------------------------------------------
-// A substrate typed into "other" is written to the spreadsheet verbatim and
-// remembered here, so the second cactus ledge is a pick rather than retyping.
+// --- remembered picker terms -------------------------------------------------
+// A term typed into a picker instead of picked off its list is written to the
+// spreadsheet verbatim and remembered here, so the second one is a pick rather
+// than retyping. Kept per field: what someone types as a nest location has no
+// business turning up in the material list.
 //
 // Deliberately per-browser. A list shared between researchers would have to
 // live in the OneDrive folder, and two people writing it at once is a
@@ -172,28 +181,44 @@ export function setReviewer(name) {
 // file records what was typed, not a reference into some list.
 const REMEMBERED_LIMIT = 40;
 
-export function getRememberedSubstrates() {
-  const v = load().substrates;
+function rememberedAll() {
+  const cfg = load();
+  const terms = (cfg.terms && typeof cfg.terms === 'object') ? { ...cfg.terms } : {};
+  // Terms remembered before substrate was split into three questions were
+  // answers to "what is the nest on?", which is now nest_location. Moved once
+  // rather than dropped, so nobody's typed-in terms vanish.
+  if (Array.isArray(cfg.substrates) && cfg.substrates.length && !terms.nest_location) {
+    terms.nest_location = cfg.substrates;
+  }
+  return terms;
+}
+
+export function getRememberedTerms(field) {
+  const v = rememberedAll()[field];
   return Array.isArray(v) ? v.filter(t => typeof t === 'string' && t) : [];
 }
 
-/** Replace the remembered list outright (Preferences, and the tests). */
-export function setRememberedSubstrates(terms) {
+/** Replace one field's remembered list outright (Preferences, and the tests). */
+export function setRememberedTerms(field, terms) {
   const cfg = load();
-  cfg.substrates = (Array.isArray(terms) ? terms : [])
+  cfg.terms = rememberedAll();
+  cfg.terms[field] = (Array.isArray(terms) ? terms : [])
     .map(t => String(t ?? '').trim())
     .filter(Boolean)
     .slice(0, REMEMBERED_LIMIT);
+  delete cfg.substrates; // migrated into cfg.terms above
   save(cfg);
 }
 
 /** Most recent first, no duplicates, oldest dropped past the limit. */
-export function rememberSubstrate(term) {
+export function rememberTerm(field, term) {
   const value = String(term ?? '').trim();
   if (!value) return;
   const cfg = load();
-  const kept = getRememberedSubstrates().filter(
+  cfg.terms = rememberedAll();
+  const kept = getRememberedTerms(field).filter(
     t => t.toLowerCase() !== value.toLowerCase());
-  cfg.substrates = [value, ...kept].slice(0, REMEMBERED_LIMIT);
+  cfg.terms[field] = [value, ...kept].slice(0, REMEMBERED_LIMIT);
+  delete cfg.substrates;
   save(cfg);
 }

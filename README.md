@@ -1,8 +1,9 @@
 # bird-swipe
 
 Swipe through Macaulay Library nest media and label each asset **nest yes/no**,
-plus three per-image observations — **human-made structure**, **anthropogenic
-material**, and **eggs present** — driven by hotkeys, saving after every entry.
+plus per-image observations — **human-made structure**, **eggs** and **chicks**,
+and, where there is a nest, what it is **made of**, what **man-made material**
+is in it and **where it sits** — driven by hotkeys, saving after every entry.
 See [PLAN.md](PLAN.md) for the original design.
 
 ## Open the app (nothing to install)
@@ -112,11 +113,12 @@ Two things that will otherwise trip you up:
 | `↓`       | next item — an undecided one is recorded as `nest_label=skip` (counts as reviewed) |
 | `↑`       | back to the previous item |
 | `Q` / `1` | toggle **human-made structure** for the current item |
-| `W` / `2` | toggle **anthropogenic material** |
 | `E` / `3` | **count the eggs** — type a number, then `Enter` |
 | `R` / `4` | **count the chicks** — type a number, then `Enter` |
 | `A` / `5` | toggle **bird visible** — only on a nest, in the nest details row |
-| `S` / `6` | choose the **substrate** — type to narrow the list, `Enter` records it |
+| `S` / `6` | choose the **substrate** — what the nest is made of; takes several answers |
+| `D` / `7` | choose the **anthropogenic material** — plastic, metal, other |
+| `F` / `8` | choose the **nest location** — where the nest sits |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Enter`   | jump to the notes box |
@@ -130,23 +132,37 @@ still a single key, which is where most images go. Stepping back onto a nest
 reopens the row with your answers in it, and the nest-details keys do nothing on
 an image that isn't marked as a nest.
 
-**Substrate — what the nest or the eggs are sitting on.** `S` opens a list;
-typing narrows it, `Enter` records the top match, and `1`–`9` pick straight off
-the unfiltered list. If what you need isn't there, **type it in and press
-`Enter`** — it goes into the spreadsheet exactly as you typed it, and it joins
-the list on this computer so the next one is a pick rather than retyping.
+**Three questions about the nest, three lists.** `S`, `D` and `F` each open a
+list; typing narrows it, `Enter` records the top match, and `1`–`9` pick
+straight off the unfiltered list. If what you need isn't there, **type it in and
+press `Enter`** — it goes into the spreadsheet exactly as you typed it, and it
+joins that list on this computer so the next one is a pick rather than retyping.
+
+| Key | Question | Means |
+|---|---|---|
+| `S` / `6` | **substrate** | what the nest is **made of** — twig, dried grass, mud / clay / feces, leaves, soft plant material, animal fur, or none |
+| `D` / `7` | **anthropogenic material** | what **man-made** material is in it — plastic, metal, other |
+| `F` / `8` | **nest location** | where the nest **physically sits** — tree, cactus, telephone pole, ground, bridge… |
+
+These were one question until it became clear it was three: "what is the nest
+on?" can't be answered once when the honest answer is mud, on a telephone pole,
+with plastic twine in it.
+
+**Substrate takes several answers.** A nest is often twigs *and* mud *and* a fur
+lining, so picking a material adds it and leaves the list open for the next one
+— pick again to remove it, `Esc` when you're done. They go into one cell
+separated by `; `. The other two lists take a single answer and close as soon as
+you pick.
+
+You are not asked separately whether there is anthropogenic material: naming one
+answers it. The `anthropogenic` column still says `yes` / `no`, worked out from
+what you picked, the same way `eggs` follows the egg count.
 
 Nothing is recorded until you confirm it: `Esc`, or any of the arrow keys,
-closes the list and leaves the substrate as it was. So a half-typed word can
-never land in the spreadsheet as an answer — but it also means `S`, a few
-letters, `Enter` is the full gesture, and the arrows don't shortcut it the way
-they do out of a count box.
-
-Substrate is the surface **immediately underneath** — which is why `plastic`
-and `metal` sit in the same list as `branch / twig` and `cliff or rock ledge`,
-and why `none / bare ground` is a real answer rather than a blank. It is a
-*separate* question from human-made structure: a nest can sit on natural
-substrate on a man-made structure, and both answers are recorded.
+closes the list and leaves the answer as it was. So a half-typed word can never
+land in the spreadsheet as an answer — but it also means `S`, a few letters,
+`Enter` is the full gesture, and the arrows don't shortcut it the way they do
+out of a count box.
 
 Each control has a letter key and the matching number key, so a number pad works
 too. They all appear as buttons above the image — **green** when set, **red**
@@ -233,12 +249,23 @@ Each row gets these columns appended to the original ones:
 | Column | Meaning |
 |---|---|
 | `nest_label` | `yes` / `no` / `skip` |
-| `human_structure`, `anthropogenic` | `yes` / `no` |
-| `bird_present` | `yes` / `no` on a nest, `n/a` where there is no nest |
-| `substrate` | what the nest or eggs sit on — a term from the list or typed in; `n/a` where there is no nest, blank if nobody answered |
+| `human_structure` | `yes` / `no` |
+| `bird_present` | `yes` / `no` on a nest |
+| `substrate` | what the nest is **made of** — one or more terms from the list or typed in, separated by `; ` |
+| `anthropogenic_material` | the **man-made** material in it — plastic, metal, other, or typed in |
+| `anthropogenic` | `yes` / `no` — derived from `anthropogenic_material`, so they can't disagree |
+| `nest_location` | where the nest **sits** — a term from the list or typed in |
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
 | `egg_count`, `chick_count` | a number |
 | `notes`, `reviewed`, `reviewed_at`, `reviewer` | |
+
+The five nest-only columns — `bird_present`, `substrate`,
+`anthropogenic_material`, `anthropogenic` and `nest_location` — are **blank**
+wherever the question didn't apply. `nest_label` in the same row says why: `no`
+means there was no nest to ask about, `skip` means nothing was answered, and a
+blank one means the row was never reached. Older files may still hold `n/a` in
+these columns from an earlier scheme; the app reads it as blank and never
+writes it again.
 
 Both files are keyed by ML catalog number; flipping a row out of "nest=yes"
 removes it from the nest file.
@@ -249,11 +276,12 @@ removes it from the nest file.
 > reviewed", never "none". That distinction is what lets a partly-finished
 > spreadsheet be analysed safely.
 
-> **Reading `n/a`.** The nest-details columns only apply where there is a nest,
-> so on a `nest_label=no` row they say `n/a` rather than sitting blank. Blank
-> therefore keeps its single meaning — not answered — and the three values are
-> distinct: an answer, `n/a` (the question didn't apply), and blank (nobody
-> answered it).
+> **Reading a blank nest-details column.** Those columns only apply where there
+> is a nest, so off one they are blank — and `nest_label` in the same row says
+> which kind of blank it is: `no` (no nest to ask about), `skip` (nothing
+> answered), or blank (never reached). Read the pair, not the column alone.
+> An earlier version wrote `n/a` instead; files labeled then still open, and
+> the app reads that as blank.
 
 > **Save when you finish a spreadsheet.** Without a local folder, in-progress
 > work lives only in that browser on that computer: it survives closing the tab,
@@ -297,7 +325,7 @@ Labels stay in memory in that mode and are never written to disk.
 ### Tests
 
 Open **http://localhost:8000/web/test.html** — 228 assertions covering the CSV
-parser, the label scheme, the nest-only columns, the substrate list and its
+parser, the label scheme, the nest-only columns, the three term lists and their
 filter, resume, the truncation guard,
 the debounced writer,
 the in-browser progress store, autosave mirroring, the output folder layout and
@@ -328,7 +356,7 @@ web/catalog.js    load, validate, label, resume       (was core/catalog.py)
 web/storage.js    file picking, progress, autosave mirroring, submit
 web/csv.js        RFC 4180 parse / serialize
 web/macaulay.js   asset URLs                          (was core/macaulay.py)
-web/settings.js   reviewer name, hotkeys, remembered substrates  (was config.py)
+web/settings.js   reviewer name, hotkeys, remembered picker terms  (was config.py)
 web/channel.js    real app or dev preview, and which storage each gets
 ```
 

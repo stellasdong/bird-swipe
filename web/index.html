@@ -106,7 +106,6 @@
     <button class="chip nest-btn" id="nest-no" type="button"></button>
     <span class="chip skip-pill" id="nest-skip" hidden>skipped</span>
     <button class="toggle" id="t-structure" aria-pressed="false" type="button"></button>
-    <button class="toggle" id="t-anthropogenic" aria-pressed="false" type="button"></button>
     <div class="counter" id="c-eggs" data-empty="true">
       <span class="counter-label"></span>
       <input type="number" id="count-eggs" min="0" step="1" inputmode="numeric"
@@ -125,18 +124,43 @@
     <span class="details-label">nest details</span>
     <button class="toggle" id="t-bird" aria-pressed="false" type="button"></button>
 
-    <!-- Substrate: a value, not a toggle. The button shows what's recorded and
-         opens the picker; the picker is keyboard-first, so the list narrows as
-         you type and nothing is set until you confirm it. -->
+    <!-- Three values, not toggles. Each button shows what's recorded and opens
+         its picker; the pickers are keyboard-first, so the list narrows as you
+         type and nothing is set until you confirm it. Substrate takes several
+         answers at once — a nest is often twigs and mud and fur. -->
     <div class="picker" id="p-substrate" data-empty="true">
       <button class="picker-btn" id="substrate-open" type="button"
               aria-haspopup="listbox" aria-expanded="false"></button>
       <div class="picker-pop" id="substrate-pop" hidden>
         <input type="text" id="substrate-filter" autocomplete="off" spellcheck="false"
                placeholder="type to narrow, or type anything new"
-               aria-label="Substrate — type to narrow the list">
-        <ul class="picker-list" id="substrate-list" role="listbox"></ul>
+               aria-label="Substrate — what the nest is made of; type to narrow the list">
+        <ul class="picker-list" id="substrate-list" role="listbox" aria-multiselectable="true"></ul>
         <div class="picker-foot" id="substrate-foot"></div>
+      </div>
+    </div>
+
+    <div class="picker" id="p-anthropogenic" data-empty="true">
+      <button class="picker-btn" id="anthropogenic-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="anthropogenic-pop" hidden>
+        <input type="text" id="anthropogenic-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Anthropogenic material — type to narrow the list">
+        <ul class="picker-list" id="anthropogenic-list" role="listbox"></ul>
+        <div class="picker-foot" id="anthropogenic-foot"></div>
+      </div>
+    </div>
+
+    <div class="picker" id="p-location" data-empty="true">
+      <button class="picker-btn" id="location-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="location-pop" hidden>
+        <input type="text" id="location-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Nest location — where the nest sits; type to narrow the list">
+        <ul class="picker-list" id="location-list" role="listbox"></ul>
+        <div class="picker-foot" id="location-foot"></div>
       </div>
     </div>
 
