@@ -150,6 +150,21 @@ joins that list on this computer so the next one is a pick rather than retyping.
 | `E` / `3` | **substrate** | what the nest is **made of** — twig, dried grass, mud / clay / feces, leaves, plant down, animal fur, feathers, or none |
 | `R` / `4` | **anthropogenic material** | what **man-made** material is in it — plastic, metal, other |
 
+**Location and substrate are required.** They say **REQUIRED** in amber until
+you answer them, and `→` won't leave a nest while either is empty — it opens
+the first one instead and tells you what's wanted. Everything else on the row
+is genuinely optional: there may be no bird in shot and no man-made material to
+name, but where a nest is and what it's built from are the questions the
+spreadsheet exists to answer.
+
+Both lists carry **unclear** for a photo that doesn't show it, which is what
+makes requiring them honest rather than a way of collecting guesses. It's a
+different answer from **other**, which means the answer is real but isn't on
+the list.
+
+`←` (not a nest) and `↓` (skip) are never gated — they stay one press. A
+requirement you can't get past just teaches people to skip rows.
+
 **Answer `Q` before `W`.** Human-made structure chooses which location list you
 get: **no** offers the natural places (tree, tree cavity, cactus, shrub, snag,
 ground, cliff or rock ledge) and **yes** offers the man-made ones (telephone

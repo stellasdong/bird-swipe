@@ -295,10 +295,19 @@ group('catalog.js — the three list questions');
         && !SUBSTRATE_OPTIONS.includes('plastic')
         && !NATURAL_LOCATION_OPTIONS.includes('plastic')
         && !MANMADE_LOCATION_OPTIONS.includes('plastic'));
-  check('nothing appears in two lists at once',
-        !SUBSTRATE_OPTIONS.some(
-          t => NATURAL_LOCATION_OPTIONS.includes(t)
-            || MANMADE_LOCATION_OPTIONS.includes(t)));
+  // No real term may sit in two lists, or the reviewer has to guess which
+  // picker it belongs in. The generic escape hatches are the exception, and
+  // every list needs both: "other" for an answer that is real but unlisted,
+  // "unclear" for a photo that doesn't show it.
+  const GENERIC = ['other', 'unclear'];
+  const real = l => l.filter(t => !GENERIC.includes(t));
+  check('no real term appears in two lists at once',
+        !real(SUBSTRATE_OPTIONS).some(
+          t => real(NATURAL_LOCATION_OPTIONS).includes(t)
+            || real(MANMADE_LOCATION_OPTIONS).includes(t)));
+  check('every list can say "the photo does not show it"',
+        [SUBSTRATE_OPTIONS, NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS]
+          .every(l => l.includes('unclear')));
 
   eq('no filter offers everything',
      filterTerms(NATURAL_LOCATION_OPTIONS, '').length,
@@ -315,7 +324,7 @@ group('catalog.js — the three list questions');
   // A word start counts anywhere in the term, not just at the front, so
   // "tree cavity" answers to "c" as readily as "cactus" does.
   eq('any word may start the match', filterTerms(NATURAL_LOCATION_OPTIONS, 'c'),
-     ['tree cavity', 'cactus', 'cliff or rock ledge']);
+     ['tree cavity', 'cactus', 'cliff or rock ledge', 'unclear']);
 
   eq('case is ignored', filterTerms(NATURAL_LOCATION_OPTIONS, 'CACTUS'), ['cactus']);
   eq('nonsense matches nothing, which is the "other" path',

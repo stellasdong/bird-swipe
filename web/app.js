@@ -205,6 +205,17 @@ const PICKERS = {
 };
 const PICKER_NAMES = Object.keys(PICKERS);
 
+// Two of them are not optional. Everything else about a nest can honestly be
+// left unanswered — there may be no bird in shot, no man-made material to
+// name — but where a nest is and what it is built from are the questions the
+// spreadsheet exists to answer, and a picker that sits quietly red reads as an
+// option nobody minds you skipping. These say REQUIRED instead, and the
+// advance key won't leave the row until they hold something.
+//
+// Both lists carry "unclear" for the photo that doesn't show it. Requiring an
+// answer without that would only buy confident-looking guesses.
+const REQUIRED_PICKERS = ['nest_location', 'substrate'];
+
 // Chick stage is three states rather than two, so it cycles rather than
 // toggling: blank -> early -> late -> unclear -> blank. The definition rides
 // on the label, because two reviewers drawing the downy/feathered line
@@ -857,8 +868,10 @@ function showNestDetails(row) {
   const isNest = (row?.nest_label ?? '') === 'yes';
   el.nestDetails.hidden = !isNest;
   if (isNest) {
-    el.detailsHint.textContent =
-      `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
+    const missing = missingRequired();
+    el.detailsHint.textContent = missing.length
+      ? `${missing.map(n => PICKERS[n].label).join(' and ')} still needed`
+      : `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
     renderPickerButtons();
     renderChickStage();
   }
@@ -897,10 +910,12 @@ function renderPickerButton(name) {
   const { label } = PICKERS[name];
   const node = el.pickers[name];
   const value = pickValue(name);
+  const required = REQUIRED_PICKERS.includes(name);
   node.wrap.dataset.empty = String(value === '');
   node.button.textContent = '';
   node.button.append(
-    value ? `${label}: ${value}  ` : `${label}  `,
+    value ? `${label}: ${value}  `
+          : (required ? `${label} — REQUIRED  ` : `${label}  `),
     Object.assign(document.createElement('span'), {
       className: 'key',
       textContent: `(${keyDisplay(state.keys[PICKERS[name].key])}`
@@ -946,6 +961,31 @@ function renderChickStage() {
       textContent: `(${keyDisplay(state.keys.cycle_chick_stage)}`
         + `/${keyDisplay(state.keys.cycle_chick_stage_num)})`,
     }));
+}
+
+/** The required questions still sitting empty, in the order they appear. */
+const missingRequired = () =>
+  REQUIRED_PICKERS.filter(name => pickValue(name) === '');
+
+/**
+ * Called when the advance key is pressed on a nest that isn't finished. Rather
+ * than only refusing, it puts the reviewer where the work is: the first empty
+ * one opens, all of them are marked, and the hint says what is wanted. `←` and
+ * `↓` are deliberately not gated — "this isn't a nest" and "I'm not answering
+ * this one" have to stay one press, or the requirement just teaches people to
+ * skip rows.
+ */
+function promptForRequired(missing) {
+  for (const name of missing) el.pickers[name].wrap.dataset.missing = 'true';
+  setTimeout(() => {
+    for (const name of missing) delete el.pickers[name].wrap.dataset.missing;
+  }, 1800);
+  const names = missing.map(n => PICKERS[n].label);
+  const keys = missing.map(n => keyDisplay(state.keys[PICKERS[n].key]));
+  el.detailsHint.textContent =
+    `${names.join(' and ')} needed before moving on `
+    + `(${keys.join(', ')}) — each list has “unclear” if the photo doesn't show it`;
+  openPicker(missing[0]);
 }
 
 const pickerOpen = () => state.openPicker !== null;
@@ -1042,6 +1082,7 @@ function confirmTerm(term) {
 
   rememberTerm(pickerMemory(name), value); // so the second one is a pick
   renderPickerButton(name);
+  delete el.pickers[name].wrap.dataset.missing;
   if (multi) {
     el.pickers[name].filter.value = ''; // ready for the next one
     renderPickerList();
@@ -1348,6 +1389,13 @@ function commit(nest, move = true) {
  */
 function nestYes() {
   const alreadyYes = state.catalog.rows[state.idx]?.nest_label === 'yes';
+  // The first press opens the panel and answers nothing, so it can't be
+  // blocked. The second is the one that leaves the row, and that is where the
+  // required questions are enforced.
+  if (alreadyYes) {
+    const missing = missingRequired();
+    if (missing.length) { promptForRequired(missing); return; }
+  }
   commit(true, alreadyYes);
 }
 

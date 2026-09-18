@@ -601,6 +601,28 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
 }
 .picker[data-empty="true"] .picker-btn::before { content: "✗"; }
 
+/* Location and substrate have to be answered before a nest can be left, so they
+   have to read as questions rather than options. Empty, they say REQUIRED in
+   amber instead of sitting quietly red like the optional ones; pressing the
+   advance key with one still empty flashes the outline and opens it. */
+.picker[data-required="true"][data-empty="true"] .picker-btn {
+  background: var(--amber);
+  outline: 2px solid transparent;
+}
+.picker[data-required="true"][data-empty="true"] .picker-btn::before { content: "!"; }
+.picker[data-missing="true"] .picker-btn {
+  animation: nudge .9s ease-out 2;
+  outline: 2px solid #d9a400;
+}
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .picker[data-missing="true"] .picker-btn { animation: none; }
+}
+
 /* Chick stage: three states on one key, so it reads like a toggle that counts
    past two rather than a list. Hidden until the chick count is above zero. */
 .cycle {

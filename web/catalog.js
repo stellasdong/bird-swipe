@@ -88,6 +88,12 @@ export const SUBSTRATE_OPTIONS = [
   'twig', 'dried grass', 'mud / clay / feces', 'leaves', 'plant down',
   'animal fur', 'feathers',
   'none',
+  // Substrate and location must be answered before a nest can be left (see
+  // REQUIRED_PICKERS in app.js), so each needs an honest way to say the photo
+  // doesn't show it. Without one, requiring an answer would only produce
+  // confident-looking guesses. It is distinct from "other", which means the
+  // answer is real but isn't on the list.
+  'unclear',
 ];
 
 // Single-select. 'other' is listed because naming it is a prompt to look for
@@ -105,12 +111,12 @@ export const ANTHROPOGENIC_OPTIONS = ['plastic', 'metal', 'other'];
 export const NATURAL_LOCATION_OPTIONS = [
   'tree', 'tree cavity', 'cactus', 'shrub', 'snag',
   'ground', 'cliff or rock ledge',
-  'other',
+  'other', 'unclear',
 ];
 export const MANMADE_LOCATION_OPTIONS = [
   'telephone pole', 'building or ledge', 'tower', 'bridge',
   'nest box or platform', 'sign',
-  'other',
+  'other', 'unclear',
 ];
 
 /** The location list the structure answer calls for. */
@@ -127,7 +133,7 @@ export function locationOptions(humanStructure) {
  */
 export function isListedLocation(term) {
   const t = String(term ?? '').trim().toLowerCase();
-  if (!t || t === 'other') return false;
+  if (!t || t === 'other' || t === 'unclear') return false;
   return [...NATURAL_LOCATION_OPTIONS, ...MANMADE_LOCATION_OPTIONS]
     .some(o => o.toLowerCase() === t);
 }

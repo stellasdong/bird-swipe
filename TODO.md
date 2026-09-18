@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 and M18 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
+M17, M18 and M19 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
 the original design; [README.md](README.md) describes what the app does today.
 Each item says where it would land in the code, because every one of them adds
 columns to a file researchers may already be half way through labeling.
@@ -10,7 +10,9 @@ Numbering carries on from the milestones at the bottom of the README (M0–M11).
 
 **Decided so far:** **every observation is nest-only** — the panel that
 marking yes opens holds all of them, so a nest costs two presses and a
-non-nest costs one and records only the decision; a question that didn't
+non-nest costs one and records only the decision; **location and substrate are
+required** and each list carries `unclear` so requiring them stays honest
+(M19), while everything else is genuinely optional; a question that didn't
 apply is left **blank**, with `nest_label` saying why; what the nest is made
 of, what man-made material is in it and where it sits are **three separate
 questions** (M17), with substrate multi-select and `anthropogenic` derived
@@ -247,6 +249,11 @@ not a decision procedure.
 
 **Still open**
 
+- It is **not required**, unlike location and substrate (M19). A nest with
+  chicks counted and no stage picked writes blank, which reads as "nobody
+  answered". Requiring it would be consistent; it was left out because Stella
+  asked for the two, and because the stage is a harder call than the other two
+  from a photograph.
 - Whether `unclear` and a mixed-age brood want separating later. They're folded
   together for now; if the column comes back full of `unclear`, that's the
   evidence for splitting it.
@@ -458,6 +465,59 @@ wins over defaults); Preferences → reset moves them to the new scheme.
   would be nice and is not obviously worth the machinery; the term is one
   keypress away in a list that just got shorter.
 
+
+## M19 — Location and substrate are required — **built**
+
+Everything in the panel looked equally optional: a red button you could walk
+past. But two of these questions are the ones the spreadsheet exists to answer.
+There may genuinely be no bird in shot and no man-made material to name, and a
+blank there is honest. A nest with no location and nothing built from is just
+an unfinished row.
+
+- [x] `nest_location` and `substrate` read **REQUIRED** in amber while empty,
+      rather than sitting the same quiet red as the optional ones. A different
+      colour and a different word, because the old state said "not answered"
+      and the new one has to say "not answered *yet*".
+- [x] **`→` will not leave a nest** while either is empty. It doesn't only
+      refuse: it marks both, says which are wanted and which keys reach them,
+      and **opens the first one**, so the prompt lands the reviewer on the work
+      instead of in front of a wall.
+- [x] Only that press is gated — the *second* `→`, the one that leaves the
+      row. The first still opens the panel and answers nothing, so it can't be
+      blocked.
+- [x] **`←` and `↓` are never gated.** "This isn't a nest" and "I'm not
+      answering this one" have to stay one press, or a requirement just teaches
+      people to press `↓`. `↑` isn't gated either: stepping back is navigation,
+      and it already saves on the way.
+
+### Requiring an answer needs a way to say "can't tell"
+
+- [x] Both location lists and the substrate list gained **`unclear`**. Without
+      it, requiring an answer doesn't collect more data, it collects
+      confident-looking guesses — the reviewer has to put *something* there.
+- [x] It is **distinct from `other`**, which was already in the location lists:
+      `other` means the answer is real but isn't on the list, `unclear` means
+      the photograph doesn't show it. Both belong in every list, and they are
+      the only terms allowed to appear in more than one — there's a test for
+      that, since a real term in two lists means guessing which picker it
+      belongs in.
+- [x] Neither counts as a listed location for M18's flip rule, so answering
+      `unclear` and then changing the structure toggle keeps it.
+
+**Still open**
+
+- **Old files.** A spreadsheet labeled before this has nests with no location
+  or substrate. Stepping onto one and pressing `→` now stops to ask — correct,
+  arguably the point, but it means finishing an old file costs a pass of real
+  work rather than a tap through. Nobody has labeled nests under M17's scheme
+  yet, so this only bites if it reaches researchers before then.
+- The done screen doesn't count unfinished nests, so there is no way to find
+  them except by walking the file. If old files do turn out to need a pass, a
+  "nests missing an answer" jump would be the thing to build — the jump box
+  already knows how to find the first skipped item.
+- Nothing stops a reviewer answering `unclear` for everything. That's true of
+  any required field, and the honest fix is looking at the data rather than
+  more machinery.
 
 ---
 
