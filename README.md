@@ -139,8 +139,8 @@ set an answer nobody can see. Stepping back onto a nest reopens the row with
 your answers in it.
 
 **Three questions about the nest, three lists.** `W`, `E` and `R` each open a
-list; typing narrows it, `Enter` records the top match, and `1`–`9` pick
-straight off the unfiltered list. If what you need isn't there, **type it in and
+list; **`↑` and `↓` walk it**, typing narrows it, `Enter` records the highlighted
+term or the top match, and `1`–`9` pick straight off the unfiltered list. If what you need isn't there, **type it in and
 press `Enter`** — it goes into the spreadsheet exactly as you typed it, and it
 joins that list on this computer so the next one is a pick rather than retyping.
 
@@ -214,11 +214,23 @@ which is what finishes a multi-select like substrate: picking clears the box
 each time, so the whole gesture is `E`, `1`, `2`, `Enter`. It also means a bare
 `Enter` can't quietly record whatever happens to be at the top of the list.
 
-Nothing is recorded until you confirm it: `Esc`, or any of the arrow keys,
-closes the list and leaves the answer as it was. So a half-typed word can never
-land in the spreadsheet as an answer — but it also means `E`, a few letters,
-`Enter` is the full gesture, and the arrows don't shortcut it the way they do
-out of a count box.
+**The arrow keys belong to an open list.** `↑` and `↓` move the highlight
+through it — outlined in amber, so you can tell where you are from what's
+recorded in green — and `Enter` takes whatever is highlighted. `↑` off the top
+clears the highlight, so `Enter` goes back to meaning *done*. `←` and `→` do
+nothing to the image while a list is open; they just move the cursor in the
+filter box.
+
+That means you can't advance off an image with a list still open — press `Esc`
+or `Enter` first. It's deliberate: stepping to the next photo out from under a
+half-answered question was never what anyone meant, and a list you can only
+reach by typing or by counting to nine is a list you can't browse. The count
+boxes are unchanged — arrows still work straight out of those, so counting is
+still `S`, a number, `→`.
+
+Nothing is recorded until you confirm it: `Esc` closes a list and leaves the
+answer exactly as it was, so a half-typed word can never land in the
+spreadsheet as an answer.
 
 **The keys run in the order the buttons do** — `Q W E R` along the top row,
 then `A S D F` on the home row below. One block your left hand covers without

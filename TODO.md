@@ -520,10 +520,24 @@ an unfinished row.
   more machinery.
 
 
-## M20 — Saying what the questions mean, and finishing a list — **built**
+## M20 — Driving a list, and saying what it asks — **built**
 
-Two small things that were costing real accuracy.
+Three small things that were costing real accuracy.
 
+- [x] **`↑` and `↓` walk the list.** The highlight is outlined rather than
+      filled, so it reads apart from the green that means *recorded* — in a
+      multi-select the same row can be both. `↑` off the top clears it, so
+      `Enter` goes back to meaning "done" rather than trapping you on row one.
+      Typing resets it, and so does a pick, since the list underneath has
+      changed.
+- [x] **The arrows no longer leave the image while a list is open.** They used
+      to close the picker and run their label action, so `→` from inside a
+      half-answered list advanced to the next photo. Stepping out from under an
+      open question was never what anyone meant. The count boxes keep their
+      shortcut — `S`, a number, `→` still works — because there the arrow is
+      finishing an answer rather than abandoning one.
+- [x] `←` and `→` are inert in a list beyond moving the caret in the filter
+      box, which is what a text box should do.
 - [x] **`Enter` finishes a list.** With a filter typed it still records the top
       match; with the box **empty** it closes instead. That is what finishes a
       multi-select — picking clears the filter each time, so substrate is

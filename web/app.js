@@ -290,6 +290,7 @@ const state = {
   chickStage: '',   // '', 'early', 'late' or 'unclear'
   openPicker: null, // which picker is showing its list, if any
   pickerRows: [],   // what the open picker is currently offering
+  pickerCursor: -1, // highlighted row in that list; -1 is "none yet"
 };
 
 // ------------------------------------------------------------------ screens
@@ -1017,6 +1018,7 @@ function openPicker(name) {
   node.hint.textContent = PICKERS[name].hint ?? '';
   node.button.setAttribute('aria-expanded', 'true');
   node.filter.value = '';
+  state.pickerCursor = -1;
   renderPickerList();
   node.filter.focus();
 }
@@ -1042,14 +1044,21 @@ function renderPickerList() {
   const chosen = state.picks[name];
   state.pickerRows = filterTerms(options, query, getRememberedTerms(pickerMemory(name)));
   node.list.textContent = '';
+  if (state.pickerCursor >= state.pickerRows.length) {
+    state.pickerCursor = state.pickerRows.length - 1;
+  }
 
   state.pickerRows.forEach((term, i) => {
     const li = document.createElement('li');
+    li.id = `${name}-opt-${i}`;
     li.setAttribute('role', 'option');
     const on = chosen.some(t => t.toLowerCase() === term.toLowerCase());
-    // The first match is what Enter takes; terms already recorded are marked,
-    // so stepping back onto a labeled item shows its answers in place.
-    li.setAttribute('aria-selected', String(multi ? on : (i === 0 && !numbered)));
+    // Green marks what is recorded, in both kinds of list, so stepping back
+    // onto a labeled item shows its answers in place. Where the arrow keys
+    // have walked to is a separate mark: it moves, and it records nothing
+    // until Enter.
+    li.setAttribute('aria-selected', String(on));
+    if (i === state.pickerCursor) li.dataset.cursor = 'true';
     if (numbered && i < 9) {
       li.append(Object.assign(document.createElement('span'),
         { className: 'num', textContent: String(i + 1) }));
@@ -1068,17 +1077,22 @@ function renderPickerList() {
     node.list.append(li);
   });
 
+  const at = node.list.children[state.pickerCursor];
+  node.filter.setAttribute('aria-activedescendant', at ? at.id : '');
+  if (at) at.scrollIntoView({ block: 'nearest' });
+
   const typed = query.trim();
   const exact = state.pickerRows.some(t => t.toLowerCase() === typed.toLowerCase());
   // With nothing typed there is no match to take, so Enter means "done" —
   // which is the only way out of a multi-select list besides Esc, and reads
   // less like a cancel. Esc still works and still records nothing further.
-  node.foot.textContent = numbered
-    ? `1–9 pick · type to narrow · Enter or Esc when done`
-    : (state.pickerRows.length
-        ? (exact ? 'Enter records it · Esc closes'
-                 : `Enter records “${state.pickerRows[0]}” · Esc closes`)
-        : `Enter adds “${typed}” · Esc closes`);
+  const offer = state.pickerRows[state.pickerCursor]
+    ?? (typed ? state.pickerRows[0] : undefined);
+  node.foot.textContent = offer
+    ? `Enter records “${offer}” · ↑↓ move · Esc closes`
+    : (typed
+        ? `Enter adds “${typed}” · ↑↓ move · Esc closes`
+        : '↑↓ move · 1–9 pick · type to narrow · Enter or Esc when done');
 }
 
 /**
@@ -1106,6 +1120,10 @@ function confirmTerm(term) {
   delete el.pickers[name].wrap.dataset.missing;
   if (multi) {
     el.pickers[name].filter.value = ''; // ready for the next one
+    // and the highlight goes with it: the list underneath has just changed
+    // back to the full one, and leaving the cursor behind would make the next
+    // Enter toggle a row nobody is looking at instead of finishing.
+    state.pickerCursor = -1;
     renderPickerList();
   } else {
     closePicker();
@@ -1731,7 +1749,10 @@ for (const name of PICKER_NAMES) {
     if (state.openPicker === name) closePicker(); else openPicker(name);
   });
 
-  node.filter.addEventListener('input', renderPickerList);
+  node.filter.addEventListener('input', () => {
+    state.pickerCursor = -1; // the list underneath it just changed
+    renderPickerList();
+  });
 
   node.filter.addEventListener('keydown', event => {
     event.stopPropagation(); // never let a filter keystroke reach the label loop
@@ -1742,9 +1763,37 @@ for (const name of PICKER_NAMES) {
       return;
     }
 
+    // Up and down walk the list. While a list is open the arrows belong to it,
+    // not to the label loop: moving to the next image out from under a
+    // half-answered question was never what the reviewer meant, and a list you
+    // can only reach with digits or by typing is a list you can't browse.
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const last = state.pickerRows.length - 1;
+      if (last < 0) return;
+      state.pickerCursor = event.key === 'ArrowDown'
+        ? Math.min(state.pickerCursor + 1, last)
+        // Up off the top returns to no selection, so Enter goes back to
+        // meaning "done" rather than trapping you on the first row.
+        : Math.max(state.pickerCursor - 1, -1);
+      renderPickerList();
+      return;
+    }
+
+    // Left and right are left alone: in a text box they move the caret, which
+    // is what you want while editing a filter, and they no longer reach the
+    // label loop from here.
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') return;
+
     if (event.key === 'Enter') {
       event.preventDefault();
       const typed = node.filter.value.trim();
+      // Whatever the arrows have walked to wins: it is the thing highlighted
+      // on screen, so it is what Enter is visibly offering.
+      if (state.pickerCursor >= 0) {
+        confirmTerm(state.pickerRows[state.pickerCursor]);
+        return;
+      }
       // Nothing typed means there is no match being offered, so Enter is
       // "done" rather than "take the first one". That is what finishes a
       // multi-select list — picking clears the filter each time, so the
@@ -1770,13 +1819,6 @@ for (const name of PICKER_NAMES) {
       return;
     }
 
-    // A navigation key does its usual job and leaves the answer alone.
-    const action = actionForEvent(event, state.keys);
-    if (event.key.length > 1 && ESCAPES_COUNT_BOX.has(action)) {
-      event.preventDefault();
-      closePicker();
-      runLabelAction(action);
-    }
   });
 }
 

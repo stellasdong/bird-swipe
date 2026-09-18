@@ -692,6 +692,13 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
   cursor: pointer;
 }
 .picker-list li[aria-selected="true"] { background: var(--green); }
+/* Where the arrow keys have walked to. Distinct from recorded (green): this
+   one moves and commits nothing until Enter, so it reads as an outline rather
+   than a fill, and the two can sit on the same row. */
+.picker-list li[data-cursor="true"] {
+  outline: 2px solid #d9a400;
+  outline-offset: -2px;
+}
 .picker-list li:hover { background: #2a2a2a; }
 .picker-list li[aria-selected="true"]:hover { background: var(--green); }
 .picker-list .num { color: var(--dim); min-width: 1.2em; font-size: 12px; }
