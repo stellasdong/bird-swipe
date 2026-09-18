@@ -126,6 +126,24 @@ Two things that will otherwise trip you up:
 | `Enter`   | jump to the notes box |
 | `Esc`     | close the file (everything is already saved) |
 
+**Marking a nest walks you through it.** `→` opens the panel *and* the location
+list; picking a location opens substrate; finishing substrate hands you back the
+panel. You never press a key whose only job is to open something, and the two
+required questions are asked first, while you're still looking at the photo. A
+whole nest can be five presses:
+
+```
+→        nest yes — the location list opens
+→        (only if it's man-made — switches which places are offered)
+1        telephone pole — substrate opens
+1        twig
+Enter    done with substrate
+```
+
+then `→` again to save and move on. `Esc` steps out of the run at any point if
+you'd rather count the eggs first; the optional questions are all still there on
+their own keys.
+
 **A nest takes two presses; everything else takes one.** Every question this
 app asks only makes sense where there is a nest — there is no structure to
 judge, nothing to count and nowhere for a nest to sit on an image without one.
@@ -165,17 +183,22 @@ the list.
 `←` (not a nest) and `↓` (skip) are never gated — they stay one press. A
 requirement you can't get past just teaches people to skip rows.
 
-**Answer `Q` before `W`.** Human-made structure chooses which location list you
-get: **no** offers the natural places (tree, tree cavity, cactus, shrub, snag,
-ground, cliff or rock ledge) and **yes** offers the man-made ones (telephone
-pole, building or ledge, tower, bridge, nest box or platform, sign). You read
-seven terms instead of fourteen, and a tree is never offered as a man-made
-place.
+**`←` and `→` switch which places you're offered.** The location list starts on
+the **natural** places (tree, tree cavity, cactus, shrub, snag, ground, cliff or
+rock ledge); one press of `→` swaps it for the **man-made** ones (telephone
+pole, building or ledge, tower, bridge, nest box or platform, sign), and the
+line above the list tells you which you're looking at. You read seven terms
+instead of fourteen, and a tree is never offered as a man-made place.
 
-If you flip `Q` after picking a location, a location that came off the list now
-hidden is **dropped** — "man-made: tree" isn't an answer anyone means to give,
-and the button goes visibly empty so you can pick again. Anything you typed
-yourself is kept, since nothing can tell which side of the line it belongs to.
+Doing that *answers* the human-made structure question — it's the same
+decision, so you make it once, from inside the list it decides. `Q` still
+toggles it from the panel if you'd rather.
+
+Either way, a location that came off the list you just turned away from is
+**dropped** — "man-made: tree" isn't an answer anyone means to give, and the
+button goes visibly empty so you can pick again without closing anything.
+Anything you typed yourself is kept, since nothing can tell which side of the
+line it belongs to.
 
 This is the opposite of the substrate rule, on purpose: a mud nest on a bridge
 is ordinary, so substrate is one list that crosses the line freely. A location

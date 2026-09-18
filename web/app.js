@@ -193,8 +193,13 @@ const PICKERS = {
   // man-made place and the reviewer reads seven terms instead of fourteen.
   nest_location: {
     label: 'location',
-    hint: 'Where the nest physically sits — the tree or the pole, not what it '
-        + 'is built from.',
+    // Says which of the two lists is showing, since the list itself is the
+    // only other clue and both are short.
+    hint: () => (toggleOn('structure')
+      ? 'MAN-MADE places — ← → for natural. Where the nest sits, not what it '
+        + 'is built from.'
+      : 'NATURAL places — ← → for man-made. Where the nest sits, not what it '
+        + 'is built from.'),
     options: () => locationOptions(toggleOn('structure')),
     multi: false, key: 'pick_location', numKey: 'pick_location_num',
     // Typed terms are remembered against the list that was showing, so a
@@ -819,14 +824,43 @@ const toggleOn = field => el.toggles[field].getAttribute('aria-pressed') === 'tr
  */
 function afterToggle(field) {
   if (field !== 'structure') return;
+  reconcileLocation();
+  closePicker();               // its list just changed underneath it
+}
+
+/**
+ * Drop a recorded location that belongs to the list the structure answer has
+ * just turned away from. Split out from afterToggle because the location
+ * picker can switch lists with itself open (left/right inside it), and there
+ * the list changing is the point rather than a reason to close.
+ */
+function reconcileLocation() {
   const [current] = state.picks.nest_location;
   if (current && isListedLocation(current)
       && !pickerOptions('nest_location').some(
            o => o.toLowerCase() === current.toLowerCase())) {
     state.picks.nest_location = [];
   }
-  closePicker();               // its list just changed underneath it
   renderPickerButton('nest_location');
+}
+
+/**
+ * Natural or man-made, from inside the location list. It answers the structure
+ * question as a side effect, which is the point: the two were one decision
+ * being asked as two, and getting them in the wrong order meant picking off
+ * the wrong list and doing it again. Left and right are otherwise inert in a
+ * list, so this costs no key anyone was using.
+ */
+function switchLocationList() {
+  // Only ever reachable from the location filter, which only has focus while
+  // that list is open — but it re-renders whichever list is open, so say so
+  // rather than trusting the caller.
+  if (state.openPicker !== 'nest_location') return;
+  setToggle('structure', !toggleOn('structure'));
+  reconcileLocation();
+  state.pickerCursor = -1;     // a different list underneath it
+  renderPickerList();
+  saveOpenRow();
 }
 
 /** Show a saved count. Blank stays blank so a skipped row doesn't read as 0. */
@@ -982,6 +1016,21 @@ function renderChickStage() {
     }));
 }
 
+/**
+ * Open the next required question that hasn't been answered, if there is one.
+ *
+ * This is what makes a nest cheap: marking one opens the location list without
+ * being asked, confirming that opens substrate, and the reviewer never presses
+ * a key whose only job is to open something. The required run chains; nothing
+ * else does, so the optional questions stay out of the way until they're
+ * wanted. Esc breaks out of it — it closes a list and chains nothing, which is
+ * how you get to the counts first if that's the order you like.
+ */
+function chainToNextRequired() {
+  const [next] = missingRequired();
+  if (next) openPicker(next);
+}
+
 /** The required questions still sitting empty, in the order they appear. */
 const missingRequired = () =>
   REQUIRED_PICKERS.filter(name => pickValue(name) === '');
@@ -1015,7 +1064,6 @@ function openPicker(name) {
   const node = el.pickers[name];
   state.openPicker = name;
   node.pop.hidden = false;
-  node.hint.textContent = PICKERS[name].hint ?? '';
   node.button.setAttribute('aria-expanded', 'true');
   node.filter.value = '';
   state.pickerCursor = -1;
@@ -1077,6 +1125,9 @@ function renderPickerList() {
     node.list.append(li);
   });
 
+  const hint = PICKERS[name].hint;
+  node.hint.textContent = (typeof hint === 'function' ? hint() : hint) ?? '';
+
   const at = node.list.children[state.pickerCursor];
   node.filter.setAttribute('aria-activedescendant', at ? at.id : '');
   if (at) at.scrollIntoView({ block: 'nearest' });
@@ -1127,6 +1178,10 @@ function confirmTerm(term) {
     renderPickerList();
   } else {
     closePicker();
+    // Answering one required question opens the next, so the run carries
+    // itself. Optional pickers chain nothing: finishing one means you went
+    // looking for it, and being handed another list would be a surprise.
+    if (REQUIRED_PICKERS.includes(name)) chainToNextRequired();
   }
   saveOpenRow();
 }
@@ -1436,6 +1491,11 @@ function nestYes() {
     if (missing.length) { promptForRequired(missing); return; }
   }
   commit(true, alreadyYes);
+  // Marking a nest opens the first thing it owes, rather than presenting a
+  // panel of seven buttons and leaving the reviewer to remember which two
+  // matter. Only on the press that opens the panel — stepping back onto a
+  // half-finished nest shouldn't have a list jump out during navigation.
+  if (!alreadyYes) chainToNextRequired();
 }
 
 /**
@@ -1780,10 +1840,16 @@ for (const name of PICKER_NAMES) {
       return;
     }
 
-    // Left and right are left alone: in a text box they move the caret, which
-    // is what you want while editing a filter, and they no longer reach the
-    // label loop from here.
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') return;
+    // In the location list, left and right switch between the natural and the
+    // man-made places — answering the structure question from inside the list
+    // it decides. Everywhere else they are left alone to move the caret, which
+    // is what a text box should do.
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (name !== 'nest_location') return;
+      event.preventDefault();
+      switchLocationList();
+      return;
+    }
 
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -1800,7 +1866,11 @@ for (const name of PICKER_NAMES) {
       // gesture is E, 1, 2, Enter — and it stops a bare Enter on a
       // single-select list quietly recording whatever happens to be at the
       // top. Esc still closes and records nothing further.
-      if (!typed) { closePicker(); return; }
+      if (!typed) {
+        closePicker();
+        if (REQUIRED_PICKERS.includes(name)) chainToNextRequired();
+        return;
+      }
       // The first match is the offer; with no matches at all, what was typed is
       // the answer — that is the "other, type it in" path, and it needs no
       // separate control.

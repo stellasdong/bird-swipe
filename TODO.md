@@ -1,14 +1,15 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 through M21 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
+M17 through M22 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
 the original design; [README.md](README.md) describes what the app does today.
 Each item says where it would land in the code, because every one of them adds
 columns to a file researchers may already be half way through labeling.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
 
-**Decided so far:** **every observation is nest-only** — the panel that
+**Decided so far:** marking a nest opens the required questions in a run that
+carries itself (M22); **every observation is nest-only** — the panel that
 marking yes opens holds all of them, so a nest costs two presses and a
 non-nest costs one and records only the decision; **location and substrate are
 required** and each list carries `unclear` so requiring them stays honest
@@ -16,10 +17,11 @@ required** and each list carries `unclear` so requiring them stays honest
 apply is left **blank**, with `nest_label` saying why; what the nest is made
 of, what man-made material is in it and where it sits are **three separate
 questions** (M17) that each say what they mean in their own popup (M20);
-`human_structure` chooses which location list is offered (M18); chick stage is
-early/late/unclear and only asked where chicks were counted (M16); every
-reviewer of a row is kept, not just the last (M21); prey is multi-select;
-height is out for now; nest IDs are parked.
+`human_structure` chooses which location list is offered (M18) and is answered
+from inside that list with `←`/`→` (M22); chick stage is early/late/unclear
+and only asked where chicks were counted (M16); every reviewer of a row is
+kept, not just the last (M21); prey is multi-select; height is out for now;
+nest IDs are parked.
 
 ---
 
@@ -586,6 +588,92 @@ analyses it.
 - Nothing records *what* a second reviewer changed, only that they were there.
   A real audit trail is a much larger piece of work and probably belongs
   outside the spreadsheet.
+
+
+## M22 — The required run carries itself — **built**
+
+A minimal nest — on a pole, built of twigs, nothing else to say — cost eight
+presses:
+
+```
+→   Q   W   1   E   1   Enter   →
+```
+
+Three of those were answers. The other five were furniture: opening two lists,
+closing one, and the arrows. Every question was a mode you entered and left by
+hand, nothing carried you from one to the next, and you had to remember which
+letter opened what. There was an invisible ordering rule on top — forget `Q`
+first and the location list is the wrong one, so you pick again.
+
+It is now five, and none of them is a key whose only job is to open something:
+
+```
+→   [→ if man-made]   1   1   Enter
+```
+
+### The run
+
+- [x] Marking a nest **opens the location list with it**. Only on the press
+      that opens the panel — stepping back onto a half-finished nest shouldn't
+      have a list jump out during navigation.
+- [x] Confirming location **opens substrate**. Finishing substrate hands the
+      panel back and stops.
+- [x] **Only the required questions chain.** Finishing an optional list means
+      you went looking for it, and being handed another one would be a
+      surprise.
+- [x] **`Esc` breaks the run** — it closes a list and chains nothing, which is
+      how you get to the counts first if that's the order you like.
+- [x] The required *prompt* on `→` is unchanged and now rarely fires: you have
+      to have actively stepped out of the run to reach it.
+
+### Left and right switch the location list
+
+- [x] Inside the location picker, `←` and `→` swap between the natural and the
+      man-made places, and **that answers the structure question**. It was one
+      decision being asked as two, in an order nothing told you about.
+- [x] The hint line says which list is showing, since the list itself is the
+      only other clue and both are short.
+- [x] Flipping still drops a stranded location (M18's rule) but **without
+      closing the picker** — here the list changing is the point rather than a
+      reason to close. `afterToggle` and the switch share that reconcile step.
+- [x] `Q` still toggles it from the panel, for anyone who wants it that way.
+- [x] Those keys were inert inside a list as of M20, so this cost nothing
+      anyone was using. It does mean `←`/`→` do something in one picker and
+      nothing in the other two.
+
+**Still open**
+
+- **`Tab` to walk the panel.** The optional questions still need their letter,
+  which is the part of the old problem that's left. See the note below.
+- The run assumes the required pair is the right place to start. If it turns
+  out people want to count first most of the time, the chain is one line to
+  reorder.
+
+### Not built: Tab through the controls
+
+The idea: `Tab` moves to the next control in the panel and opens it,
+`Shift-Tab` goes back, so the whole row is walkable without knowing a single
+letter. It would finish what the run starts — the run covers the two required
+questions, and `Tab` would cover the other five.
+
+Reasons it isn't in yet:
+
+- **`Tab` is the browser's own key.** It moves focus between the page's real
+  controls, and the panel's buttons are real controls. Taking it means
+  `preventDefault` on every `Tab` the label screen sees, which is exactly the
+  kind of thing that breaks keyboard accessibility if done carelessly — a
+  screen-reader user navigating the page would lose the one key they rely on.
+  Doing it properly means a roving tabindex, not an interception.
+- **It overlaps the run.** Once the chain opens location and substrate for
+  you, `Tab`'s remaining job is reaching bird, the two counts and chick stage —
+  four controls that already have single letters sitting under the reviewer's
+  fingers. The win is smaller than it looks.
+- **It needs a visible focus ring** to be worth anything, and the panel has
+  three different control shapes (toggle, counter, picker) that would each need
+  one. That's a styling pass, not a keybinding.
+
+Worth doing if the letters turn out to be the thing people forget. Worth
+measuring first: the letters are only hard while they're new.
 
 ---
 
