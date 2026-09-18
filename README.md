@@ -113,10 +113,10 @@ Two things that will otherwise trip you up:
 | `←`       | nest = **NO** → save + next |
 | `↓`       | next item — an undecided one is recorded as `nest_label=skip` (counts as reviewed) |
 | `↑`       | back to the previous item |
-| `Q` / `1` | toggle **human-made structure** — and it chooses the location list |
+| `Q` / `1` | toggle **on a human-made structure** — and it chooses the location list |
 | `W` / `2` | choose the **nest location** — where the nest sits |
 | `E` / `3` | choose the **substrate** — what the nest is made of; takes several answers |
-| `R` / `4` | choose the **anthropogenic material** — plastic, metal, other |
+| `R` / `4` | choose the **man-made material** built into the nest — plastic, metal, other |
 | `A` / `5` | toggle **bird visible** |
 | `S` / `6` | **count the eggs** — type a number, then `Enter` |
 | `D` / `7` | **count the chicks** — type a number, then `Enter` |
@@ -148,7 +148,7 @@ joins that list on this computer so the next one is a pick rather than retyping.
 |---|---|---|
 | `W` / `2` | **nest location** | where the nest **physically sits** — see below |
 | `E` / `3` | **substrate** | what the nest is **made of** — twig, dried grass, mud / clay / feces, leaves, plant down, animal fur, feathers, or none |
-| `R` / `4` | **anthropogenic material** | what **man-made** material is in it — plastic, metal, other |
+| `R` / `4` | **man-made material** | man-made material built **into** the nest — twine, wire, plastic. Written to `anthropogenic_material` |
 
 **Location and substrate are required.** They say **REQUIRED** in amber until
 you answer them, and `→` won't leave a nest while either is empty — it opens
@@ -186,15 +186,33 @@ These were one question until it became clear it was three: "what is the nest
 on?" can't be answered once when the honest answer is mud, on a telephone pole,
 with plastic twine in it.
 
+**Three questions that are easy to mix up**, so each list says what it means at
+the top of its own popup — you read it at the moment you answer it, not in a
+manual:
+
+- **substrate** is the **natural** material the nest is built *from*
+- **man-made material** is man-made material built *into* it — twine, wire
+- **structure** and **location** are what it is *sitting on*
+
+A nest of twine on a telephone pole is three different answers, and the button
+has room for a label and a key and nothing else. The column is still called
+`anthropogenic_material`, because spreadsheets already carry that name.
+
 **Substrate takes several answers.** A nest is often twigs *and* mud *and* a fur
 lining, so picking a material adds it and leaves the list open for the next one
 — pick again to remove it, `Esc` when you're done. They go into one cell
 separated by `; `. The other two lists take a single answer and close as soon as
 you pick.
 
-You are not asked separately whether there is anthropogenic material: naming one
+You are not asked separately whether there is man-made material: naming one
 answers it. The `anthropogenic` column still says `yes` / `no`, worked out from
 what you picked, the same way `eggs` follows the egg count.
+
+**`Enter` finishes a list.** With something typed, `Enter` records the top match
+— that's how you pick. With the box empty it means *done* and closes the list,
+which is what finishes a multi-select like substrate: picking clears the box
+each time, so the whole gesture is `E`, `1`, `2`, `Enter`. It also means a bare
+`Enter` can't quietly record whatever happens to be at the top of the list.
 
 Nothing is recorded until you confirm it: `Esc`, or any of the arrow keys,
 closes the list and leaves the answer as it was. So a half-typed word can never

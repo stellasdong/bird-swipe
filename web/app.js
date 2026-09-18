@@ -98,14 +98,17 @@ const el = {
     nest_location: {
       wrap: $('p-location'), button: $('location-open'), pop: $('location-pop'),
       filter: $('location-filter'), list: $('location-list'), foot: $('location-foot'),
+      hint: $('location-hint'),
     },
     substrate: {
       wrap: $('p-substrate'), button: $('substrate-open'), pop: $('substrate-pop'),
       filter: $('substrate-filter'), list: $('substrate-list'), foot: $('substrate-foot'),
+      hint: $('substrate-hint'),
     },
     anthropogenic_material: {
       wrap: $('p-anthropogenic'), button: $('anthropogenic-open'), pop: $('anthropogenic-pop'),
       filter: $('anthropogenic-filter'), list: $('anthropogenic-list'), foot: $('anthropogenic-foot'),
+      hint: $('anthropogenic-hint'),
     },
   },
   counters: {
@@ -163,7 +166,9 @@ const TOGGLE_FIELDS = {
   bird: 'bird_present',
 };
 const TOGGLE_LABELS = {
-  structure: 'human-made structure',
+  // "structure" is about what the nest is ON, which is why it chooses the
+  // location list. The material it is built FROM is a separate question.
+  structure: 'on a human-made structure',
   bird: 'bird visible',
 };
 // Both the letter and number binding of a toggle map to the same field.
@@ -187,7 +192,10 @@ const PICKERS = {
   // and chooses between two shorter lists, so a tree is never offered as a
   // man-made place and the reviewer reads seven terms instead of fourteen.
   nest_location: {
-    label: 'location', options: () => locationOptions(toggleOn('structure')),
+    label: 'location',
+    hint: 'Where the nest physically sits — the tree or the pole, not what it '
+        + 'is built from.',
+    options: () => locationOptions(toggleOn('structure')),
     multi: false, key: 'pick_location', numKey: 'pick_location_num',
     // Typed terms are remembered against the list that was showing, so a
     // man-made one doesn't come back while the natural list is up.
@@ -195,11 +203,21 @@ const PICKERS = {
                                          : 'nest_location_natural'),
   },
   substrate: {
-    label: 'substrate', options: SUBSTRATE_OPTIONS, multi: true,
+    label: 'substrate',
+    hint: 'The NATURAL material the nest is built from. Pick as many as apply.',
+    options: SUBSTRATE_OPTIONS, multi: true,
     key: 'pick_substrate', numKey: 'pick_substrate_num',
   },
+  // "anthropogenic" is the word the column keeps, because three spreadsheets
+  // already carry it. On screen it says what it means: this is the man-made
+  // material the nest is built from — the twine and wire woven into it — and
+  // not the man-made thing it is sitting on, which is the structure toggle
+  // and the location picker between them.
   anthropogenic_material: {
-    label: 'anthropogenic', options: ANTHROPOGENIC_OPTIONS, multi: false,
+    label: 'man-made material',
+    hint: 'Man-made material built INTO the nest — twine, wire, plastic. Not '
+        + 'the pole or building it sits on: that is structure and location.',
+    options: ANTHROPOGENIC_OPTIONS, multi: false,
     key: 'pick_anthropogenic', numKey: 'pick_anthropogenic_num',
   },
 };
@@ -996,6 +1014,7 @@ function openPicker(name) {
   const node = el.pickers[name];
   state.openPicker = name;
   node.pop.hidden = false;
+  node.hint.textContent = PICKERS[name].hint ?? '';
   node.button.setAttribute('aria-expanded', 'true');
   node.filter.value = '';
   renderPickerList();
@@ -1051,13 +1070,15 @@ function renderPickerList() {
 
   const typed = query.trim();
   const exact = state.pickerRows.some(t => t.toLowerCase() === typed.toLowerCase());
-  const close = multi ? 'Esc done' : 'Esc closes';
+  // With nothing typed there is no match to take, so Enter means "done" —
+  // which is the only way out of a multi-select list besides Esc, and reads
+  // less like a cancel. Esc still works and still records nothing further.
   node.foot.textContent = numbered
-    ? `1–9 pick · type to narrow · ${close}`
+    ? `1–9 pick · type to narrow · Enter or Esc when done`
     : (state.pickerRows.length
-        ? (exact ? `Enter records it · ${close}`
-                 : `Enter records “${state.pickerRows[0]}” · ${close}`)
-        : `Enter adds “${typed}” · ${close}`);
+        ? (exact ? 'Enter records it · Esc closes'
+                 : `Enter records “${state.pickerRows[0]}” · Esc closes`)
+        : `Enter adds “${typed}” · Esc closes`);
 }
 
 /**
@@ -1724,11 +1745,17 @@ for (const name of PICKER_NAMES) {
     if (event.key === 'Enter') {
       event.preventDefault();
       const typed = node.filter.value.trim();
+      // Nothing typed means there is no match being offered, so Enter is
+      // "done" rather than "take the first one". That is what finishes a
+      // multi-select list — picking clears the filter each time, so the
+      // gesture is E, 1, 2, Enter — and it stops a bare Enter on a
+      // single-select list quietly recording whatever happens to be at the
+      // top. Esc still closes and records nothing further.
+      if (!typed) { closePicker(); return; }
       // The first match is the offer; with no matches at all, what was typed is
       // the answer — that is the "other, type it in" path, and it needs no
       // separate control.
-      confirmTerm(state.pickerRows[0] && typed ? state.pickerRows[0]
-                  : (typed || state.pickerRows[0]));
+      confirmTerm(state.pickerRows[0] || typed);
       return;
     }
 

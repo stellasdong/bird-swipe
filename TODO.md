@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17, M18 and M19 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
+M17 through M20 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
 the original design; [README.md](README.md) describes what the app does today.
 Each item says where it would land in the code, because every one of them adds
 columns to a file researchers may already be half way through labeling.
@@ -15,11 +15,10 @@ required** and each list carries `unclear` so requiring them stays honest
 (M19), while everything else is genuinely optional; a question that didn't
 apply is left **blank**, with `nest_label` saying why; what the nest is made
 of, what man-made material is in it and where it sits are **three separate
-questions** (M17), with substrate multi-select and `anthropogenic` derived
-from the material rather than asked; `human_structure` chooses which location
-list is offered (M18); chick stage is early/late/unclear and only asked where
-chicks were counted (M16); prey is multi-select; height is out for now; nest
-IDs are parked.
+questions** (M17) that each say what they mean in their own popup (M20);
+`human_structure` chooses which location list is offered (M18); chick stage is
+early/late/unclear and only asked where chicks were counted (M16); prey is
+multi-select; height is out for now; nest IDs are parked.
 
 ---
 
@@ -518,6 +517,31 @@ an unfinished row.
 - Nothing stops a reviewer answering `unclear` for everything. That's true of
   any required field, and the honest fix is looking at the data rather than
   more machinery.
+
+
+## M20 — Saying what the questions mean, and finishing a list — **built**
+
+Two small things that were costing real accuracy.
+
+- [x] **`Enter` finishes a list.** With a filter typed it still records the top
+      match; with the box **empty** it closes instead. That is what finishes a
+      multi-select — picking clears the filter each time, so substrate is
+      `E`, `1`, `2`, `Enter` — and `Esc` was doing that job while reading like
+      a cancel.
+- [x] It also closes a **footgun**: a bare `Enter` used to record whichever
+      term happened to sit at the top of the unfiltered list. Nothing typed
+      means nothing is being offered, so there is nothing to take.
+- [x] **Each picker says what it means**, in its own popup, above the filter.
+      The button has room for a label and a key and nothing else, and these
+      three are genuinely easy to mix up: a nest of twine on a telephone pole
+      is three separate answers.
+- [x] **"anthropogenic" is gone from the screen.** The button reads *man-made
+      material* and its hint says "built INTO the nest — twine, wire, plastic.
+      Not the pole or building it sits on." The column keeps the name
+      `anthropogenic_material`, because spreadsheets already carry it.
+- [x] The structure toggle reads **"on a human-made structure"** rather than
+      "human-made structure", so the thing it is about — what the nest sits on
+      — is in the label rather than assumed.
 
 ---
 

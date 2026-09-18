@@ -666,6 +666,17 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
   color: var(--text);
   font: inherit;
 }
+/* What the question actually means, at the moment you are answering it. The
+   button has room for a label and a key and nothing else, and these three are
+   easy to mix up — a nest built from twine, sitting on a pole, is two
+   different answers. */
+.picker-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+
 .picker-list {
   list-style: none;
   margin: 6px 0 0;
