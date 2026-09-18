@@ -77,8 +77,8 @@ function dropLegacyNotApplicable(row) {
 // Multi-select: a nest is often twigs AND mud AND a fur lining, and making the
 // reviewer choose one would throw away the other two.
 export const SUBSTRATE_OPTIONS = [
-  'twig', 'dried grass', 'mud / clay / feces', 'leaves',
-  'soft / plushy plant material', 'animal fur',
+  'twig', 'dried grass', 'mud / clay / feces', 'leaves', 'plant down',
+  'animal fur', 'feathers',
   'none',
 ];
 

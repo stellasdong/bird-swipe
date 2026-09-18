@@ -113,8 +113,8 @@ Two things that will otherwise trip you up:
 | `↓`       | next item — an undecided one is recorded as `nest_label=skip` (counts as reviewed) |
 | `↑`       | back to the previous item |
 | `Q` / `1` | toggle **human-made structure** for the current item |
+| `W` / `2` | **count the chicks** — type a number, then `Enter` |
 | `E` / `3` | **count the eggs** — type a number, then `Enter` |
-| `R` / `4` | **count the chicks** — type a number, then `Enter` |
 | `A` / `5` | toggle **bird visible** — only on a nest, in the nest details row |
 | `S` / `6` | choose the **substrate** — what the nest is made of; takes several answers |
 | `D` / `7` | choose the **anthropogenic material** — plastic, metal, other |
@@ -140,7 +140,7 @@ joins that list on this computer so the next one is a pick rather than retyping.
 
 | Key | Question | Means |
 |---|---|---|
-| `S` / `6` | **substrate** | what the nest is **made of** — twig, dried grass, mud / clay / feces, leaves, soft plant material, animal fur, or none |
+| `S` / `6` | **substrate** | what the nest is **made of** — twig, dried grass, mud / clay / feces, leaves, plant down, animal fur, feathers, or none |
 | `D` / `7` | **anthropogenic material** | what **man-made** material is in it — plastic, metal, other |
 | `F` / `8` | **nest location** | where the nest **physically sits** — tree, cactus, telephone pole, ground, bridge… |
 

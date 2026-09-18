@@ -270,8 +270,8 @@ means one thing in the file and another in the comments.
 ### The three controls
 
 - [x] `substrate` — **natural material the nest is built from**: twig, dried
-      grass, mud / clay / feces, leaves, soft / plushy plant material, animal
-      fur, **none**. Hotkey `S` / `6`, keeping the key it already had.
+      grass, mud / clay / feces, leaves, plant down, animal fur, feathers,
+      **none**. Hotkey `S` / `6`, keeping the key it already had.
 - [x] **Multi-select**, confirmed with Stella: a nest is often twigs *and* mud
       *and* a fur lining. Picking toggles a term and leaves the list open for
       the next; several answers ride in one cell joined with `; `, the
@@ -308,9 +308,10 @@ means one thing in the file and another in the comments.
       second press.
 - [x] **Two behaviour changes worth knowing**, both consequences of it moving
       into the panel: `anthropogenic` is now **blank off a nest** where it used
-      to say `no`, and **`w` / `2` is unbound** — deliberately left empty
-      rather than shifting every key below it up one, which would have cost
-      muscle memory for the sake of tidiness. This is the first key this
+      to say `no`, and the toggle's old `w` / `2` was left empty rather than
+      shifting every key below it up one. **Stella has since moved the chick
+      count into that slot** — so the top row is `Q` structure, `W` chicks,
+      `E` eggs, and `r` / `4` is the gap instead. This is the first key this
       project has taken away rather than added.
 - [x] **It breaks "the existing four toggles do not move"**, stated in the flow
       section. That rule was about not disturbing what already works; this is a
@@ -327,11 +328,6 @@ means one thing in the file and another in the comments.
 
 **Still open**
 
-- **Feathers are missing from the material list**, and they are a common
-  lining — a reviewer has to type them today. Likewise "soft / plushy plant
-  material" is Stella's phrasing and clear in conversation, but it wants a
-  settled term before it reaches whoever analyses the column ("plant down"?).
-  Both are one-word list edits now and spreadsheet cleanup later.
 - **Is `anthropogenic_material` single-select the right call?** Plastic twine
   and wire in the same nest is plausible. Left single because only substrate
   was confirmed multi; the machinery is now there either way, so it is a
@@ -340,8 +336,7 @@ means one thing in the file and another in the comments.
   derivable from `nest_location` for every listed answer: tree and cactus are
   natural, telephone pole and bridge are not. It only earns its place for typed
   "other" values, where nothing can infer it. Kept for now — it has real data
-  behind it and costs one press — but it is the next thing to question, and
-  `q` / `1` sits next to the `w` / `2` this milestone just emptied.
+  behind it and costs one press — but it is the next thing to question.
 - Whether `nest_location` wants the same natural/man-made grouping M13's list
   had, as *ordering* within one list rather than two lists.
 

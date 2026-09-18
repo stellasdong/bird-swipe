@@ -28,16 +28,17 @@ export const DEFAULT_KEYS = {
   notes: 'Enter',
   toggle_structure: 'q',
   toggle_structure_num: '1',
-  // 'w' / '2' deliberately left unbound: the anthropogenic toggle used to live
-  // here before the material list replaced it, and shifting every key below it
-  // up one would break muscle memory for the sake of tidiness.
+  // Chicks moved up into the slot the anthropogenic toggle left when the
+  // material list replaced it, so the top row is three adjacent keys again.
+  // 'r' / '4' is now the unbound one; nothing was shifted into it, because
+  // moving a key someone already knows costs more than leaving a gap.
+  count_chicks: 'w',
+  count_chicks_num: '2',
   count_eggs: 'e',
   count_eggs_num: '3',
-  count_chicks: 'r',
-  count_chicks_num: '4',
   // Nest-details questions, only reachable once a row is marked nest = yes.
   // These run A, S, D, F as they are added — a home-row run left of the
-  // existing Q E R, with 5 onwards mirroring them on the number pad.
+  // existing Q W E, with 5 onwards mirroring them on the number pad.
   toggle_bird: 'a',
   toggle_bird_num: '5',
   pick_substrate: 's',
@@ -61,10 +62,10 @@ export const ACTION_LABELS = {
   notes: 'Edit notes',
   toggle_structure: 'Human-made structure (letter)',
   toggle_structure_num: 'Human-made structure (number)',
-  count_eggs: 'Egg count (letter)',
-  count_eggs_num: 'Egg count (number)',
   count_chicks: 'Chick count (letter)',
   count_chicks_num: 'Chick count (number)',
+  count_eggs: 'Egg count (letter)',
+  count_eggs_num: 'Egg count (number)',
   toggle_bird: 'Bird visible — nest details (letter)',
   toggle_bird_num: 'Bird visible — nest details (number)',
   pick_substrate: 'Substrate / material — nest details (letter)',
