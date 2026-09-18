@@ -1,9 +1,10 @@
 # bird-swipe
 
 Swipe through Macaulay Library nest media and label each asset **nest yes/no**,
-plus per-image observations — **human-made structure**, **eggs** and **chicks**,
-and, where there is a nest, what it is **made of**, what **man-made material**
-is in it and **where it sits** — driven by hotkeys, saving after every entry.
+and then, only where there is a nest, everything else about it — **human-made
+structure**, **eggs** and **chicks**, what it is **made of**, what **man-made
+material** is in it and **where it sits** — driven by hotkeys, saving after
+every entry.
 See [PLAN.md](PLAN.md) for the original design.
 
 ## Open the app (nothing to install)
@@ -112,27 +113,31 @@ Two things that will otherwise trip you up:
 | `←`       | nest = **NO** → save + next |
 | `↓`       | next item — an undecided one is recorded as `nest_label=skip` (counts as reviewed) |
 | `↑`       | back to the previous item |
-| `Q` / `1` | toggle **human-made structure** for the current item |
-| `W` / `2` | **count the chicks** — type a number, then `Enter` |
-| `E` / `3` | **count the eggs** — type a number, then `Enter` |
-| `A` / `5` | toggle **bird visible** — only on a nest, in the nest details row |
-| `S` / `6` | choose the **substrate** — what the nest is made of; takes several answers |
-| `D` / `7` | choose the **anthropogenic material** — plastic, metal, other |
-| `F` / `8` | choose the **nest location** — where the nest sits |
+| `Q` / `1` | toggle **human-made structure** — and it chooses the location list |
+| `W` / `2` | choose the **nest location** — where the nest sits |
+| `E` / `3` | choose the **substrate** — what the nest is made of; takes several answers |
+| `R` / `4` | choose the **anthropogenic material** — plastic, metal, other |
+| `A` / `5` | toggle **bird visible** |
+| `S` / `6` | **count the eggs** — type a number, then `Enter` |
+| `D` / `7` | **count the chicks** — type a number, then `Enter` |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Enter`   | jump to the notes box |
 | `Esc`     | close the file (everything is already saved) |
 
-**A nest takes two presses.** Some questions only make sense where there is a
-nest, so `→` now marks nest = YES and *stays on the image*, opening a **nest
-details** row underneath the others with those questions in it. Pressing `→`
-again saves and moves on. Nothing else changes: `←` (no) and `↓` (next) are
-still a single key, which is where most images go. Stepping back onto a nest
-reopens the row with your answers in it, and the nest-details keys do nothing on
-an image that isn't marked as a nest.
+**A nest takes two presses; everything else takes one.** Every question this
+app asks only makes sense where there is a nest — there is no structure to
+judge, nothing to count and nowhere for a nest to sit on an image without one.
+So all of them live in a **nest details** row that `→` opens: it marks
+nest = YES and *stays on the image*, and `→` again saves and moves on. `←` (no)
+and `↓` (next) stay a single key, which is where most images go, and those rows
+record the decision and nothing else.
 
-**Three questions about the nest, three lists.** `S`, `D` and `F` each open a
+Every key below `↑` does nothing until the panel is open, so there is no way to
+set an answer nobody can see. Stepping back onto a nest reopens the row with
+your answers in it.
+
+**Three questions about the nest, three lists.** `W`, `E` and `R` each open a
 list; typing narrows it, `Enter` records the top match, and `1`–`9` pick
 straight off the unfiltered list. If what you need isn't there, **type it in and
 press `Enter`** — it goes into the spreadsheet exactly as you typed it, and it
@@ -140,9 +145,26 @@ joins that list on this computer so the next one is a pick rather than retyping.
 
 | Key | Question | Means |
 |---|---|---|
-| `S` / `6` | **substrate** | what the nest is **made of** — twig, dried grass, mud / clay / feces, leaves, plant down, animal fur, feathers, or none |
-| `D` / `7` | **anthropogenic material** | what **man-made** material is in it — plastic, metal, other |
-| `F` / `8` | **nest location** | where the nest **physically sits** — tree, cactus, telephone pole, ground, bridge… |
+| `W` / `2` | **nest location** | where the nest **physically sits** — see below |
+| `E` / `3` | **substrate** | what the nest is **made of** — twig, dried grass, mud / clay / feces, leaves, plant down, animal fur, feathers, or none |
+| `R` / `4` | **anthropogenic material** | what **man-made** material is in it — plastic, metal, other |
+
+**Answer `Q` before `W`.** Human-made structure chooses which location list you
+get: **no** offers the natural places (tree, tree cavity, cactus, shrub, snag,
+ground, cliff or rock ledge) and **yes** offers the man-made ones (telephone
+pole, building or ledge, tower, bridge, nest box or platform, sign). You read
+seven terms instead of fourteen, and a tree is never offered as a man-made
+place.
+
+If you flip `Q` after picking a location, a location that came off the list now
+hidden is **dropped** — "man-made: tree" isn't an answer anyone means to give,
+and the button goes visibly empty so you can pick again. Anything you typed
+yourself is kept, since nothing can tell which side of the line it belongs to.
+
+This is the opposite of the substrate rule, on purpose: a mud nest on a bridge
+is ordinary, so substrate is one list that crosses the line freely. A location
+doesn't cross it — a nest sits in one place, and that place either is man-made
+or it isn't.
 
 These were one question until it became clear it was three: "what is the nest
 on?" can't be answered once when the honest answer is mud, on a telephone pole,
@@ -160,21 +182,31 @@ what you picked, the same way `eggs` follows the egg count.
 
 Nothing is recorded until you confirm it: `Esc`, or any of the arrow keys,
 closes the list and leaves the answer as it was. So a half-typed word can never
-land in the spreadsheet as an answer — but it also means `S`, a few letters,
+land in the spreadsheet as an answer — but it also means `E`, a few letters,
 `Enter` is the full gesture, and the arrows don't shortcut it the way they do
 out of a count box.
 
-Each control has a letter key and the matching number key, so a number pad works
-too. They all appear as buttons above the image — **green** when set, **red**
-when not — and you can click them instead of using the keys. They always show
-what is already saved for that item, so stepping back shows your earlier answers
-rather than a blank slate.
+**The keys run in the order the buttons do** — `Q W E R` along the top row,
+then `A S D` on the home row below. One block your left hand covers without
+moving, so the panel can be answered straight down the row rather than
+memorised. The numbers mirror them `1`–`7` in the same order, for a number pad.
 
-**Eggs and chicks are counted, not just flagged.** Pressing `E` (or `R`) puts
+The order is the order you would describe a nest in: where it is, what it is
+built from, what is in it — and structure comes first because it decides which
+list the location picker offers.
+
+Each control has a letter key and the matching number key, so a number pad works
+too. They all appear as buttons in the nest details row — **green** when set,
+**red** when not — and you can click them instead of using the keys. They always
+show what is already saved for that item, so stepping back shows your earlier
+answers rather than a blank slate.
+
+**Eggs and chicks are counted, not just flagged.** Pressing `S` (or `D`) puts
 the cursor in that box with the current number selected, so typing replaces it.
 You don't have to press `Enter` first — `→`, `←`, `↑` and `↓` all work straight
-from the box, so counting is `E`, a number, then `→`. A nest can hold both, and
-both are optional; leave a box alone and it records as none seen.
+from the box, so counting is `S`, a number, then `→`. A nest can hold both, and
+both are optional; on a nest, leaving a box alone records as none seen. Off a
+nest they aren't asked at all, and stay blank.
 
 **Zoom in before you count.** Photographs taken from a distance rarely show eggs
 or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
@@ -249,39 +281,41 @@ Each row gets these columns appended to the original ones:
 | Column | Meaning |
 |---|---|
 | `nest_label` | `yes` / `no` / `skip` |
-| `human_structure` | `yes` / `no` |
-| `bird_present` | `yes` / `no` on a nest |
+| `human_structure` | `yes` / `no` — also chooses which location list is offered |
+| `bird_present` | `yes` / `no` |
 | `substrate` | what the nest is **made of** — one or more terms from the list or typed in, separated by `; ` |
 | `anthropogenic_material` | the **man-made** material in it — plastic, metal, other, or typed in |
 | `anthropogenic` | `yes` / `no` — derived from `anthropogenic_material`, so they can't disagree |
-| `nest_location` | where the nest **sits** — a term from the list or typed in |
+| `nest_location` | where the nest **sits** — a term from whichever list `human_structure` selected, or typed in |
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
 | `egg_count`, `chick_count` | a number |
 | `notes`, `reviewed`, `reviewed_at`, `reviewer` | |
 
-The five nest-only columns — `bird_present`, `substrate`,
-`anthropogenic_material`, `anthropogenic` and `nest_location` — are **blank**
-wherever the question didn't apply. `nest_label` in the same row says why: `no`
-means there was no nest to ask about, `skip` means nothing was answered, and a
-blank one means the row was never reached. Older files may still hold `n/a` in
-these columns from an earlier scheme; the app reads it as blank and never
-writes it again.
+**Every column but `nest_label` is nest-only**, and blank wherever there was no
+nest to ask about. `nest_label` in the same row says which kind of blank it is:
+`no` means there was no nest, `skip` means nothing was answered, and a blank one
+means the row was never reached.
+
+Structure, eggs and chicks were asked on every image until recently, so files
+labeled before that carry `yes`/`no`/`0` for them on non-nest rows. Those values
+stay as they are; only rows relabeled from now on go blank. Older files may also
+hold `n/a` in the nest-only columns from an earlier scheme — the app reads that
+as blank and never writes it again.
 
 Both files are keyed by ML catalog number; flipping a row out of "nest=yes"
 removes it from the nest file.
 
-> **Reading the counts.** On a reviewed row (`reviewed=TRUE`), a count of `0`
-> means none were seen — the image was looked at. A **blank** count only ever
-> appears on rows that were skipped or never reached, so blank means "not
-> reviewed", never "none". That distinction is what lets a partly-finished
-> spreadsheet be analysed safely.
+> **Reading the counts.** On a row marked `nest_label=yes`, a count of `0`
+> means none were seen — someone looked. A **blank** count means the question
+> was never put: the row is not a nest, was skipped, or was never reached. So
+> `0` and blank both mean "no eggs here", but only `0` is an observation.
 
-> **Reading a blank nest-details column.** Those columns only apply where there
-> is a nest, so off one they are blank — and `nest_label` in the same row says
-> which kind of blank it is: `no` (no nest to ask about), `skip` (nothing
-> answered), or blank (never reached). Read the pair, not the column alone.
-> An earlier version wrote `n/a` instead; files labeled then still open, and
-> the app reads that as blank.
+> **Reading a blank column.** Every column but `nest_label` only applies where
+> there is a nest, so off one they are all blank — and `nest_label` in the same
+> row says which kind of blank it is: `no` (no nest to ask about), `skip`
+> (nothing answered), or blank (never reached). Read the pair, not the column
+> alone. An earlier version wrote `n/a` instead; files labeled then still open,
+> and the app reads that as blank.
 
 > **Save when you finish a spreadsheet.** Without a local folder, in-progress
 > work lives only in that browser on that computer: it survives closing the tab,

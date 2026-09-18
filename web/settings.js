@@ -26,27 +26,32 @@ export const DEFAULT_KEYS = {
   forward: 'ArrowDown',
   back: 'ArrowUp',
   notes: 'Enter',
+  // Every question below is a nest-details question, reachable only once a row
+  // is marked nest = yes: off a nest there is nothing to observe.
+  //
+  // They are listed in the order they appear on screen, and keyed in that same
+  // order: Q W E R along the top row, then A S D on the home row below it. One
+  // block the left hand covers without moving — a single run of seven would
+  // have reached out to T Y U, which is a hand shift halfway through the
+  // panel. The numbers stay 1-7 in the same order for the number-pad mirror.
+  //
+  // The order is the order you'd describe a nest in: where it is, what it's
+  // built from, what's in it. Structure comes first because it decides which
+  // location list the next question offers.
   toggle_structure: 'q',
   toggle_structure_num: '1',
-  // Chicks moved up into the slot the anthropogenic toggle left when the
-  // material list replaced it, so the top row is three adjacent keys again.
-  // 'r' / '4' is now the unbound one; nothing was shifted into it, because
-  // moving a key someone already knows costs more than leaving a gap.
-  count_chicks: 'w',
-  count_chicks_num: '2',
-  count_eggs: 'e',
-  count_eggs_num: '3',
-  // Nest-details questions, only reachable once a row is marked nest = yes.
-  // These run A, S, D, F as they are added — a home-row run left of the
-  // existing Q W E, with 5 onwards mirroring them on the number pad.
+  pick_location: 'w',
+  pick_location_num: '2',
+  pick_substrate: 'e',
+  pick_substrate_num: '3',
+  pick_anthropogenic: 'r',
+  pick_anthropogenic_num: '4',
   toggle_bird: 'a',
   toggle_bird_num: '5',
-  pick_substrate: 's',
-  pick_substrate_num: '6',
-  pick_anthropogenic: 'd',
-  pick_anthropogenic_num: '7',
-  pick_location: 'f',
-  pick_location_num: '8',
+  count_eggs: 's',
+  count_eggs_num: '6',
+  count_chicks: 'd',
+  count_chicks_num: '7',
   zoom: 'z',
   jump: 'g',
   close: 'Escape',
@@ -60,20 +65,20 @@ export const ACTION_LABELS = {
   forward: 'Forward  (skip if undecided)',
   back: 'Back  (previous item)',
   notes: 'Edit notes',
-  toggle_structure: 'Human-made structure (letter)',
-  toggle_structure_num: 'Human-made structure (number)',
-  count_chicks: 'Chick count (letter)',
-  count_chicks_num: 'Chick count (number)',
-  count_eggs: 'Egg count (letter)',
-  count_eggs_num: 'Egg count (number)',
-  toggle_bird: 'Bird visible — nest details (letter)',
-  toggle_bird_num: 'Bird visible — nest details (number)',
+  toggle_structure: 'Human-made structure — nest details (letter)',
+  toggle_structure_num: 'Human-made structure — nest details (number)',
+  pick_location: 'Nest location — nest details (letter)',
+  pick_location_num: 'Nest location — nest details (number)',
   pick_substrate: 'Substrate / material — nest details (letter)',
   pick_substrate_num: 'Substrate / material — nest details (number)',
   pick_anthropogenic: 'Anthropogenic material — nest details (letter)',
   pick_anthropogenic_num: 'Anthropogenic material — nest details (number)',
-  pick_location: 'Nest location — nest details (letter)',
-  pick_location_num: 'Nest location — nest details (number)',
+  toggle_bird: 'Bird visible — nest details (letter)',
+  toggle_bird_num: 'Bird visible — nest details (number)',
+  count_eggs: 'Egg count — nest details (letter)',
+  count_eggs_num: 'Egg count — nest details (number)',
+  count_chicks: 'Chick count — nest details (letter)',
+  count_chicks_num: 'Chick count — nest details (number)',
   zoom: 'Zoom the photo in / out',
   jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this

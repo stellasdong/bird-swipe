@@ -101,33 +101,45 @@
     <div class="progress-fill" id="progress-fill"></div>
   </div>
 
+  <!-- The decision, and nothing else. Every observation this app records only
+       makes sense where there is a nest, so they all live in the panel below
+       and a non-nest image costs exactly one press. -->
   <div class="chips">
     <button class="chip nest-btn" id="nest-yes" type="button"></button>
     <button class="chip nest-btn" id="nest-no" type="button"></button>
     <span class="chip skip-pill" id="nest-skip" hidden>skipped</span>
-    <button class="toggle" id="t-structure" aria-pressed="false" type="button"></button>
-    <div class="counter" id="c-eggs" data-empty="true">
-      <span class="counter-label"></span>
-      <input type="number" id="count-eggs" min="0" step="1" inputmode="numeric"
-             placeholder="0" aria-label="Number of eggs">
-    </div>
-    <div class="counter" id="c-chicks" data-empty="true">
-      <span class="counter-label"></span>
-      <input type="number" id="count-chicks" min="0" step="1" inputmode="numeric"
-             placeholder="0" aria-label="Number of chicks">
-    </div>
   </div>
 
   <!-- Questions that only apply where there is a nest. Shown exactly when the
        current row is nest = yes; marking yes opens it without advancing. -->
   <div class="chips nest-details" id="nest-details" hidden>
     <span class="details-label">nest details</span>
-    <button class="toggle" id="t-bird" aria-pressed="false" type="button"></button>
 
-    <!-- Three values, not toggles. Each button shows what's recorded and opens
-         its picker; the pickers are keyboard-first, so the list narrows as you
-         type and nothing is set until you confirm it. Substrate takes several
-         answers at once — a nest is often twigs and mud and fur. -->
+    <!-- In the order you would describe a nest in: where it is, what it is
+         built from, what is in it. The keys run along the top row in that same
+         order — Q W E R T Y U — with each number binding directly above its
+         own letter, so the row can be read off the screen rather than learned.
+
+         Structure comes first because it decides which list the location
+         picker offers. The pickers show what is recorded and open a
+         keyboard-first list: typing narrows it, and nothing is set until it is
+         confirmed. Substrate takes several answers at once, since a nest is
+         often twigs and mud and fur. -->
+    <button class="toggle" id="t-structure" aria-pressed="false" type="button"></button>
+
+    <div class="picker" id="p-location" data-empty="true">
+      <button class="picker-btn" id="location-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="location-pop" hidden>
+        <input type="text" id="location-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Nest location — where the nest sits; type to narrow the list">
+        <!-- Which list this shows follows the man-made structure toggle. -->
+        <ul class="picker-list" id="location-list" role="listbox"></ul>
+        <div class="picker-foot" id="location-foot"></div>
+      </div>
+    </div>
+
     <div class="picker" id="p-substrate" data-empty="true">
       <button class="picker-btn" id="substrate-open" type="button"
               aria-haspopup="listbox" aria-expanded="false"></button>
@@ -152,16 +164,17 @@
       </div>
     </div>
 
-    <div class="picker" id="p-location" data-empty="true">
-      <button class="picker-btn" id="location-open" type="button"
-              aria-haspopup="listbox" aria-expanded="false"></button>
-      <div class="picker-pop" id="location-pop" hidden>
-        <input type="text" id="location-filter" autocomplete="off" spellcheck="false"
-               placeholder="type to narrow, or type anything new"
-               aria-label="Nest location — where the nest sits; type to narrow the list">
-        <ul class="picker-list" id="location-list" role="listbox"></ul>
-        <div class="picker-foot" id="location-foot"></div>
-      </div>
+    <button class="toggle" id="t-bird" aria-pressed="false" type="button"></button>
+
+    <div class="counter" id="c-eggs" data-empty="true">
+      <span class="counter-label"></span>
+      <input type="number" id="count-eggs" min="0" step="1" inputmode="numeric"
+             placeholder="0" aria-label="Number of eggs">
+    </div>
+    <div class="counter" id="c-chicks" data-empty="true">
+      <span class="counter-label"></span>
+      <input type="number" id="count-chicks" min="0" step="1" inputmode="numeric"
+             placeholder="0" aria-label="Number of chicks">
     </div>
 
     <span class="details-hint" id="details-hint"></span>

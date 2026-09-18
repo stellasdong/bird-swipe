@@ -1,23 +1,23 @@
 # bird-swipe — what's next
 
-The next round of labeling features, from Stella. The flow, M12 and M13 are
-built; everything below them is not. [PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes what
-the app does today. Each item says where it would land in the code, because
-every one of them adds columns to a file researchers may already be half way
-through labeling.
+The next round of labeling features, from Stella. The flow and M12, M13, M17
+and M18 are built; M14 and M16 are next, M15 is parked. [PLAN.md](PLAN.md) is
+the original design; [README.md](README.md) describes what the app does today.
+Each item says where it would land in the code, because every one of them adds
+columns to a file researchers may already be half way through labeling.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
 
-**Decided so far:** the new questions appear only on `nest = yes` rows, in a
-details panel that marking yes opens — so a nest costs two presses and a
-non-nest stays one; a question that doesn't apply is left **blank**, with
-`nest_label` saying why; bird present is a plain two-state toggle; what the
-nest is made of, what man-made material is in it and where it sits are **three
-separate questions** (M17, superseding M13), with substrate multi-select and
+**Decided so far:** **every observation is nest-only** — the panel that
+marking yes opens holds all of them, so a nest costs two presses and a
+non-nest costs one and records only the decision; a question that didn't apply
+is left **blank**, with `nest_label` saying why; what the nest is made of,
+what man-made material is in it and where it sits are **three separate
+questions** (M17, superseding M13), with substrate multi-select and
 `anthropogenic` derived from the material rather than asked; `human_structure`
-stays for now; prey is multi-select; chick stage is asked only when chicks
-were counted, with an unclear/unknown option; height is out for now; nest IDs
-are parked.
+chooses which location list is offered (M18); prey is multi-select; chick
+stage is asked only when chicks were counted, with an unclear/unknown option;
+height is out for now; nest IDs are parked.
 
 ---
 
@@ -37,9 +37,13 @@ presses, a non-nest stays one**, which is where the volume is.
 
 - Stepping back onto a `nest = yes` row reopens the panel with its saved
   answers, the same way the existing toggles already show what's stored.
-- The existing four toggles (structure, anthropogenic, eggs, chicks) **do not
-  move**. They stay where they are, answerable before the decision, and keep
-  writing the values they write today. Only the new questions live in the panel.
+- ~~The existing four toggles (structure, anthropogenic, eggs, chicks) **do not
+  move**.~~ All four ended up moving, one at a time and each for its own
+  reason: anthropogenic in M17 when a material list replaced it, and structure,
+  eggs and chicks in M18 once it was clear that *every* question this app asks
+  is a nest question. The rule was about not disturbing what works; it went
+  when the panel turned out to be the right home for all of it. The chip row
+  now holds the decision and nothing else.
 
 ### What gets written when a question doesn't apply
 
@@ -61,9 +65,11 @@ this costs is reading a column *in isolation*: `substrate` on its own can no
 longer tell you whether the nest had no substrate recorded or there was no nest.
 Pair it with `nest_label` and nothing is lost.
 
-Note this does **not** change the counts: `egg_count` and `chick_count` still
-write `0` rather than blank on a reviewed row, because "looked, saw none" is a
-real observation there and `0` is its value, not a filler.
+The counts follow the same rule, with one wrinkle. On a **nest**, an
+unanswered `egg_count` is `0`, not blank: someone looked and saw none, and `0`
+is that observation's value rather than a filler. Off a nest it is blank like
+everything else — M18 made the counts nest-only, so `0` now appears only where
+somebody actually counted.
 
 **Files already labeled with `n/a` still load.** `catalog.js` reads the old
 token as blank (`LEGACY_NOT_APPLICABLE`) and never writes it again, so an old
@@ -153,7 +159,8 @@ fixed this definition; it needs to reach whoever analyses the column, because
 
 ## M14 — Prey provisioning — **next**
 
-Hotkey when built: `G` / `9` — M17 took `D` and `F`. The multi-select picker
+Hotkey when built: `F` / `8` — M18 keyed the seven panel questions
+`Q W E R` / `A S D` and `1`–`7`. The multi-select picker
 M17 built for substrate is the thing to reuse: same open/filter/confirm
 behaviour, same `; `-joined cell, already written and tested.
 
@@ -203,7 +210,7 @@ Suggesting is a much larger piece of work.
 
 ## M16 — Chick stage — **next**
 
-Hotkey when built: `H` / `0` — M17 took `D` and `F`. **Three states**, so a key that cycles
+Hotkey when built: `H` / `9` — not `G`, which is jump. **Three states**, so a key that cycles
 early → late → unclear → off rather than a two-way toggle; still one control,
 still one keypress per press, no picker needed.
 
@@ -296,9 +303,11 @@ means one thing in the file and another in the comments.
 ### What this cost
 
 - [x] **Two more panel keys**, `D` / `7` and `F` / `8` — the run is now
-      A S D F. M14 and M16 move down to `G` / `9` and `H` / `0` when they are
-      built. Five controls is a full panel; worth looking at the layout before
-      adding a sixth.
+      A S D F. Five controls is a full panel; worth looking at the layout
+      before adding a sixth. *(Superseded by M18, which laid all seven out in
+      screen order as `Q`–`U` / `1`–`7`. The keys named in this section and in
+      M12 and M13 are what they were at the time, not what they are now — see
+      M18 for the current ones.)*
 - [x] **`anthropogenic` is no longer asked.** It was a top-level toggle
       (`w` / `2`) written `yes`/`no` on *every* reviewed row. The material list
       replaced it, and the column is now **derived** from it — exactly the
@@ -314,8 +323,8 @@ means one thing in the file and another in the comments.
       `E` eggs, and `r` / `4` is the gap instead. This is the first key this
       project has taken away rather than added.
 - [x] **It breaks "the existing four toggles do not move"**, stated in the flow
-      section. That rule was about not disturbing what already works; this is a
-      deliberate exception, not an oversight.
+      section. That rule was about not disturbing what already works; this was
+      a deliberate exception, and M18 went on to move the other three.
 - [x] `catalog.js`'s `NEST_ONLY_COLUMNS`, `LABEL_COLUMNS`, the skip-clearing
       list and the done-screen stats carry the new columns, and the substrate
       comment block is rewritten to the new definition. README updated too —
@@ -332,13 +341,118 @@ means one thing in the file and another in the comments.
   and wire in the same nest is plausible. Left single because only substrate
   was confirmed multi; the machinery is now there either way, so it is a
   one-line change.
-- **`human_structure` is now largely redundant.** Natural vs man-made is
-  derivable from `nest_location` for every listed answer: tree and cactus are
-  natural, telephone pole and bridge are not. It only earns its place for typed
-  "other" values, where nothing can infer it. Kept for now — it has real data
-  behind it and costs one press — but it is the next thing to question.
-- Whether `nest_location` wants the same natural/man-made grouping M13's list
-  had, as *ordering* within one list rather than two lists.
+- ~~**`human_structure` is now largely redundant**, since natural vs man-made
+  is derivable from `nest_location`.~~ Settled by M18, and the other way up:
+  it is now the question that *chooses* the location list, so it earns its
+  place as an input rather than a fact recoverable from the output.
+- ~~Whether `nest_location` wants the natural/man-made grouping as *ordering*
+  within one list rather than two lists.~~ Two lists, per M18 — and the
+  worry that went with it (never hide half the list) is answered by the
+  structure toggle being asked first, so nothing is hidden that the reviewer
+  hasn't already ruled out.
+
+
+## M18 — Everything is a nest question — **built**
+
+The panel started as the place for questions that only made sense on a nest.
+It turns out that is *all* of them: there is no structure to judge, nothing to
+count and nowhere for a nest to sit on an image that hasn't got one. So the top
+row now holds the decision and nothing else.
+
+- [x] **`human_structure`, the egg count and the chick count move into the
+      panel**, joining bird present and the three lists. The chip row above the
+      image is now nest YES / nest NO / the skipped pill.
+- [x] ~~**Nothing moved keys.**~~ Everything moved keys, immediately
+      afterwards: with all seven questions in one row it was worth laying them
+      out properly rather than preserving two historical runs. See below.
+- [x] Every one of those keys now **does nothing while the panel is closed**,
+      the rule the panel's own keys already followed — there is no way to set
+      an answer nobody can see.
+- [x] `NEST_ONLY_COLUMNS` grows to ten; `nest_label` is the only label column
+      left outside it. `setSkip` is one loop again, because the list it had to
+      clear by hand *is* that set now.
+
+### `human_structure` chooses the location list
+
+- [x] **No** offers the natural places — tree, tree cavity, cactus, shrub,
+      snag, ground, cliff or rock ledge. **Yes** offers the man-made ones —
+      telephone pole, building or ledge, tower, bridge, nest box or platform,
+      sign. Seven terms instead of fourteen, and a tree is never offered as a
+      man-made place.
+- [x] **This is the opposite of the rule substrate follows**, and deliberately
+      so. A mud nest on a bridge is ordinary, so substrate is one list that
+      crosses the line freely; M13 was right about that and it still holds. A
+      *location* doesn't cross it — a nest sits in one place, and that place
+      either is man-made or it isn't.
+- [x] **Flipping the toggle drops a stranded location.** Pick "tree", then
+      answer man-made, and "man-made: tree" is not an answer anyone meant to
+      give; the picker goes visibly empty and asks again. Anything **typed in
+      is kept** — nothing can tell which side of the line a typed term sits on,
+      and discarding someone's typing is the worse mistake.
+- [x] Typed terms are remembered against **the list that was showing**, so a
+      man-made one doesn't come back while the natural list is up.
+- [x] `human_structure` is no longer redundant, which it was becoming: it is
+      the input that picks the list rather than a fact recoverable from it.
+
+**The behaviour change with teeth**
+
+`human_structure`, `eggs`, `egg_count`, `chicks` and `chick_count` used to be
+written on *every* reviewed row — `yes`/`no` and `0`. Off a nest they are now
+blank. Three labeled spreadsheets already hold the old shape; those values stay
+as they are, and only rows relabeled from here on go blank, so a part-labeled
+file ends up mixed in exactly the way the `n/a` removal already left it.
+
+Worth being deliberate about, because it changes what a count means: `0` now
+appears only on nests, where it says someone looked and saw none. Blank means
+the question was never put. Anyone analysing `egg_count` across a whole file
+needs to read `nest_label` beside it — which is the same instruction the rest
+of the columns already carry.
+
+### The order, and the keys
+
+Seven controls, read left to right in the order you would describe a nest in —
+**where it is, what it is built from, what is in it** — and keyed in that same
+order along the top row:
+
+| | Control | Key |
+|---|---|---|
+| 1 | human-made structure | `Q` / `1` |
+| 2 | nest location | `W` / `2` |
+| 3 | substrate | `E` / `3` |
+| 4 | anthropogenic material | `R` / `4` |
+| 5 | bird visible | `A` / `5` |
+| 6 | eggs | `S` / `6` |
+| 7 | chicks | `D` / `7` |
+
+- [x] **`Q W E R` then `A S D`** — one block the left hand covers without
+      moving. A single run of seven would have reached out to `T Y U`, which is
+      a hand shift halfway through the panel; two rows of four and three is the
+      same seven keys without it. The numbers stay `1`–`7` in the same order,
+      so the number-pad mirror is unbroken.
+- [x] Structure leads because it decides which list the location picker
+      offers, so the dependency runs the same way the eye does.
+- [x] Eggs before chicks, the order they happen in.
+- [x] The panel, the legend and the Preferences list are all generated in this
+      order too, so nothing can drift out of step with the screen.
+- [x] `r` / `4` is no longer a gap: 1–7 are contiguous, which leaves `8` and
+      `9` for M14 and M16 — `F`, then `H` rather than `G`, which is jump.
+
+**The cost:** every key moved. Nobody is labeling on the dev build yet, so this
+is the moment to do it — but it is the third key change in as many milestones,
+and it should be the last. Anyone who saved custom bindings keeps them (saved
+wins over defaults); Preferences → reset moves them to the new scheme.
+
+**Still open**
+
+- Seven controls is a lot to lay out on a narrow window, and nothing has been
+  done about it — worth looking at before M14 and M16 add an eighth and ninth.
+- Moving between the two count boxes needs an `Enter` in between: `S` 3 `D` 1
+  doesn't work, because while the cursor is in a count box every printable key
+  types into it. Only the arrows escape. That predates this reorder, but
+  putting the two counts side by side is what makes it noticeable.
+- Flipping the toggle twice does not bring the dropped location back. An undo
+  would be nice and is not obviously worth the machinery; the term is one
+  keypress away in a list that just got shorter.
 
 ---
 

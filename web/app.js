@@ -8,7 +8,7 @@
 import {
   Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
   normalizeCount, filterTerms, joinTerms, splitTerms,
-  SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS, LOCATION_OPTIONS,
+  SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS, locationOptions, isListedLocation,
 } from './catalog.js';
 import {
   PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, photoUrl, videoUrl,
@@ -91,7 +91,12 @@ const el = {
   },
   nestDetails: $('nest-details'),
   detailsHint: $('details-hint'),
+  // Listed in panel order throughout this file: location, substrate, material.
   pickers: {
+    nest_location: {
+      wrap: $('p-location'), button: $('location-open'), pop: $('location-pop'),
+      filter: $('location-filter'), list: $('location-list'), foot: $('location-foot'),
+    },
     substrate: {
       wrap: $('p-substrate'), button: $('substrate-open'), pop: $('substrate-pop'),
       filter: $('substrate-filter'), list: $('substrate-list'), foot: $('substrate-foot'),
@@ -99,10 +104,6 @@ const el = {
     anthropogenic_material: {
       wrap: $('p-anthropogenic'), button: $('anthropogenic-open'), pop: $('anthropogenic-pop'),
       filter: $('anthropogenic-filter'), list: $('anthropogenic-list'), foot: $('anthropogenic-foot'),
-    },
-    nest_location: {
-      wrap: $('p-location'), button: $('location-open'), pop: $('location-pop'),
-      filter: $('location-filter'), list: $('location-list'), foot: $('location-foot'),
     },
   },
   counters: {
@@ -154,6 +155,7 @@ const el = {
   prefsSave: $('prefs-save'),
 };
 
+// Panel order again: structure leads, bird sits after the three lists.
 const TOGGLE_FIELDS = {
   structure: 'human_structure',
   bird: 'bird_present',
@@ -168,8 +170,10 @@ const TOGGLE_ACTIONS = {
   toggle_bird: 'bird',
   toggle_bird_num: 'bird',
 };
-// Toggles that live in the nest-details panel rather than the main chip row.
-const NEST_ONLY_TOGGLES = new Set(['bird']);
+// Every toggle lives in the nest-details panel now, so this is all of them.
+// Kept as a set rather than dropped: it is what stops a key setting a value on
+// a row where the panel is closed and nobody could see it.
+const NEST_ONLY_TOGGLES = new Set(['structure', 'bird']);
 
 // The three list questions, all nest-only, all answered by the same picker.
 // They were one question until it became clear it was three: what the nest is
@@ -177,6 +181,17 @@ const NEST_ONLY_TOGGLES = new Set(['bird']);
 // material used to be a top-level yes/no toggle; the list replaced it, and the
 // old column is now derived from this one in catalog.js.
 const PICKERS = {
+  // The only picker whose list changes: man-made structure is answered first
+  // and chooses between two shorter lists, so a tree is never offered as a
+  // man-made place and the reviewer reads seven terms instead of fourteen.
+  nest_location: {
+    label: 'location', options: () => locationOptions(toggleOn('structure')),
+    multi: false, key: 'pick_location', numKey: 'pick_location_num',
+    // Typed terms are remembered against the list that was showing, so a
+    // man-made one doesn't come back while the natural list is up.
+    memory: () => (toggleOn('structure') ? 'nest_location_manmade'
+                                         : 'nest_location_natural'),
+  },
   substrate: {
     label: 'substrate', options: SUBSTRATE_OPTIONS, multi: true,
     key: 'pick_substrate', numKey: 'pick_substrate_num',
@@ -185,12 +200,18 @@ const PICKERS = {
     label: 'anthropogenic', options: ANTHROPOGENIC_OPTIONS, multi: false,
     key: 'pick_anthropogenic', numKey: 'pick_anthropogenic_num',
   },
-  nest_location: {
-    label: 'location', options: LOCATION_OPTIONS, multi: false,
-    key: 'pick_location', numKey: 'pick_location_num',
-  },
 };
 const PICKER_NAMES = Object.keys(PICKERS);
+// A picker's list and its remembered-terms key can both depend on another
+// answer, so they are resolved when the list is drawn rather than at startup.
+const pickerOptions = name => {
+  const o = PICKERS[name].options;
+  return typeof o === 'function' ? o() : o;
+};
+const pickerMemory = name => {
+  const m = PICKERS[name].memory;
+  return typeof m === 'function' ? m() : (m ?? name);
+};
 // Both the letter and number binding of a picker open the same list.
 const PICKER_ACTIONS = Object.fromEntries(PICKER_NAMES.flatMap(
   name => [[PICKERS[name].key, name], [PICKERS[name].numKey, name]]));
@@ -740,6 +761,30 @@ function setToggle(field, on) {
 }
 const toggleOn = field => el.toggles[field].getAttribute('aria-pressed') === 'true';
 
+/**
+ * Follow-on work after a toggle is flipped by hand.
+ *
+ * Man-made structure chooses which location list is offered, so flipping it
+ * strands a location that came off the list now hidden — "man-made: tree" is
+ * not an answer anyone meant to give. That value is dropped and the picker
+ * goes back to empty, which is visible immediately since the reviewer is
+ * looking straight at it.
+ *
+ * Anything typed in is kept: nothing can tell which side of the line a typed
+ * term sits on, and throwing away what someone typed is the worse mistake.
+ */
+function afterToggle(field) {
+  if (field !== 'structure') return;
+  const [current] = state.picks.nest_location;
+  if (current && isListedLocation(current)
+      && !pickerOptions('nest_location').some(
+           o => o.toLowerCase() === current.toLowerCase())) {
+    state.picks.nest_location = [];
+  }
+  closePicker();               // its list just changed underneath it
+  renderPickerButton('nest_location');
+}
+
 /** Show a saved count. Blank stays blank so a skipped row doesn't read as 0. */
 function setCount(field, value) {
   const { input } = el.counters[field];
@@ -879,12 +924,13 @@ function closePicker() {
 function renderPickerList() {
   const name = state.openPicker;
   if (!name) return;
-  const { options, multi } = PICKERS[name];
+  const { multi } = PICKERS[name];
+  const options = pickerOptions(name);
   const node = el.pickers[name];
   const query = node.filter.value;
   const numbered = query.trim() === '';
   const chosen = state.picks[name];
-  state.pickerRows = filterTerms(options, query, getRememberedTerms(name));
+  state.pickerRows = filterTerms(options, query, getRememberedTerms(pickerMemory(name)));
   node.list.textContent = '';
 
   state.pickerRows.forEach((term, i) => {
@@ -943,7 +989,7 @@ function confirmTerm(term) {
     state.picks[name] = [value];
   }
 
-  rememberTerm(name, value); // so the second one is a pick, not retyping
+  rememberTerm(pickerMemory(name), value); // so the second one is a pick
   renderPickerButton(name);
   if (multi) {
     el.pickers[name].filter.value = ''; // ready for the next one
@@ -1015,13 +1061,15 @@ function renderLegend() {
     [keyDisplay(k.nest_yes), 'YES'], [keyDisplay(k.nest_no), 'NO'],
     [keyDisplay(k.forward), 'next'], [keyDisplay(k.back), 'back'],
     [keyDisplay(k.notes), 'notes'],
+    // Same order as the panel itself, so the legend can be read straight
+    // across rather than hunted through.
     [`${keyDisplay(k.toggle_structure)}/${keyDisplay(k.toggle_structure_num)}`, 'structure'],
-    [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
-    [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
-    [`${keyDisplay(k.toggle_bird)}/${keyDisplay(k.toggle_bird_num)}`, 'bird'],
+    [`${keyDisplay(k.pick_location)}/${keyDisplay(k.pick_location_num)}`, 'location'],
     [`${keyDisplay(k.pick_substrate)}/${keyDisplay(k.pick_substrate_num)}`, 'substrate'],
     [`${keyDisplay(k.pick_anthropogenic)}/${keyDisplay(k.pick_anthropogenic_num)}`, 'anthro'],
-    [`${keyDisplay(k.pick_location)}/${keyDisplay(k.pick_location_num)}`, 'location'],
+    [`${keyDisplay(k.toggle_bird)}/${keyDisplay(k.toggle_bird_num)}`, 'bird'],
+    [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
+    [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
     [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
     [keyDisplay(k.jump), 'jump to…'],
     [keyDisplay(k.close), 'close file'],
@@ -1508,6 +1556,7 @@ for (const [node, value] of [[el.nestYes, true], [el.nestNo, false]]) {
  * should mean three eggs, not twenty-three.
  */
 function focusCount(field) {
+  if (el.nestDetails.hidden) return; // counts are nest-only, like everything else
   const { input } = el.counters[field];
   input.focus();
   input.select();
@@ -1598,8 +1647,10 @@ for (const name of PICKER_NAMES) {
 
 for (const [field, node] of Object.entries(el.toggles)) {
   node.addEventListener('click', () => {
+    if (NEST_ONLY_TOGGLES.has(field) && el.nestDetails.hidden) return;
     setToggle(field, !toggleOn(field));
     node.blur(); // keep arrow keys with the label loop
+    afterToggle(field);
     if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
   });
 }
@@ -1660,6 +1711,7 @@ function runLabelAction(action) {
     // hidden, so flipping it would set a value nobody can see.
     if (NEST_ONLY_TOGGLES.has(field) && el.nestDetails.hidden) return;
     setToggle(field, !toggleOn(field));
+    afterToggle(field);
     if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
   } else if (action in PICKER_ACTIONS) {
     openPicker(PICKER_ACTIONS[action]);

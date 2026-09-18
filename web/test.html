@@ -27,7 +27,8 @@ import {
   Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
   NEST_ONLY_COLUMNS, LEGACY_NOT_APPLICABLE, SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
-  LOCATION_OPTIONS, filterTerms, joinTerms, splitTerms,
+  NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS, locationOptions,
+  isListedLocation, filterTerms, joinTerms, splitTerms,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
@@ -233,45 +234,122 @@ group('catalog.js — nest-only questions');
   eq('and follows a re-label', catalog.stats().birds, 1);
 }
 
+group('catalog.js — every observation is nest-only');
+{
+  // Off a nest there is nothing to observe: no structure to judge, nothing to
+  // count, nowhere for a nest to sit. Only nest_label is written, and the row
+  // costs one press. Structure, eggs and chicks were top-row questions asked
+  // on every image until this landed.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: true,
+                        eggCount: '2', chickCount: '1' });
+  eq('structure recorded on a nest', catalog.rows[0].human_structure, 'yes');
+  eq('eggs recorded on a nest', catalog.rows[0].egg_count, '2');
+  eq('chicks recorded on a nest', catalog.rows[0].chick_count, '1');
+
+  catalog.setLabel(1, { nest: true, structure: false });
+  eq('a nest nobody counted still says zero, not blank',
+     catalog.rows[1].egg_count, '0');
+  eq('because on a nest, looking and seeing none is an observation',
+     catalog.rows[1].eggs, 'no');
+
+  // The behaviour change with teeth: these columns used to carry yes/no/0 on
+  // every reviewed row, and three labeled spreadsheets already hold them that
+  // way. Rows relabeled from here on go blank off a nest.
+  catalog.setLabel(2, { nest: false, structure: true,
+                        eggCount: '4', chickCount: '4' });
+  eq('structure is blank off a nest', catalog.rows[2].human_structure, '');
+  eq('so is the egg count', catalog.rows[2].egg_count, '');
+  eq('and the chick count', catalog.rows[2].chick_count, '');
+  eq('and their yes/no flags', catalog.rows[2].eggs, '');
+  eq('the decision itself is still recorded', catalog.rows[2].nest_label, 'no');
+
+  for (const col of ['human_structure', 'eggs', 'egg_count',
+                     'chicks', 'chick_count']) {
+    check(`${col} is nest-only`, NEST_ONLY_COLUMNS.includes(col));
+  }
+  eq('nest_label is the only thing left that is not',
+     LABEL_COLUMNS.filter(c => !NEST_ONLY_COLUMNS.includes(c)),
+     ['nest_label', 'notes', 'reviewed', 'reviewed_at', 'reviewer']);
+}
+
 group('catalog.js — the three list questions');
 {
   // One question became three: what the nest is made of, what man-made
   // material is in it, and where it sits. The lists must not overlap, or the
   // reviewer has to guess which picker an answer belongs in.
   eq('each list is short enough to read',
-     [SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS, LOCATION_OPTIONS]
+     [SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
+      NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS]
        .every(l => l.length <= 20), true);
   check('substrate holds natural materials, not places',
         SUBSTRATE_OPTIONS.includes('twig') && SUBSTRATE_OPTIONS.includes('animal fur'));
   check('"none" is a real substrate answer rather than a blank',
         SUBSTRATE_OPTIONS.includes('none'));
   check('location holds places, not materials',
-        LOCATION_OPTIONS.includes('cactus') && LOCATION_OPTIONS.includes('telephone pole'));
+        NATURAL_LOCATION_OPTIONS.includes('cactus')
+        && MANMADE_LOCATION_OPTIONS.includes('telephone pole'));
   check('man-made materials live only in their own list',
         ANTHROPOGENIC_OPTIONS.includes('plastic')
         && !SUBSTRATE_OPTIONS.includes('plastic')
-        && !LOCATION_OPTIONS.includes('plastic'));
+        && !NATURAL_LOCATION_OPTIONS.includes('plastic')
+        && !MANMADE_LOCATION_OPTIONS.includes('plastic'));
   check('nothing appears in two lists at once',
-        !SUBSTRATE_OPTIONS.some(t => LOCATION_OPTIONS.includes(t)));
+        !SUBSTRATE_OPTIONS.some(
+          t => NATURAL_LOCATION_OPTIONS.includes(t)
+            || MANMADE_LOCATION_OPTIONS.includes(t)));
 
   eq('no filter offers everything',
-     filterTerms(LOCATION_OPTIONS, '').length, LOCATION_OPTIONS.length);
+     filterTerms(NATURAL_LOCATION_OPTIONS, '').length,
+     NATURAL_LOCATION_OPTIONS.length);
 
-  // "b" starts building and bridge and sits mid-word in shrub and nest box:
-  // the starters come first, which is the ordering that makes Enter safe.
-  const b = filterTerms(LOCATION_OPTIONS, 'b');
-  eq('word-start matches lead', b.slice(0, 3),
+  // "b" starts building, bridge and the "box" in nest box — all word starts,
+  // in list order. That ordering is what makes the top offer safe to trust.
+  eq('word-start matches lead', filterTerms(MANMADE_LOCATION_OPTIONS, 'b'),
      ['building or ledge', 'bridge', 'nest box or platform']);
-  check('mid-word matches still appear, after them', b.indexOf('shrub') > 2);
+  // In the natural list "b" starts nothing and sits mid-word in shrub, which
+  // still has to be reachable — just not ahead of a real word-start match.
+  eq('mid-word matches still appear', filterTerms(NATURAL_LOCATION_OPTIONS, 'b'),
+     ['shrub']);
+  // A word start counts anywhere in the term, not just at the front, so
+  // "tree cavity" answers to "c" as readily as "cactus" does.
+  eq('any word may start the match', filterTerms(NATURAL_LOCATION_OPTIONS, 'c'),
+     ['tree cavity', 'cactus', 'cliff or rock ledge']);
 
-  eq('case is ignored', filterTerms(LOCATION_OPTIONS, 'CACTUS'), ['cactus']);
+  eq('case is ignored', filterTerms(NATURAL_LOCATION_OPTIONS, 'CACTUS'), ['cactus']);
   eq('nonsense matches nothing, which is the "other" path',
-     filterTerms(LOCATION_OPTIONS, 'zzzz'), []);
+     filterTerms(NATURAL_LOCATION_OPTIONS, 'zzzz'), []);
 
-  const withExtra = filterTerms(LOCATION_OPTIONS, 'cattle', ['cattle panel']);
+  const withExtra = filterTerms(MANMADE_LOCATION_OPTIONS, 'cattle', ['cattle panel']);
   eq('a remembered term is offered', withExtra, ['cattle panel']);
   eq('a remembered duplicate is not listed twice',
      filterTerms(ANTHROPOGENIC_OPTIONS, 'metal', ['metal']), ['metal']);
+}
+
+group('catalog.js — the structure answer chooses the location list');
+{
+  // A location is one place and that place is either man-made or it isn't, so
+  // asking first halves the list. This is the opposite of the substrate rule,
+  // where the two kinds cross freely and one list is right.
+  eq('no is the natural list', locationOptions(false), NATURAL_LOCATION_OPTIONS);
+  eq('yes is the man-made list', locationOptions(true), MANMADE_LOCATION_OPTIONS);
+  check('a tree is never offered as a man-made place',
+        !MANMADE_LOCATION_OPTIONS.includes('tree'));
+  check('and a telephone pole is never offered as a natural one',
+        !NATURAL_LOCATION_OPTIONS.includes('telephone pole'));
+  check('both lists are shorter than the single list they replace',
+        NATURAL_LOCATION_OPTIONS.length < 10 && MANMADE_LOCATION_OPTIONS.length < 10);
+
+  // Flipping the toggle strands whatever was picked off the list now hidden.
+  // isListedLocation is what tells those apart from a typed-in term.
+  check('a listed natural term is recognised', isListedLocation('tree'));
+  check('a listed man-made term is recognised', isListedLocation('bridge'));
+  check('case and spacing do not matter', isListedLocation('  Tree  '));
+  check('a typed term belongs to neither list, so it is kept',
+        !isListedLocation('cattle panel'));
+  check('"other" is not a real location either', !isListedLocation('other'));
+  check('and neither is nothing at all', !isListedLocation(''));
 }
 
 group('catalog.js — multi-select cells');
@@ -356,11 +434,17 @@ group('catalog.js — egg and chick counts');
   eq('chicks without eggs', [catalog.rows[1].eggs, catalog.rows[1].chicks], ['no', 'yes']);
   eq('zero eggs is recorded as 0', catalog.rows[1].egg_count, '0');
 
-  catalog.setLabel(2, { nest: false, structure: false });
-  eq('an unanswered count on a reviewed row is 0, not blank',
+  // On a nest, an unanswered count is 0: someone looked and saw none. Off a
+  // nest it is blank, because there was nothing to count in the first place —
+  // counts became nest-only when every observation did.
+  catalog.setLabel(2, { nest: true, structure: false });
+  eq('an unanswered count on a nest is 0, not blank',
      [catalog.rows[2].egg_count, catalog.rows[2].chick_count], ['0', '0']);
-  check('so a blank count only ever means not-reviewed',
-        catalog.rows[3].egg_count === '' && !catalog.isReviewed(3));
+  catalog.setLabel(3, { nest: false, structure: false });
+  eq('but a non-nest row has no count at all',
+     [catalog.rows[3].egg_count, catalog.rows[3].chick_count], ['', '']);
+  check('and a blank count never means "none seen"',
+        catalog.rows[3].nest_label === 'no');
 
   const st = catalog.stats();
   eq('counts images with eggs', st.eggs, 1);

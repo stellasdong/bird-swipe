@@ -26,7 +26,9 @@ export const CATALOG_KEY = 'ML Catalog Number';
 // eggs/chicks stay yes/no for continuity with already-labeled files, and are
 // derived from the counts so the two can never disagree. anthropogenic is the
 // same arrangement one step later: it was a toggle until a material list
-// replaced it, and is now derived from anthropogenic_material. On a reviewed row an
+// replaced it, and is now derived from anthropogenic_material.
+//
+// Every one of these but nest_label is nest-only: see NEST_ONLY_COLUMNS. On a reviewed row an
 // unanswered count is written as 0 rather than left blank: the row was looked
 // at, so "none seen" is a real observation. Blank counts therefore only ever
 // appear on rows that were skipped or never reached.
@@ -45,9 +47,13 @@ export const LABEL_COLUMNS = [
 // distinction (no / skip / blank), so the filler was doing work the row
 // already did. A reader handles two tokens: a value, or blank — and reads
 // nest_label to learn why it is blank. See TODO.md.
+// Every observation is nest-only now. Off a nest there is nothing to observe:
+// no structure to judge, nothing to count, nowhere for a nest to sit. The row
+// is one press and carries a decision, and that is all.
 export const NEST_ONLY_COLUMNS = [
-  'bird_present', 'substrate', 'anthropogenic', 'anthropogenic_material',
-  'nest_location',
+  'human_structure', 'bird_present',
+  'eggs', 'egg_count', 'chicks', 'chick_count',
+  'substrate', 'anthropogenic', 'anthropogenic_material', 'nest_location',
 ];
 
 // Only ever read, never written: files labeled before that change still hold
@@ -86,15 +92,43 @@ export const SUBSTRATE_OPTIONS = [
 // it, not because the picker needs it.
 export const ANTHROPOGENIC_OPTIONS = ['plastic', 'metal', 'other'];
 
-// Single-select: a nest is in one place. Most of this list is the old
-// substrate list, which is what it had always been describing.
-export const LOCATION_OPTIONS = [
-  'tree', 'cactus', 'shrub', 'snag', 'tree cavity',
+// Where the nest sits, in two lists rather than one. human_structure is asked
+// first and chooses between them, so the reviewer reads six or seven terms
+// instead of fourteen, and a tree can never be offered as a man-made place.
+//
+// This is the opposite of the rule the substrate list follows, and
+// deliberately so: substrate crosses the natural/man-made line freely — a mud
+// nest on a bridge is ordinary — but a location does not. A nest sits in one
+// place, and that place is either man-made or it isn't.
+export const NATURAL_LOCATION_OPTIONS = [
+  'tree', 'tree cavity', 'cactus', 'shrub', 'snag',
   'ground', 'cliff or rock ledge',
+  'other',
+];
+export const MANMADE_LOCATION_OPTIONS = [
   'telephone pole', 'building or ledge', 'tower', 'bridge',
   'nest box or platform', 'sign',
   'other',
 ];
+
+/** The location list the structure answer calls for. */
+export function locationOptions(humanStructure) {
+  return humanStructure ? MANMADE_LOCATION_OPTIONS : NATURAL_LOCATION_OPTIONS;
+}
+
+/**
+ * Whether a recorded location belongs to a list. Used when the structure
+ * answer is flipped: a term off the list now hidden is dropped, because
+ * "man-made: tree" is not an answer anyone meant to give. Anything typed in
+ * belongs to neither list and is kept — nothing can tell which side it is on,
+ * and throwing away what someone typed is worse than leaving it standing.
+ */
+export function isListedLocation(term) {
+  const t = String(term ?? '').trim().toLowerCase();
+  if (!t || t === 'other') return false;
+  return [...NATURAL_LOCATION_OPTIONS, ...MANMADE_LOCATION_OPTIONS]
+    .some(o => o.toLowerCase() === t);
+}
 
 // Several answers in one cell, joined so a comma never has to be escaped to
 // stay readable. The same separator M14 will use for prey.
@@ -307,9 +341,10 @@ export class Catalog {
     const eggs = normalizeCount(eggCount);
     const chicks = normalizeCount(chickCount);
     const anthropogenic = joinTerms(anthropogenicMaterial);
-    // A toggle has a default ("no" once the row is reviewed); a picker has
+    // A toggle has a default ("no" once the row is answered); a picker has
     // none, so an unanswered one stays blank — which still reads as "nobody
-    // answered", exactly as blank does everywhere else.
+    // answered", exactly as blank does everywhere else. A count has a default
+    // too: 0, because on a nest someone looked and saw none.
     //
     // anthropogenic is no longer asked: it is derived from whether a material
     // was named, the same way eggs is derived from egg_count, so the yes/no
@@ -317,19 +352,20 @@ export class Catalog {
     // material list replaced it, and it stays in the file for continuity with
     // spreadsheets labeled before that.
     const nestOnly = {
+      human_structure: structure ? 'yes' : 'no',
       bird_present: birdPresent ? 'yes' : 'no',
+      eggs: eggs > 0 ? 'yes' : 'no',
+      egg_count: String(eggs),
+      chicks: chicks > 0 ? 'yes' : 'no',
+      chick_count: String(chicks),
       substrate: joinTerms(substrate),
       anthropogenic: anthropogenic ? 'yes' : 'no',
       anthropogenic_material: anthropogenic,
       nest_location: String(nestLocation ?? '').trim(),
     };
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
-    row.human_structure = structure ? 'yes' : 'no';
-    row.eggs = eggs > 0 ? 'yes' : 'no';
-    row.egg_count = String(eggs);
-    row.chicks = chicks > 0 ? 'yes' : 'no';
-    row.chick_count = String(chicks);
-    // Answered on a nest; blank off one, where the question didn't apply.
+    // Answered on a nest; blank off one, where the question didn't apply —
+    // which is now every observation the app records.
     for (const col of NEST_ONLY_COLUMNS) {
       row[col] = nest === true ? (nestOnly[col] ?? '') : '';
     }
@@ -351,12 +387,9 @@ export class Catalog {
   setSkip(index, { reviewer = '', notes = '' } = {}) {
     const row = this.rows[index];
     row.nest_label = SKIPPED;
-    row.human_structure = ''; // no observations recorded on a skip
-    row.eggs = '';
-    row.egg_count = '';
-    row.chicks = '';
-    row.chick_count = '';
-    for (const col of NEST_ONLY_COLUMNS) row[col] = ''; // anthropogenic included
+    // No observations recorded on a skip — and since every observation is
+    // nest-only, that is the whole list in one loop.
+    for (const col of NEST_ONLY_COLUMNS) row[col] = '';
     row.notes = notes;
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
