@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 through M20 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
+M17 through M21 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
 the original design; [README.md](README.md) describes what the app does today.
 Each item says where it would land in the code, because every one of them adds
 columns to a file researchers may already be half way through labeling.
@@ -17,8 +17,9 @@ apply is left **blank**, with `nest_label` saying why; what the nest is made
 of, what man-made material is in it and where it sits are **three separate
 questions** (M17) that each say what they mean in their own popup (M20);
 `human_structure` chooses which location list is offered (M18); chick stage is
-early/late/unclear and only asked where chicks were counted (M16); prey is
-multi-select; height is out for now; nest IDs are parked.
+early/late/unclear and only asked where chicks were counted (M16); every
+reviewer of a row is kept, not just the last (M21); prey is multi-select;
+height is out for now; nest IDs are parked.
 
 ---
 
@@ -542,6 +543,35 @@ Two small things that were costing real accuracy.
 - [x] The structure toggle reads **"on a human-made structure"** rather than
       "human-made structure", so the thing it is about — what the nest sits on
       — is in the label rather than assumed.
+
+## M21 — More than one reviewer on a row — **built**
+
+`reviewer` was overwritten by whoever went last. One person walks a
+spreadsheet, another corrects a call, and the first name vanished with no sign
+the row had been looked at twice.
+
+- [x] New column **`reviewers`**: everyone who has answered the row, in the
+      order they first did, `; `-joined. `reviewer` keeps its meaning —
+      whoever went last, which is what you want when chasing a mistake.
+- [x] A correction **adds** a name, never replaces one, and re-labeling by
+      someone already listed adds no duplicate.
+- [x] A skip counts: it is a decision somebody made.
+- [x] The existing "someone else has labeled this file" warning now reads the
+      full list, so a name that has since been labeled over still raises it.
+
+**Per row, not per file.** A file-level list would have to be rewritten onto
+every row each time somebody new joined — including rows that person never
+opened — and this project does not silently rewrite rows nobody touched. The
+file-level set is the union of the column, which is one line for whoever
+analyses it.
+
+**Still open**
+
+- Rows labeled before the column existed have it blank until they are answered
+  again; there is no history to recover, only what happens from here.
+- Nothing records *what* a second reviewer changed, only that they were there.
+  A real audit trail is a much larger piece of work and probably belongs
+  outside the spreadsheet.
 
 ---
 

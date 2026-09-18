@@ -37,7 +37,7 @@ export const LABEL_COLUMNS = [
   'eggs', 'egg_count', 'chicks', 'chick_count',
   'bird_present', 'substrate', 'anthropogenic_material', 'nest_location',
   'chick_stage',
-  'notes', 'reviewed', 'reviewed_at', 'reviewer',
+  'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers',
 ];
 
 // Questions that only make sense where there is a nest. They are answered in
@@ -148,6 +148,27 @@ export function isListedLocation(term) {
 export const CHICK_STAGES = ['early', 'late', 'unclear'];
 
 export const MULTI_SEP = '; ';
+
+/**
+ * Everyone who has labeled a row, kept alongside `reviewer` rather than
+ * instead of it. `reviewer` is whoever answered it last, which is what you
+ * want when you are chasing a mistake; `reviewers` is everyone who has touched
+ * it, which is what you want when you are asking who agreed.
+ *
+ * It matters because a row can be labeled twice: one person walks a
+ * spreadsheet, another corrects a call, and the second name used to overwrite
+ * the first with nothing to show a second pass ever happened. Names accumulate
+ * in the order they first appear and never disappear — a correction adds a
+ * name, it doesn't replace one.
+ *
+ * Accumulated per row rather than per file on purpose. A file-level list would
+ * have to be rewritten onto every row each time somebody new joined, including
+ * rows that person never looked at, and this project does not silently rewrite
+ * rows nobody touched.
+ */
+export function addReviewer(prior, who) {
+  return joinTerms([...splitTerms(prior), who]);
+}
 
 /** A multi-select cell as a list of terms. Tolerates a plain single value. */
 export function splitTerms(value) {
@@ -392,6 +413,7 @@ export class Catalog {
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
     row.reviewer = reviewer;
+    row.reviewers = addReviewer(row.reviewers, reviewer);
 
     this.labeled.upsert(row);
     if (nest) this.nest.upsert(row);
@@ -413,6 +435,8 @@ export class Catalog {
     row.reviewed = REVIEWED;
     row.reviewed_at = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
     row.reviewer = reviewer;
+    // A skip is a decision someone made, so it counts as having reviewed it.
+    row.reviewers = addReviewer(row.reviewers, reviewer);
 
     this.labeled.upsert(row);
     this.nest.discard(row[CATALOG_KEY]); // a skip is never a nest
@@ -446,8 +470,11 @@ export class Catalog {
   otherReviewers(me) {
     const seen = new Set();
     for (const row of this.labeled.rowsById.values()) {
-      const who = (row.reviewer ?? '').trim();
-      if (who && who !== me) seen.add(who);
+      // Everyone who has touched a row, not just whoever touched it last, so a
+      // name that has since been labeled over still raises the warning.
+      for (const who of splitTerms(row.reviewers || row.reviewer)) {
+        if (who && who !== me) seen.add(who);
+      }
     }
     return [...seen];
   }

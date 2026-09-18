@@ -331,7 +331,9 @@ Each row gets these columns appended to the original ones:
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
 | `egg_count`, `chick_count` | a number |
 | `chick_stage` | `early` (downy), `late` (feathered) or `unclear` — only where chicks were counted |
-| `notes`, `reviewed`, `reviewed_at`, `reviewer` | |
+| `notes`, `reviewed`, `reviewed_at` | |
+| `reviewer` | whoever answered the row **last** |
+| `reviewers` | **everyone** who has answered it, in the order they first did, separated by `; ` |
 
 **Every column but `nest_label` is nest-only**, and blank wherever there was no
 nest to ask about. `nest_label` in the same row says which kind of blank it is:
@@ -367,6 +369,13 @@ removes it from the nest file.
 Because each researcher works on their own spreadsheet and submits a finished
 file, two people never write the same file at once. If the app does spot labels
 from someone else in a file you open, it warns you.
+
+When a row *is* answered twice — one person walks the spreadsheet, another
+corrects a call — both names are kept. `reviewer` is whoever went last, which
+is what you want when chasing a mistake; `reviewers` is everyone who has
+touched it, which is what you want when asking who agreed. A correction adds a
+name, it never replaces one. Rows labeled before this column existed fill it in
+the first time they are answered again.
 
 ### Your data stays yours
 

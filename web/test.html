@@ -269,9 +269,9 @@ group('catalog.js — every observation is nest-only');
                      'chicks', 'chick_count']) {
     check(`${col} is nest-only`, NEST_ONLY_COLUMNS.includes(col));
   }
-  eq('nest_label is the only thing left that is not',
+  eq('only the decision and the provenance columns are not',
      LABEL_COLUMNS.filter(c => !NEST_ONLY_COLUMNS.includes(c)),
-     ['nest_label', 'notes', 'reviewed', 'reviewed_at', 'reviewer']);
+     ['nest_label', 'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers']);
 }
 
 group('catalog.js — the three list questions');
@@ -541,6 +541,43 @@ group('catalog.js — resume across a reload');
   eq('legacy n/a is not counted as a substrate', legacy.stats().substrates, 0);
 }
 
+group('catalog.js — more than one reviewer on a row');
+{
+  // reviewer is whoever answered it last; reviewers is everyone who has. A
+  // second pass over a spreadsheet used to overwrite the first name with
+  // nothing to show the row had been looked at twice.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false, substrate: 'twig',
+                        nestLocation: 'tree', reviewer: 'mei' });
+  eq('the first reviewer is recorded', catalog.rows[0].reviewer, 'mei');
+  eq('and listed', catalog.rows[0].reviewers, 'mei');
+
+  catalog.setLabel(0, { nest: true, structure: false, substrate: 'twig',
+                        nestLocation: 'cactus', reviewer: 'stella' });
+  eq('a correction becomes the current reviewer', catalog.rows[0].reviewer, 'stella');
+  eq('but the first name is still there', catalog.rows[0].reviewers, 'mei; stella');
+
+  catalog.setLabel(0, { nest: true, structure: false, reviewer: 'mei' });
+  eq('and re-labeling adds no duplicate', catalog.rows[0].reviewers, 'mei; stella');
+
+  // A skip is a decision somebody made, so it counts.
+  catalog.setSkip(1, { reviewer: 'mei' });
+  eq('a skip records its reviewer', catalog.rows[1].reviewers, 'mei');
+  catalog.setSkip(1, { reviewer: 'stella' });
+  eq('and a second look adds to it', catalog.rows[1].reviewers, 'mei; stella');
+
+  // An unnamed reviewer must not leave an empty entry behind.
+  catalog.setLabel(2, { nest: false, structure: false, reviewer: '' });
+  eq('no name means no entry', catalog.rows[2].reviewers, '');
+  catalog.setLabel(2, { nest: false, structure: false, reviewer: 'mei' });
+  eq('and naming one later still starts clean', catalog.rows[2].reviewers, 'mei');
+
+  eq('it rides with the other provenance columns, not the nest ones',
+     NEST_ONLY_COLUMNS.includes('reviewers'), false);
+  check('and it is a label column', LABEL_COLUMNS.includes('reviewers'));
+}
+
 group('catalog.js — reviewer collision detection');
 {
   const a = Catalog.open('s.csv', SAMPLE).catalog;
@@ -548,6 +585,12 @@ group('catalog.js — reviewer collision detection');
   const { catalog: b } = Catalog.open('s.csv', SAMPLE, { labeledText: a.labeled.serialize() });
   eq('sees the other reviewer', b.otherReviewers('stella'), ['alex']);
   eq('does not flag yourself', b.otherReviewers('alex'), []);
+
+  // A name labeled over is still a name that touched the file, so the warning
+  // has to read the full list rather than only whoever went last.
+  a.setLabel(0, { nest: true, structure: false, reviewer: 'stella' });
+  const { catalog: c } = Catalog.open('s.csv', SAMPLE, { labeledText: a.labeled.serialize() });
+  eq('an earlier reviewer still counts', c.otherReviewers('stella'), ['alex']);
 }
 
 group('catalog.js — column union growth');
