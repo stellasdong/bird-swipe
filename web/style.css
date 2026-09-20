@@ -553,6 +553,26 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
   pointer-events: none;
 }
 
+/* --------------------------------------------------------- keyboard focus */
+/* Tab walks the panel in the order the controls are laid out, because that is
+   what the browser does with real buttons in DOM order — no key is taken from
+   it, so Shift-Tab and screen readers keep working. What was missing was being
+   able to SEE where Tab had got to, which is the whole difference between a
+   walkable row and a guess.
+ *
+ * :focus-visible rather than :focus, so clicking a control doesn't leave a
+ * ring behind; it shows for the keyboard and stays out of the way of the
+ * mouse. The ring is white against every state these controls take — green
+ * when set, red when empty, amber when required — which a coloured ring
+ * wouldn't be. */
+.chip:focus-visible,
+.toggle:focus-visible,
+.cycle:focus-visible,
+.picker-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 /* ---------------------------------------------------------- nest details */
 /* The questions that only apply where there is a nest. Marking nest = yes
    opens this row without advancing, so it appears under the decision it

@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 through M22 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
+M17 through M23 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
 the original design; [README.md](README.md) describes what the app does today.
 Each item says where it would land in the code, because every one of them adds
 columns to a file researchers may already be half way through labeling.
@@ -643,37 +643,72 @@ It is now five, and none of them is a key whose only job is to open something:
 
 **Still open**
 
-- **`Tab` to walk the panel.** The optional questions still need their letter,
-  which is the part of the old problem that's left. See the note below.
+- ~~**`Tab` to walk the panel.**~~ Built as M23: the optional questions no
+  longer need their letter remembered.
 - The run assumes the required pair is the right place to start. If it turns
   out people want to count first most of the time, the chain is one line to
   reorder.
 
-### Not built: Tab through the controls
+### Tab through the controls
 
-The idea: `Tab` moves to the next control in the panel and opens it,
-`Shift-Tab` goes back, so the whole row is walkable without knowing a single
-letter. It would finish what the run starts — the run covers the two required
-questions, and `Tab` would cover the other five.
+Built, as M23 — but not the way it was sketched here. The note below is kept
+because the reasoning changed on contact with the problem.
 
-Reasons it isn't in yet:
+~~The idea: `Tab` moves to the next control in the panel and opens it,
+`Shift-Tab` goes back.~~ It turned out `Tab` **already did** the walking: the
+panel's controls are real buttons and inputs in DOM order, and DOM order is
+layout order, so the browser was offering the whole row and nobody could see
+it. What was missing was three smaller things — see M23.
 
-- **`Tab` is the browser's own key.** It moves focus between the page's real
-  controls, and the panel's buttons are real controls. Taking it means
-  `preventDefault` on every `Tab` the label screen sees, which is exactly the
-  kind of thing that breaks keyboard accessibility if done carelessly — a
-  screen-reader user navigating the page would lose the one key they rely on.
-  Doing it properly means a roving tabindex, not an interception.
-- **It overlaps the run.** Once the chain opens location and substrate for
-  you, `Tab`'s remaining job is reaching bird, the two counts and chick stage —
-  four controls that already have single letters sitting under the reviewer's
-  fingers. The win is smaller than it looks.
-- **It needs a visible focus ring** to be worth anything, and the panel has
-  three different control shapes (toggle, counter, picker) that would each need
-  one. That's a styling pass, not a keybinding.
+The worry that `Tab` would have to be intercepted, and that intercepting it
+breaks keyboard accessibility, was the right worry. The answer was to take
+nothing.
 
-Worth doing if the letters turn out to be the thing people forget. Worth
-measuring first: the letters are only hard while they're new.
+---
+
+## M23 — Tab walks the panel — **built**
+
+`Tab` and `Shift-Tab` move through the nest panel in the order it is laid out,
+`Enter` or `Space` opens or flips whatever is focused, and `Esc` hands focus
+back so the walk continues. No key is taken from the browser, so `Shift-Tab`,
+screen readers and the rest of the page keep working exactly as they did.
+
+That is the whole feature, and almost none of it is new code, because the
+browser was already doing it. Three things were in the way:
+
+- [x] **You couldn't see where `Tab` had got to.** Every panel control now
+      takes a white focus ring on `:focus-visible` — white because these
+      controls are green when set, red when empty and amber when required, and
+      a coloured ring would vanish against one of them. `:focus-visible`
+      rather than `:focus`, so clicking something doesn't leave a ring behind.
+- [x] **`Enter` on a focused button did two things at once.** The browser turns
+      it into a click, and the label loop also read it as "edit notes" — so
+      tabbing to a picker and pressing `Enter` opened the list and jumped to
+      the notes box together. `Enter` and `Space` on a focused button now
+      belong to that button.
+- [x] **Activating a control by keyboard threw the walk away.** The toggles and
+      the chick-stage button call `blur()` on click, to hand the arrows back to
+      the label loop after a mouse click — which also fired on a keyboard
+      activation, sending focus back to the top of the page every time you
+      pressed `Space`. They now blur only for a real pointer click, which a
+      `detail` of 0 distinguishes.
+- [x] **`Esc` returns focus to the button that opened the list**, rather than
+      dropping it, so a list opened from the walk hands the walk back. Only
+      when the list actually had focus — closing one because the row changed
+      underneath must not pull focus from wherever it has gone.
+
+Chick stage needs no special case: it is `hidden` until there are chicks, and
+hidden elements are not focusable, so it joins and leaves the order on its own.
+
+**Still open**
+
+- `Tab` from the last control carries on into the notes box and the rest of the
+  page, rather than cycling within the panel. That is the ordinary behaviour
+  and probably right, but a reviewer who tabs past the end has to `Shift-Tab`
+  back rather than wrapping around.
+- The focus ring is the same on all four control shapes. The counters already
+  had their own white outline for the text cursor, so a focused-but-not-typing
+  count box and a focused-and-typing one look alike.
 
 ---
 

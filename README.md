@@ -123,6 +123,7 @@ Two things that will otherwise trip you up:
 | `F` / `8` | **chick stage** — only once you've counted a chick; press again to change |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
+| `Tab`     | move through the nest details row — `Enter` or `Space` opens or flips what's focused |
 | `Enter`   | jump to the notes box |
 | `Esc`     | close the file (everything is already saved) |
 
@@ -263,6 +264,13 @@ memorised. The numbers mirror them `1`–`8` in the same order, for a number pad
 The order is the order you would describe a nest in: where it is, what it is
 built from, what is in it — and structure comes first because it decides which
 list the location picker offers.
+
+**Or don't learn the letters at all.** `Tab` moves along the nest details row
+in the order you see it, `Shift-Tab` goes back, and `Enter` or `Space` opens or
+flips whatever is focused — a white ring shows where you are. `Esc` closes a
+list and hands you back to the button you opened it from, so the walk carries
+on. It's the ordinary browser behaviour, so nothing about the rest of the page
+changes.
 
 Each control has a letter key and the matching number key, so a number pad works
 too. They all appear as buttons in the nest details row — **green** when set,

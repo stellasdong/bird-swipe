@@ -1056,6 +1056,17 @@ function promptForRequired(missing) {
   openPicker(missing[0]);
 }
 
+/**
+ * A click made with the mouse, rather than the browser turning a keypress on a
+ * focused button into one. Those arrive with detail 0.
+ *
+ * The difference matters because a mouse click should hand the keyboard back
+ * to the label loop — the pointer is where the reviewer's attention is — while
+ * a keyboard activation has to leave focus exactly where it was, or Tab starts
+ * again from the top of the page every time you press Space.
+ */
+const fromPointer = event => event.detail > 0;
+
 const pickerOpen = () => state.openPicker !== null;
 
 function openPicker(name) {
@@ -1075,10 +1086,16 @@ function closePicker() {
   const name = state.openPicker;
   if (!name) return;
   const node = el.pickers[name];
+  // Hand focus back to the button that opened it, so Tab carries on from
+  // where the reviewer was rather than restarting at the top of the page.
+  // Only when the list actually had focus: closing one because the row
+  // changed underneath must not pull focus from wherever it has gone.
+  const hadFocus = document.activeElement === node.filter;
   node.pop.hidden = true;
   node.button.setAttribute('aria-expanded', 'false');
   node.filter.blur();
   state.openPicker = null;
+  if (hadFocus) node.button.focus();
 }
 
 function renderPickerList() {
@@ -1744,9 +1761,9 @@ el.doneOpenAnother.addEventListener('click', closeFile);
 // Clicking a nest button does exactly what its arrow key does: commit the
 // decision with the observation toggles as they stand, then advance.
 for (const [node, value] of [[el.nestYes, true], [el.nestNo, false]]) {
-  node.addEventListener('click', () => {
+  node.addEventListener('click', event => {
     if (!state.catalog || state.idx >= state.catalog.rows.length) return;
-    node.blur(); // keep arrow keys with the label loop
+    if (fromPointer(event)) node.blur(); // keep arrow keys with the label loop
     if (value) nestYes(); else commit(false);
   });
 }
@@ -1892,16 +1909,16 @@ for (const name of PICKER_NAMES) {
   });
 }
 
-el.chickStage.addEventListener('click', () => {
+el.chickStage.addEventListener('click', event => {
   cycleChickStage();
-  el.chickStage.blur(); // keep arrow keys with the label loop
+  if (fromPointer(event)) el.chickStage.blur(); // arrows back to the label loop
 });
 
 for (const [field, node] of Object.entries(el.toggles)) {
-  node.addEventListener('click', () => {
+  node.addEventListener('click', event => {
     if (NEST_ONLY_TOGGLES.has(field) && el.nestDetails.hidden) return;
     setToggle(field, !toggleOn(field));
-    node.blur(); // keep arrow keys with the label loop
+    if (fromPointer(event)) node.blur(); // keep arrow keys with the label loop
     afterToggle(field);
     if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
   });
@@ -1938,6 +1955,12 @@ document.addEventListener('keydown', event => {
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+  // Enter and Space on a focused button belong to that button — the browser
+  // turns them into a click. Without this they would also run whatever the
+  // label loop binds them to, so tabbing to a picker and pressing Enter would
+  // open the list and jump to the notes box at the same time.
+  if (target instanceof HTMLButtonElement
+      && (event.key === 'Enter' || event.key === ' ')) return;
 
   const action = actionForEvent(event, state.keys);
   if (!action) return;
