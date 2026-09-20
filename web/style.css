@@ -664,7 +664,9 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
 }
 .cycle[data-empty="true"]::before { content: "\2717"; }
 
-/* Above the photo, and wide enough to read a long term without wrapping. */
+/* Wide enough to read a long term without wrapping. Anchored under its own
+   button, which is fine on a narrow window where there is nowhere better — see
+   the rail below for what happens when there is room. */
 .picker-pop {
   position: absolute;
   z-index: 60;
@@ -731,3 +733,37 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
   font-size: 11px;
   line-height: 1.5;
 }
+
+/* ------------------------------------------------------ the picker's rail */
+/* A list that covers the photo is a list you have to close to answer. The
+   location one opens by itself on every nest, and it was landing in the middle
+   of the image — the part you are looking at to answer it.
+ *
+ * So on a window with room, the list moves to a column down the right-hand
+ * side and the photo's box gives up that width rather than sitting underneath
+ * it. That costs the photo nothing in practice: the media box is wide and
+ * short, so a fitted photo is limited by height, and taking 300px off a
+ * 1440-wide box leaves the same picture at the same size. A panorama wide
+ * enough to be width-limited shrinks a little; nothing is ever hidden.
+ *
+ * Below 900px there is no width to give, so the list stays under its button
+ * and covers what it covers. --pop-top is set when the list opens, from the
+ * bottom of the panel, because the panel's height depends on what has wrapped. */
+@media (min-width: 900px) {
+  .picker-pop {
+    position: fixed;
+    left: auto;
+    right: 14px;
+    top: var(--pop-top, 210px);
+    bottom: 14px;
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+  }
+  .picker-pop .picker-list {
+    max-height: none;
+    flex: 1;
+  }
+  #screen-label.picker-open .media { margin-right: 314px; }
+}
+

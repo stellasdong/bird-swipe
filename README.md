@@ -157,6 +157,12 @@ Every key below `↑` does nothing until the panel is open, so there is no way t
 set an answer nobody can see. Stepping back onto a nest reopens the row with
 your answers in it.
 
+**The lists don't cover the photo.** On a window with room, an open list runs
+down the right-hand side and the photo's box gives up that width instead of
+sitting underneath it — which costs the picture nothing, because it's fitted to
+the height of a box far wider than it needs. On a narrow window there's no width
+to give, so the list falls back to hanging under its own button.
+
 **Three questions about the nest, three lists.** `W`, `E` and `R` each open a
 list; **`↑` and `↓` walk it**, typing narrows it, `Enter` records the highlighted
 term or the top match, and `1`–`9` pick straight off the unfiltered list. If what you need isn't there, **type it in and

@@ -1074,6 +1074,13 @@ function openPicker(name) {
   if (state.openPicker && state.openPicker !== name) closePicker();
   const node = el.pickers[name];
   state.openPicker = name;
+  // The rail hangs from the bottom of the panel, whose height depends on what
+  // has wrapped, so it is measured rather than assumed. The screen carries the
+  // class that narrows the photo's box to make room; see style.css.
+  const screen = el.screens.label;
+  screen.style.setProperty('--pop-top',
+    `${Math.round(el.nestDetails.getBoundingClientRect().bottom) + 4}px`);
+  screen.classList.add('picker-open');
   node.pop.hidden = false;
   node.button.setAttribute('aria-expanded', 'true');
   node.filter.value = '';
@@ -1092,6 +1099,7 @@ function closePicker() {
   // changed underneath must not pull focus from wherever it has gone.
   const hadFocus = document.activeElement === node.filter;
   node.pop.hidden = true;
+  el.screens.label.classList.remove('picker-open');
   node.button.setAttribute('aria-expanded', 'false');
   node.filter.blur();
   state.openPicker = null;
