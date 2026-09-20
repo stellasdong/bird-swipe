@@ -1,7 +1,7 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 through M24 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
+M17 through M23 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
 the original design; [README.md](README.md) describes what the app does today.
 Each item says where it would land in the code, because every one of them adds
 columns to a file researchers may already be half way through labeling.
@@ -711,39 +711,36 @@ hidden elements are not focusable, so it joins and leaves the order on its own.
   count box and a focused-and-typing one look alike.
 
 
-## M24 — An open list stops covering the photo — **built**
+## M24 — An open list covers the photo — **open, one attempt reverted**
 
 M22 made the location list open by itself on every nest, which turned a
-tolerable overlap into a constant one: the popup hung under its button and
-landed in the middle-left of the image, 320×424 over a media box of 1440×486 —
-17% of it, and the part you are looking at to answer the question it is asking.
+tolerable overlap into a constant one. Measured at 1440×900: the popup hangs
+under its button at 320×424 over a media box of 1440×486 — **17% of it**, and
+the middle-left of the image, which is the part you look at to answer the
+question it is asking.
 
-- [x] On a window **900px or wider**, an open list runs down the **right-hand
-      side**, and `.media` gives up that width while it is open. Measured: 0%
-      overlap, and the box returns to full width when the list closes.
-- [x] **It costs the photo nothing in practice.** The media box is wide and
-      short, so a fitted photo is limited by its height: taking 300px off a
-      1440-wide box leaves the same picture at the same size. Only a panorama
-      wide enough to be width-limited shrinks at all, and nothing is ever
-      hidden.
-- [x] Below 900px there is no width to give, so the list stays under its button
-      and covers what it covers — unchanged from before.
-- [x] The rail hangs from the bottom of the panel, measured when the list opens
-      rather than assumed, because the panel's height depends on what has
-      wrapped.
+**Tried and undone:** moving an open list to a column down the right-hand side
+while the media box gave up that width. It measured perfectly — 0% overlap,
+and no loss of picture, since a fitted photo is limited by its height and the
+box is far wider than it needs — but Stella didn't like it, so it is out. Don't
+rebuild it without asking.
 
-**Worth knowing:** the rail rules had to be placed *after* the base
-`.picker-pop` rule, not before it. A media query adds no specificity, so the
-plain rule was winning on source order and the rail silently did nothing —
-while the photo dutifully narrowed beside it, which is what made it look like
-it was working.
+One thing worth keeping from the attempt: those rules have to come **after**
+the base `.picker-pop` rule. A media query adds no specificity, so the plain
+rule wins on source order — and the photo narrows beside a rail that isn't
+there, which is exactly what makes it look like it worked.
 
-**Still open**
+**Still to solve.** Ideas not yet tried:
 
-- The narrow-window case is now the worse one, and it got no better: at
-  800×700 the panel wraps to 169px, leaving a 183px-tall photo under a 424px
-  popup. If anyone labels on a small screen, that wants its own answer — a
-  shorter list, or a bottom sheet with the photo above it.
+- A **bottom sheet** — the list along the bottom, photo above it, so the
+  overlap is at the edge of the frame rather than the middle.
+- **Shorter lists**, cutting the popup's height rather than moving it. The
+  location lists are 8 and 7 terms now, so most of that 424px is the hint, the
+  filter box and the footer rather than the terms.
+- **Not opening it by itself**, which would give the overlap back its old
+  rarity at the cost of M22's run.
+- Leaving it: the reviewer has already looked at the photo to decide it is a
+  nest, and `Esc` reopens the view.
 
 ---
 
