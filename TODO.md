@@ -730,13 +730,25 @@ the base `.picker-pop` rule. A media query adds no specificity, so the plain
 rule wins on source order — and the photo narrows beside a rail that isn't
 there, which is exactly what makes it look like it worked.
 
-**Still to solve.** Ideas not yet tried:
+**Second attempt, kept: make it shorter.** 424px → 272px, and 17% of the media
+box down to 11%, without moving anything:
+
+- [x] The explanatory hint above each filter is **gone**. It was two lines on
+      every popup, on every nest, to explain a distinction the button labels
+      already carry now that "anthropogenic" reads *man-made material*.
+- [x] The location list's natural/man-made cue moved into the **filter's
+      placeholder**, which shows while the box is empty — exactly when the cue
+      is wanted — and costs no height at all.
+- [x] The footer is down to one line, because what the filter box is for is
+      written in the filter box. It was wrapping to two.
+- [x] Tighter rows (24px from 27), tighter padding, and `max-height` down from
+      46vh to 34vh. Nine terms still fit without scrolling, which is every
+      list there is.
+
+**Still to solve.** It is smaller, not gone. Ideas not yet tried:
 
 - A **bottom sheet** — the list along the bottom, photo above it, so the
   overlap is at the edge of the frame rather than the middle.
-- **Shorter lists**, cutting the popup's height rather than moving it. The
-  location lists are 8 and 7 terms now, so most of that 424px is the hint, the
-  filter box and the footer rather than the terms.
 - **Not opening it by itself**, which would give the overlap back its old
   rarity at the cost of M22's run.
 - Leaving it: the reviewer has already looked at the photo to decide it is a

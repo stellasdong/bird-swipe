@@ -184,8 +184,9 @@ the list.
 `←` (not a nest) and `↓` (skip) are never gated — they stay one press. A
 requirement you can't get past just teaches people to skip rows.
 
-**`←` and `→` switch which places you're offered.** The location list starts on
-the **natural** places (tree, tree cavity, cactus, shrub, snag, ground, cliff or
+**`←` and `→` switch which places you're offered**, and the filter box says
+which you're looking at until you start typing. The location list starts on the
+**natural** places (tree, tree cavity, cactus, shrub, snag, ground, cliff or
 rock ledge); one press of `→` swaps it for the **man-made** ones (telephone
 pole, building or ledge, tower, bridge, nest box or platform, sign), and the
 line above the list tells you which you're looking at. You read seven terms
@@ -210,17 +211,15 @@ These were one question until it became clear it was three: "what is the nest
 on?" can't be answered once when the honest answer is mud, on a telephone pole,
 with plastic twine in it.
 
-**Three questions that are easy to mix up**, so each list says what it means at
-the top of its own popup — you read it at the moment you answer it, not in a
-manual:
+**Three questions that are easy to mix up.** A nest of twine on a telephone
+pole is three different answers:
 
 - **substrate** is the **natural** material the nest is built *from*
 - **man-made material** is man-made material built *into* it — twine, wire
 - **structure** and **location** are what it is *sitting on*
 
-A nest of twine on a telephone pole is three different answers, and the button
-has room for a label and a key and nothing else. The column is still called
-`anthropogenic_material`, because spreadsheets already carry that name.
+The column is still called `anthropogenic_material`, because spreadsheets
+already carry that name.
 
 **Substrate takes several answers.** A nest is often twigs *and* mud *and* a fur
 lining, so picking a material adds it and leaves the list open for the next one

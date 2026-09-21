@@ -98,17 +98,14 @@ const el = {
     nest_location: {
       wrap: $('p-location'), button: $('location-open'), pop: $('location-pop'),
       filter: $('location-filter'), list: $('location-list'), foot: $('location-foot'),
-      hint: $('location-hint'),
     },
     substrate: {
       wrap: $('p-substrate'), button: $('substrate-open'), pop: $('substrate-pop'),
       filter: $('substrate-filter'), list: $('substrate-list'), foot: $('substrate-foot'),
-      hint: $('substrate-hint'),
     },
     anthropogenic_material: {
       wrap: $('p-anthropogenic'), button: $('anthropogenic-open'), pop: $('anthropogenic-pop'),
       filter: $('anthropogenic-filter'), list: $('anthropogenic-list'), foot: $('anthropogenic-foot'),
-      hint: $('anthropogenic-hint'),
     },
   },
   counters: {
@@ -193,13 +190,6 @@ const PICKERS = {
   // man-made place and the reviewer reads seven terms instead of fourteen.
   nest_location: {
     label: 'location',
-    // Says which of the two lists is showing, since the list itself is the
-    // only other clue and both are short.
-    hint: () => (toggleOn('structure')
-      ? 'MAN-MADE places — ← → for natural. Where the nest sits, not what it '
-        + 'is built from.'
-      : 'NATURAL places — ← → for man-made. Where the nest sits, not what it '
-        + 'is built from.'),
     options: () => locationOptions(toggleOn('structure')),
     multi: false, key: 'pick_location', numKey: 'pick_location_num',
     // Typed terms are remembered against the list that was showing, so a
@@ -209,7 +199,6 @@ const PICKERS = {
   },
   substrate: {
     label: 'substrate',
-    hint: 'The NATURAL material the nest is built from. Pick as many as apply.',
     options: SUBSTRATE_OPTIONS, multi: true,
     key: 'pick_substrate', numKey: 'pick_substrate_num',
   },
@@ -220,8 +209,6 @@ const PICKERS = {
   // and the location picker between them.
   anthropogenic_material: {
     label: 'man-made material',
-    hint: 'Man-made material built INTO the nest — twine, wire, plastic. Not '
-        + 'the pole or building it sits on: that is structure and location.',
     options: ANTHROPOGENIC_OPTIONS, multi: false,
     key: 'pick_anthropogenic', numKey: 'pick_anthropogenic_num',
   },
@@ -1142,9 +1129,6 @@ function renderPickerList() {
     node.list.append(li);
   });
 
-  const hint = PICKERS[name].hint;
-  node.hint.textContent = (typeof hint === 'function' ? hint() : hint) ?? '';
-
   const at = node.list.children[state.pickerCursor];
   node.filter.setAttribute('aria-activedescendant', at ? at.id : '');
   if (at) at.scrollIntoView({ block: 'nearest' });
@@ -1156,11 +1140,22 @@ function renderPickerList() {
   // less like a cancel. Esc still works and still records nothing further.
   const offer = state.pickerRows[state.pickerCursor]
     ?? (typed ? state.pickerRows[0] : undefined);
+  // Which of the two location lists is showing, and how to swap them, put in
+  // the filter's placeholder rather than on a line of its own: it shows while
+  // the box is empty, which is exactly when the cue is wanted, and costs no
+  // height at all. The popup hangs over the photo, and every line of it is
+  // picture the reviewer can't see.
+  node.filter.placeholder = name === 'nest_location'
+    ? (toggleOn('structure') ? 'man-made places · ←→ for natural'
+                             : 'natural places · ←→ for man-made')
+    : 'type to narrow, or type anything new';
+
+  // Kept to one line. What the filter box is for is written in the filter box.
   node.foot.textContent = offer
-    ? `Enter records “${offer}” · ↑↓ move · Esc closes`
+    ? `Enter records “${offer}” · ↑↓ move · Esc`
     : (typed
-        ? `Enter adds “${typed}” · ↑↓ move · Esc closes`
-        : '↑↓ move · 1–9 pick · type to narrow · Enter or Esc when done');
+        ? `Enter adds “${typed}” · ↑↓ move · Esc`
+        : '↑↓ move · 1–9 pick · Enter when done');
 }
 
 /**
