@@ -1,12 +1,17 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 through M23 are built; M14 is next, M15 is parked. [PLAN.md](PLAN.md) is
-the original design; [README.md](README.md) describes what the app does today.
-Each item says where it would land in the code, because every one of them adds
-columns to a file researchers may already be half way through labeling.
+M17 through M24 are built; **M25 (duplicate images) is the high priority**,
+M14 is next after it, M15 is parked and M26–M27 are low priority.
+[PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes
+what the app does today. Each item says where it would land in the code,
+because every one of them adds columns to a file researchers may already be
+half way through labeling.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
+Unbuilt items carry a priority: **high priority** first, then whatever is
+marked **next**, then **low priority**, then **parked** (which means blocked on
+a decision rather than unimportant).
 
 **Decided so far:** marking a nest opens the required questions in a run that
 carries itself (M22); **every observation is nest-only** — the panel that
@@ -753,6 +758,96 @@ box down to 11%, without moving anything:
   rarity at the cost of M22's run.
 - Leaving it: the reviewer has already looked at the photo to decide it is a
   nest, and `Esc` reopens the view.
+
+
+## M25 — Duplicate images — **high priority**
+
+Stella's, and the most important thing outstanding.
+
+**First, what it means.** Three readings, and they are different pieces of
+work, so this needs settling before anything is built:
+
+1. **The same catalog number twice in one export.** A row repeated in the
+   spreadsheet.
+2. **The same photograph uploaded more than once**, under different catalog
+   numbers — so it looks like two assets and is two rows.
+3. **A burst of near-identical frames** of one nest, which is not really
+   duplication so much as redundancy: ten shots, one nest, ten rows to label.
+
+Reading 3 overlaps [M15](#m15--repeat-nests--parked) — repeat nests — but is
+not the same thing: M15 is about recognising a nest across *different*
+photographs, this is about the same photograph appearing more than once.
+
+**A real bug sits under reading 1, whichever one was meant.** Nothing checks
+for it. `catalog.rows` is the raw list from the file, so a repeated catalog
+number is walked twice and labeled twice — but both `LabeledFile`s are keyed by
+catalog number (`rowsById`), so the second answer silently overwrites the
+first, and the output has one row where the input had two. No warning, and the
+counts on the done screen disagree with the file. That is worth fixing on its
+own, and it is small: `validateFieldnames` already has a warnings channel that
+the welcome screen shows.
+
+**Once the reading is settled, the questions it raises:**
+
+- Should a duplicate be **detected and skipped**, **detected and shown** ("you
+  have already labeled this one — here is what you said"), or **carried over**
+  automatically?
+- What counts as the same image for reading 2 — same photographer and date and
+  dimensions? That is a guess, not a fact, so it probably has to be shown
+  rather than acted on.
+- Whatever it does must stay honest about what got reviewed: a skipped
+  duplicate still needs a row in the output, or the spreadsheet comes back
+  shorter than it went in.
+
+## M26 — iPad, in the Chrome app — **low priority**
+
+It does not run at all today. `isSupported()` in `storage.js` requires
+`window.showDirectoryPicker`, and the File System Access API does not exist on
+iOS — every browser on an iPad is WebKit underneath, Chrome included, so this
+is not something Chrome can differ on. An iPad gets the "unsupported browser"
+screen before it gets a file picker.
+
+So this is not a styling job. What it needs:
+
+- **A second way in and out.** Opening would be a plain `<input type="file">`,
+  and saving a download or the share sheet rather than a folder. Autosave to a
+  folder is simply unavailable; in-browser progress (IndexedDB) still works, so
+  the work would be recoverable but only on that iPad.
+- **A different set of gestures.** The whole app is keyboard-first — seven
+  hotkeys, arrow navigation, type-to-filter. On glass there is no keyboard
+  unless one is attached. Every control is already a real button and tappable,
+  but the flow is built around keys, and the chained run would want thinking
+  about as a touch gesture.
+- **Bigger targets.** The chips are sized for a pointer.
+
+Worth deciding *why* first: an iPad is a nicer screen for judging a photograph,
+which is a real argument. But a keyboard-first app on a device without a
+keyboard is a different app, not a port.
+
+## M27 — Login and accounts — **low priority**
+
+There is no server. The app is a static page on GitHub Pages, the spreadsheet
+lives on the researcher's own machine, and work is saved to their own folder —
+which is why it has no accounts and why it needs none to run.
+
+Accounts would mean a backend, and that changes what this is. Worth being clear
+about what they would buy, because some of it already exists:
+
+- **Who labeled what** — already there. `reviewer` and `reviewers` carry it,
+  from a name typed once in Preferences.
+- **Stopping two people labeling the same sheet** — partly there. The app warns
+  when it finds another name in a file you open. A real lock needs shared
+  state.
+- **A shared list of typed-in terms**, instead of one per browser. Wanted (see
+  M13), and the smallest thing on this list — it needs a file two people can
+  write, not accounts.
+- **Getting finished files to one place** — OneDrive already does this, and it
+  is where the identity really lives.
+
+So the honest version of this item is probably not "login" but "somewhere
+shared to put a handful of small files". If it turns out to be genuine accounts
+— a hosted app people sign into, with the spreadsheets server-side — that is a
+rewrite of the storage layer and should be its own plan, not a milestone here.
 
 ---
 
