@@ -972,7 +972,8 @@ function showNestDetails(row) {
       ? `${missing.map(n => PICKERS[n].label).join(' and ')} still needed`
       : state.carriedFrom
         ? `filled in from nest ${state.carriedFrom} — check the counts, then `
-          + `${keyDisplay(state.keys.nest_yes)} to ${isNest ? 'save' : 'confirm'}`
+          + `${keyDisplay(state.keys.nest_yes)} to `
+          + `${isNest ? 'save and move on' : 'confirm and move on'}`
         : `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
     renderPickerButtons();
     renderConditionalPickers();
@@ -1794,6 +1795,22 @@ function nestYes() {
   if (!alreadyYes && adoptGroupAnswers(groupAnswers(row))) {
     state.carriedFrom = row.nest_id;
   }
+
+  // A nest costs two presses because the first one opens a panel to fill in.
+  // An asset that arrived with its nest's answers already in the panel has
+  // nothing to fill in, and has been sitting there visibly filled since the
+  // reviewer got to it — so the press that says "yes, this is that nest" is
+  // also the press that finishes it. One arrow per duplicate, which is the
+  // whole point of recognising them.
+  //
+  // Only when nothing required is still empty. An inherited row that is
+  // somehow short of an answer falls back to the normal two presses and gets
+  // asked for it, rather than being hurried past.
+  if (!alreadyYes && state.carriedFrom && !missingRequired().length) {
+    commit(true, true);
+    return;
+  }
+
   commit(true, alreadyYes);
   // Marking a nest opens the first thing it owes, rather than presenting a
   // panel of seven buttons and leaving the reviewer to remember which two

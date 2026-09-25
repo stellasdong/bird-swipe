@@ -350,7 +350,15 @@ kept: the nest's answers fill the gaps, they don't overrule you.
 
 **And every later asset in the group arrives the same way.** Walk on to one and
 its panel is already open and filled, saying **filled in from nest AAAA — check
-the counts, then `→` to confirm**. Once a nest has been answered, the other
+the counts, then `→` to confirm and move on**.
+
+**A duplicate costs one press, not two.** A nest normally takes two — the first
+opens the panel to fill in, the second saves. An asset that arrived with its
+nest's answers has nothing to fill in and you've been looking at them since you
+got there, so the press that says "yes, this is that nest" is also the press
+that finishes it. Correct anything that changed first, then `→` once. (If a
+required answer is somehow still empty it falls back to two presses and asks
+for it, rather than hurrying you past.) Once a nest has been answered, the other
 assets in its group start from those answers — structure, location, substrate,
 material, the lot — so you don't retype the same nest ten times for a burst.
 The panel says **filled in from nest AAAA — check the counts**, and the chip row

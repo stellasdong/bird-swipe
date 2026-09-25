@@ -867,6 +867,13 @@ the recognising. Stella caught both.
 
 ### Grouping fills things in
 
+- [x] **A duplicate costs one arrow press, not two.** The two-press rule
+      exists because the first press opens a panel to fill in; an inherited
+      asset has nothing to fill in and has been sitting there visibly filled
+      since the reviewer arrived, so the press that says yes also finishes it.
+      Only when nothing required is still empty — an inherited row somehow
+      short of an answer falls back to two presses and gets asked, rather than
+      being hurried past. Ungrouped nests are untouched: still two.
 - [x] **The panel opens for an undecided asset that has inherited answers**,
       so the reviewer can see what they are about to confirm. The values were
       always being loaded; the panel was shut until the decision, so the
