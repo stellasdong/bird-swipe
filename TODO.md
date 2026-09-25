@@ -957,6 +957,56 @@ visit. That is [M15](#m15--repeat-nests--parked) and therefore
 [M25](#m25--duplicate-images--high-priority), and this puts the evidence on
 screen before either is built.
 
+
+## M30 — Media notes in English — **built**
+
+The media note is what the eBirder wrote about the photograph, and it is often
+the one line that says whether it is a nest at all. It is written in whatever
+language they use, and a reviewer who can't read it is missing the only
+context anybody thought worth recording.
+
+- [x] A note detected as **not English** is shown translated, labelled
+      **"Media notes (translated from Spanish)"**, with **show original** beside
+      it. The toggle names the language both ways, so the reviewer always knows
+      which they are reading.
+- [x] **The original is the record.** The translation is never written to a
+      spreadsheet, and the untranslated text is one click away at all times.
+- [x] **On-device only.** Chrome's built-in `Translator` and `LanguageDetector`
+      (Chrome 138+, desktop) run a model locally. This is the only reason the
+      feature is acceptable: a cloud translation API would be posting a
+      researcher's field notes to a third party, and there is no backend here
+      to hide that behind.
+- [x] Without the APIs — every other browser, and every browser on an iPad —
+      the note shows exactly as written, with no button and no error.
+
+**One click, then automatic.** Chrome refuses to build a model without a user
+gesture, so the first note in a language cannot translate itself; the app puts
+up **translate to English**, and pressing it *is* the gesture. The models it
+builds are kept for the session, so every later note in that language
+translates on sight. Rather than assume the refusal, the app tries first and
+only offers the button when Chrome actually says no — so if a future Chrome
+drops the requirement for an already-downloaded model, this becomes automatic
+throughout with no change.
+
+**What it refuses to do:**
+
+- [x] Translate on a weak detection. Notes are short — "nest w/ 2 eggs" is
+      barely a sentence — so anything under 0.6 confidence is left alone.
+      Translating an English note on a coin-flip is worse than not translating.
+- [x] Touch `Observation Details`, which is the same kind of free text and the
+      obvious next candidate. Left alone deliberately: Stella asked for media
+      notes, and one field is enough to find out whether this helps.
+
+**Still open**
+
+- `Observation Details` gets the same treatment if this proves useful. Same
+  function, one more call site.
+- Nothing caches a translation across rows, so stepping back onto a note
+  re-translates it. On-device and near-instant, so it has not mattered; a
+  `Map` keyed by catalog number would fix it if it ever does.
+- The language a note is translated *to* is hardcoded English. Right for this
+  project; wrong the moment a non-English-speaking reviewer uses it.
+
 ---
 
 ## Parked — not now

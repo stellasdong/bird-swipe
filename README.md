@@ -301,6 +301,21 @@ fit.
 photographs, the notes, what else was seen there. Recordist, date and checklist
 together are how you recognise a nest you've labeled before.
 
+**Media notes are shown in English** where the browser can manage it. The note
+is what the eBirder wrote about the photograph, in whatever language they use,
+and it is often the line that says whether it is a nest at all — so a note
+detected as something other than English is translated, labelled **"Media notes
+(translated from Spanish)"**, with **show original** next to it. The original is
+one click away and is always what the spreadsheet holds; the translation is a
+reading aid and is never written to a file.
+
+The first note of a session needs one click on **translate to English** —
+Chrome won't build a translation model without a gesture. After that it is
+automatic for every note in that language. It needs **Chrome 138 or newer on
+desktop**, and it runs entirely on your own machine: nothing is uploaded, which
+is the only reason it's in here at all — field notes are the researcher's data.
+On any browser without it, the note simply shows as written.
+
 If a photo won't load, bird-swipe retries once by itself and then offers a
 **Try again** button — so a patchy connection doesn't push you into skipping an
 item you never actually saw.

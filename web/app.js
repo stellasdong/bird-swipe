@@ -16,6 +16,9 @@ import {
   videoUrl,
 } from './macaulay.js';
 import {
+  canTranslate, languageName, NeedsGestureError, Translators,
+} from './translate.js';
+import {
   AUTOSAVE_DIR, DebouncedWriter, ExportHandles, Folder, Progress,
   TruncatedReadError, ensureReadable, isSupported, mirrorSink, pickExport, readText,
 } from './storage.js';
@@ -1267,6 +1270,88 @@ function renderMeta(row) {
     b.textContent = `${key}: `;
     line.append(b, row[key]);
     el.meta.append(line);
+    if (key === 'Media notes') offerTranslation(line, b, row[key], mlId);
+  }
+}
+
+// ------------------------------------------------------------- translation
+// Media notes are written by whoever uploaded the asset, in whatever language
+// they use, and are often the one line that says whether it is a nest. So they
+// are shown in English where that is possible — with the original one click
+// away, because the original is the record and a machine translation is not.
+//
+// Chrome wants a user gesture before it will build a model, so the first note
+// in a language cannot translate itself. Rather than assume that, this tries,
+// and puts up a button only when Chrome actually refuses. Once a click has
+// bought the model, every later note in that language translates on sight.
+const translators = new Translators();
+
+/** Swap a rendered note between the original and its translation. */
+function showNote(line, label, { original, english, language, showing }) {
+  const name = languageName(language);
+  line.textContent = '';
+  label.textContent = showing === 'english'
+    ? `Media notes (translated from ${name}): `
+    : `Media notes (${name}): `;
+  line.append(label, showing === 'english' ? english : original);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'link-btn';
+  button.textContent = showing === 'english'
+    ? `show original (${name})` : 'show translation';
+  button.addEventListener('click', () => showNote(line, label, {
+    original, english, language,
+    showing: showing === 'english' ? 'original' : 'english',
+  }));
+  line.append(' ', button);
+}
+
+/**
+ * Translate one note in place, if this browser can and the note isn't English.
+ *
+ * Everything here is best-effort: a browser without the APIs, a language with
+ * no model, a detection too weak to trust, or an outright failure all leave
+ * the note exactly as the eBirder wrote it. `mlId` guards against a slow
+ * translation landing on whatever row the reviewer has since moved to.
+ */
+async function offerTranslation(line, label, text, mlId) {
+  if (!canTranslate()) return;
+  const stale = () => state.catalog?.rows[state.idx]?.[CATALOG_KEY] !== mlId;
+
+  const run = async () => {
+    const language = await translators.detect(text);
+    if (!language) return true;             // English, or too unsure to act
+    const english = await translators.translate(text, language);
+    if (stale() || !english || english === text) return true;
+    showNote(line, label, { original: text, english, language, showing: 'english' });
+    return true;
+  };
+
+  try {
+    await run();
+  } catch (err) {
+    if (!(err instanceof NeedsGestureError)) {
+      noteHandledError('translate media notes failed', err);
+      return;
+    }
+    // Chrome wants a click first. Offer one; it is also the gesture.
+    if (stale()) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'link-btn';
+    button.textContent = 'translate to English';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      button.textContent = 'translating…';
+      try {
+        await run();
+      } catch (e) {
+        noteHandledError('translate media notes failed', e);
+        button.textContent = 'translation unavailable';
+      }
+    });
+    line.append(' ', button);
   }
 }
 

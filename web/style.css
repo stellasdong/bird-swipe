@@ -456,6 +456,9 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   cursor: pointer;
 }
 .link-btn:hover:not(:disabled) { background: none; color: var(--text); }
+/* The same control inline in a line of metadata, where there is no card to
+   centre it against and it reads as part of the sentence. */
+#meta .link-btn { align-self: auto; vertical-align: baseline; }
 
 /* -------------------------------------------------------------- reporting */
 /* One control, fixed at the bottom centre of every screen. The screens reserve

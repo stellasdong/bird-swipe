@@ -36,6 +36,9 @@ import {
 } from './storage.js';
 import { checklistUrl } from './macaulay.js';
 import {
+  canTranslate, languageName, pickLanguage, NeedsGestureError, Translators,
+} from './translate.js';
+import {
   DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay,
   getRememberedTerms, rememberTerm, setRememberedTerms,
 } from './settings.js';
@@ -398,6 +401,96 @@ group('catalog.js — chick stage');
 
   catalog.setSkip(1);
   eq('a skip clears it too', catalog.rows[1].chick_stage, '');
+}
+
+group('translate.js — deciding whether to translate a note');
+{
+  // Media notes come in whatever language the eBirder writes in, and are often
+  // the line that says whether it is a nest. But they are short — "nest w/ 2
+  // eggs" is barely a sentence — so detection is genuinely uncertain, and
+  // translating on a coin-flip would corrupt a note that was English already.
+  eq('a confident foreign detection is worth translating',
+     pickLanguage([{ detectedLanguage: 'es', confidence: 0.98 }]), 'es');
+  eq('the most likely one wins',
+     pickLanguage([{ detectedLanguage: 'pt', confidence: 0.9 },
+                   { detectedLanguage: 'es', confidence: 0.1 }]), 'pt');
+
+  eq('English is left alone',
+     pickLanguage([{ detectedLanguage: 'en', confidence: 0.99 }]), null);
+  eq('and so is a regional English',
+     pickLanguage([{ detectedLanguage: 'en-GB', confidence: 0.99 }]), null);
+  eq('a weak guess is not acted on',
+     pickLanguage([{ detectedLanguage: 'es', confidence: 0.3 }]), null);
+  eq('nor is "undetermined"',
+     pickLanguage([{ detectedLanguage: 'und', confidence: 0.99 }]), null);
+  eq('nothing detected, nothing done', pickLanguage([]), null);
+  eq('and a missing result is not a crash', pickLanguage(undefined), null);
+
+  // The reviewer has to be told what they are reading a translation of.
+  eq('a tag becomes a name', languageName('es'), 'Spanish');
+  eq('a regional tag too', languageName('pt-BR'), 'Brazilian Portuguese');
+  eq('an unknown tag is shown as-is rather than hidden',
+     languageName('zzz'), 'zzz');
+  eq('and nothing is nothing', languageName(''), '');
+
+  check('feature detection answers either way without throwing',
+        typeof canTranslate() === 'boolean');
+}
+
+group('translate.js — one gesture, then automatic');
+{
+  // Chrome wants a user gesture before it will build a model, so the first
+  // note in a language can't translate itself. Everything after it should,
+  // which is what caching the built models buys.
+  const calls = { detector: 0, translator: [] };
+  const fake = {
+    LanguageDetector: {
+      create: async () => {
+        calls.detector += 1;
+        return { detect: async () => [{ detectedLanguage: 'es', confidence: 0.9 }] };
+      },
+    },
+    Translator: {
+      create: async ({ sourceLanguage }) => {
+        calls.translator.push(sourceLanguage);
+        return { translate: async t => `EN(${t})` };
+      },
+    },
+  };
+  const t = new Translators(fake);
+  await t.detect('hola');
+  await t.detect('adios');
+  eq('the detector is built once, not per note', calls.detector, 1);
+  eq('translating goes through', await t.translate('hola', 'es'), 'EN(hola)');
+  await t.translate('adios', 'es');
+  eq('and its model is built once per language', calls.translator, ['es']);
+  await t.translate('bonjour', 'fr');
+  eq('a new language needs its own', calls.translator, ['es', 'fr']);
+  check('and it knows when it is ready', t.ready('es'));
+  check('but not for one it has never built', !t.ready('de'));
+
+  // A refusal for want of a gesture is not a failure; it is "ask me from a
+  // click". It gets its own type so the app can offer a button instead of
+  // reporting something broken.
+  const refuses = {
+    LanguageDetector: { create: async () => {
+      const e = new Error('needs activation'); e.name = 'NotAllowedError'; throw e;
+    } },
+    Translator: { create: async () => ({}) },
+  };
+  let caught = null;
+  try { await new Translators(refuses).detect('hola'); } catch (e) { caught = e; }
+  check('a missing gesture is its own kind of answer',
+        caught instanceof NeedsGestureError);
+
+  // A browser without the APIs — which is most of them, and every browser on
+  // an iPad. The whole feature stays out of the way and the note shows as
+  // written.
+  const bare = new Translators({});
+  eq('no APIs, no detection', await bare.detect('hola'), null);
+  eq('no APIs, no translation', await bare.translate('hola', 'es'), null);
+  check('and the check says so up front', !canTranslate({}));
+  check('half of it is not enough', !canTranslate({ Translator: {} }));
 }
 
 group('macaulay.js — the checklist link');
