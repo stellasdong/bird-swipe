@@ -341,16 +341,17 @@ A code is the nest's name, so marking a row "no" and then "yes" again keeps it �
 a mis-press can't rename a nest or break it out of a group you built by hand.
 
 **Grouping fills the image you're on, straight away** — whichever order you do
-it in. Group before deciding and the nest details row opens filled, already
-marked as a nest, because saying "this is that nest" is saying it's a nest.
-Group after deciding and the open panel fills in front of you. Either way the
-panel fills from the other image — structure,
+it in. Group before deciding and the nest details row opens showing the
+answers, ready to confirm; group after deciding and the open panel fills in
+front of you. Either way the panel fills from the other image — structure,
 location, substrate, material, counts — and says **filled in from nest AAAA —
 check the counts**. Anything you'd already answered about *this* photograph is
 kept: the nest's answers fill the gaps, they don't overrule you.
 
-**And every later asset in the group arrives pre-filled too.** Once a nest has
-been answered, the other assets in its group start from those answers — structure, location, substrate,
+**And every later asset in the group arrives the same way.** Walk on to one and
+its panel is already open and filled, saying **filled in from nest AAAA — check
+the counts, then `→` to confirm**. Once a nest has been answered, the other
+assets in its group start from those answers — structure, location, substrate,
 material, the lot — so you don't retype the same nest ten times for a burst.
 The panel says **filled in from nest AAAA — check the counts**, and the chip row
 says **answers ready** before you've even decided.

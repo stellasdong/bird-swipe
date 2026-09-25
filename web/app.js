@@ -959,14 +959,20 @@ function renderProgressReadout() {
 
 function showNestDetails(row) {
   const isNest = (row?.nest_label ?? '') === 'yes';
-  el.nestDetails.hidden = !isNest;
-  if (isNest) {
+  // Also shown for an asset that has inherited its nest's answers but has not
+  // been decided yet. The values are already sitting in the controls; keeping
+  // the panel shut until the decision meant the reviewer could not see what
+  // they were about to confirm, so the inheritance looked like it had not
+  // happened at all. Nothing is recorded by showing it.
+  const show = isNest || Boolean(state.carriedFrom);
+  el.nestDetails.hidden = !show;
+  if (show) {
     const missing = missingRequired();
     el.detailsHint.textContent = missing.length
       ? `${missing.map(n => PICKERS[n].label).join(' and ')} still needed`
       : state.carriedFrom
         ? `filled in from nest ${state.carriedFrom} — check the counts, then `
-          + `${keyDisplay(state.keys.nest_yes)} to save`
+          + `${keyDisplay(state.keys.nest_yes)} to ${isNest ? 'save' : 'confirm'}`
         : `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
     renderPickerButtons();
     renderConditionalPickers();
@@ -2627,31 +2633,25 @@ function saveDupes() {
   // away. Saying "this is that nest" is the request; making them then walk
   // somewhere else and come back to see it take effect would be absurd.
   const row = state.catalog.rows[state.idx];
-  const source = groupAnswers(row);
-  let filled = 0;
-  if (source && row.nest_label !== 'yes') {
-    // Grouping an undecided asset with a nest that has already been answered
-    // IS the decision: you cannot say "this is that nest" about something
-    // that is not a nest. Marking it opens the panel, which is the only way
-    // the answers it just inherited are visible at all — otherwise grouping
-    // looks like it did nothing. `←` still disagrees, as it always did.
-    nestYes();
-    filled = 1;
-  } else if (row?.nest_label === 'yes') {
-    filled = adoptGroupAnswers(source);
-    if (filled) {
-      state.carriedFrom = id;
-      showNestDetails(row);
-      updateChip(row);
-      saveOpenRow();
-    }
+  // An undecided asset needs nothing here: showCurrent() above has already
+  // loaded its nest's answers and opened the panel to show them, and the
+  // decision stays the reviewer's to make. A decided one is a different case
+  // — it is already reviewed, so it loads its own answers rather than the
+  // nest's, and has to be filled in explicitly.
+  const filled = row?.nest_label === 'yes' ? adoptGroupAnswers(groupAnswers(row)) : 0;
+  if (filled) {
+    state.carriedFrom = id;
+    showNestDetails(row);
+    updateChip(row);
+    saveOpenRow();
   }
   state.writer.schedule(state.catalog);
 
   const saved = picks.length - later;
   announce('info',
     `${picks.length} assets marked as nest ${id}.`
-    + (filled ? ` This one filled in from the nest — check the counts.` : '')
+    + (state.carriedFrom === id
+        ? ' This one filled in from the nest — check the counts.' : '')
     + (later ? ` ${saved} saved now; the other ${later} save when you review them.`
              : ''));
 }

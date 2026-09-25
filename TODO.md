@@ -867,12 +867,17 @@ the recognising. Stella caught both.
 
 ### Grouping fills things in
 
-- [x] **Grouping an undecided asset with an answered nest marks it a nest**
-      and opens the panel filled. You cannot say "this is that nest" about
-      something that is not a nest — and since the panel is hidden until the
-      decision, it was the only way the inherited answers were visible at all.
-      Without it, grouping before deciding looked like it did nothing, which
-      is exactly what Stella reported. `←` still disagrees, as always.
+- [x] **The panel opens for an undecided asset that has inherited answers**,
+      so the reviewer can see what they are about to confirm. The values were
+      always being loaded; the panel was shut until the decision, so the
+      inheritance looked like it had not happened — first on the asset being
+      grouped, then on every later one. Nothing is recorded by showing it, and
+      the hint reads *→ to confirm* rather than *to save*.
+- [x] An earlier attempt had grouping **mark the asset a nest** so the panel
+      would open. It worked, and it was wrong: the app had never decided
+      anything on the reviewer's behalf, and doing it for the convenience of
+      showing a panel is a poor reason to start. Showing the panel without
+      committing gets the same result and keeps the decision theirs.
 - [x] **The asset in front of the reviewer fills in the moment they group it.**
       Saying "this is that nest" is the request; making them walk away and come
       back to see it take effect would be absurd. This needed its own path:
