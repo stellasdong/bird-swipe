@@ -318,6 +318,7 @@ const state = {
   // single- and multi-select differ only in how many entries are allowed.
   picks: Object.fromEntries(PICKER_NAMES.map(name => [name, []])),
   chickStage: '',   // '', 'early', 'late' or 'unclear'
+  carriedFrom: '',  // nest code these answers were pre-filled from, if any
   dupePicks: new Set(), // row indices selected in the contact sheet
   openPicker: null, // which picker is showing its list, if any
   pickerRows: [],   // what the open picker is currently offering
@@ -774,16 +775,22 @@ function showCurrent() {
   renderMeta(row);
   el.notes.value = row.notes ?? '';
   refreshNotesSize();
+  // An unreviewed asset in a group starts from what its nest already says.
+  // Nothing is written by looking — these are the controls, and the reviewer
+  // still has to press the key that commits them.
+  const carried = carriedFrom(row);
+  state.carriedFrom = carried ? carried.nest_id : '';
+  const source = carried ?? row;
   for (const [field, column] of Object.entries(TOGGLE_FIELDS)) {
-    setToggle(field, row[column] === 'yes');
+    setToggle(field, source[column] === 'yes');
   }
   for (const [field, column] of Object.entries(COUNTER_FIELDS)) {
-    setCount(field, row[column] ?? '');
+    setCount(field, source[column] ?? '');
   }
   closePicker(); // never carry an open list onto the next item
   // Legacy 'n/a' is already dropped as the file loads, so these are values or blanks.
-  for (const name of PICKER_NAMES) setPick(name, row[name] ?? '');
-  setChickStage(row.chick_stage ?? '');
+  for (const name of PICKER_NAMES) setPick(name, source[name] ?? '');
+  setChickStage(source.chick_stage ?? '');
   updateChip(row);
   showNestDetails(row);
   renderNestLabels();
@@ -957,7 +964,10 @@ function showNestDetails(row) {
     const missing = missingRequired();
     el.detailsHint.textContent = missing.length
       ? `${missing.map(n => PICKERS[n].label).join(' and ')} still needed`
-      : `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
+      : state.carriedFrom
+        ? `filled in from nest ${state.carriedFrom} — check the counts, then `
+          + `${keyDisplay(state.keys.nest_yes)} to save`
+        : `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
     renderPickerButtons();
     renderConditionalPickers();
     renderChickStage();
@@ -1272,6 +1282,39 @@ function saveOpenRow() {
   if (state.catalog?.rows[state.idx]?.nest_label === 'yes') commit(true, false);
 }
 
+/**
+ * The answers this asset should start from, when it has none of its own.
+ *
+ * Assets grouped as one nest are one nest, so most of what is true of one is
+ * true of the rest — where it sits, what it is built from, whether it is on a
+ * human-made structure. Retyping that for the tenth frame of a burst is ten
+ * chances to differ from the first.
+ *
+ * So an unreviewed member starts filled in from the most recently answered
+ * member of its group. It is a starting point, not an answer: nothing is
+ * written until the reviewer presses the key that commits the row, which is
+ * the whole reason they are still made to walk through every asset. The
+ * things that genuinely change between visits — the counts, the chick stage,
+ * whether a parent is feeding — are exactly what they are there to correct,
+ * and the panel says where the values came from.
+ *
+ * A row that has already been reviewed is never overwritten: its answers are
+ * someone's judgement about that photograph, and a group is not a reason to
+ * throw that away.
+ */
+function carriedFrom(row) {
+  if (!row || row.reviewed === REVIEWED) return null;
+  if (!row.nest_id) return null;
+  const mates = state.catalog.nestGroup(row.nest_id)
+    .map(i => state.catalog.rows[i])
+    .filter(r => r !== row && r.reviewed === REVIEWED && r.nest_label === 'yes');
+  if (!mates.length) return null;
+  // The freshest judgement about this nest, which on a revisit is the one
+  // closest to what the reviewer is looking at now.
+  return mates.sort((a, b) =>
+    String(b.reviewed_at ?? '').localeCompare(String(a.reviewed_at ?? '')))[0];
+}
+
 function updateChip(row) {
   // The code sits with the decision rather than in the details panel, because
   // the button that groups nests does too — and a reviewer checking whether
@@ -1279,6 +1322,7 @@ function updateChip(row) {
   const others = row.nest_id ? state.catalog.nestGroup(row.nest_id).length - 1 : 0;
   el.nestCode.textContent = row.nest_id
     ? `nest ${row.nest_id}${others > 0 ? ` · with ${others} more` : ''}`
+      + (state.carriedFrom ? ' · answers ready' : '')
     : '';
   const label = row.nest_label ?? '';
   el.nestYes.setAttribute('aria-pressed', String(label === 'yes'));
@@ -2486,6 +2530,11 @@ function renderDupes() {
 
 function openDupes() {
   if (!state.catalog || state.idx >= state.catalog.rows.length) return;
+  // Save what is in the panel first. Grouping re-renders the row, and a count
+  // typed but not yet committed lives only in its box — without this, opening
+  // the sheet to group a nest silently threw away the eggs you had just
+  // counted. Same reason the arrow keys flush before they navigate.
+  flushNestDetails();
   const row = state.catalog.rows[state.idx];
   // Reopening a nest that already has a group starts from that group, so this
   // is how you add a twelfth photograph to eleven rather than starting again.

@@ -340,6 +340,21 @@ from that group, so adding an eleventh photograph to ten is the same gesture.
 A code is the nest's name, so marking a row "no" and then "yes" again keeps it —
 a mis-press can't rename a nest or break it out of a group you built by hand.
 
+**Grouped assets arrive pre-filled.** Once a nest has been answered, the other
+assets in its group start from those answers — structure, location, substrate,
+material, the lot — so you don't retype the same nest ten times for a burst.
+The panel says **filled in from nest AAAA — check the counts**, and the chip row
+says **answers ready** before you've even decided.
+
+Nothing is written by looking. You still walk through every asset and still
+press `→` to save it, which is the point: **the counts, the chick stage and
+whether a parent is feeding are exactly what changes between visits**, and
+they're what you're there to correct. Eggs in May are chicks in June.
+
+An asset that has already been reviewed is never overwritten — its answers are
+your judgement about that photograph, and grouping it with others isn't a
+reason to throw that away.
+
 An asset you haven't reviewed yet can be grouped, but the grouping only reaches
 the file when you label it — the tile says **not reviewed yet**, and the
 confirmation tells you how many saved now and how many will save later.

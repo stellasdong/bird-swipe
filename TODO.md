@@ -865,6 +865,34 @@ the recognising. Stella caught both.
 - [x] A code is the nest's **name**: marking a row no and yes again keeps it,
       so a mis-press cannot rename a nest or break it out of a group.
 
+### Grouped assets arrive pre-filled
+
+- [x] An **unreviewed** member of a group starts filled in from the group's
+      **most recently answered** member — the freshest judgement about that
+      nest, which on a revisit is closest to what is on screen now.
+- [x] **Nothing is written by looking.** The values sit in the controls; the
+      reviewer still walks every asset and still presses the key that commits
+      it. That is Stella's guard against the obvious danger, and it is why
+      this is safe to do at all.
+- [x] It is **visible**: the panel reads *filled in from nest AAAA — check the
+      counts*, and the chip row says *answers ready* before the decision.
+- [x] A **reviewed** row is never overwritten. Its answers are somebody's
+      judgement about that photograph, and a group is not a reason to discard
+      them.
+
+The risk is real and worth naming: what carries well is what does not change —
+structure, location, substrate, material. What changes between visits is the
+counts, the chick stage and whether a parent is feeding, and those are exactly
+what the reviewer is there to correct. Eggs in May are chicks in June. The
+design bets that making them walk through every asset, with the source named
+on screen, is enough. If the column ever fills with suspiciously identical
+counts across a group, that bet was wrong.
+
+**Still open:** members reviewed *before* the group was made keep their own
+answers, so a group can hold two different sets. Pushing the current row's
+answers onto already-reviewed members would fix that and would also overwrite
+real judgements without asking — worth a decision, not a guess.
+
 **`nest_id` is not nest-only**, unlike every observation. It is which nest the
 reviewer says this is, not something they observed, and losing a grouping that
 took a pass through the spreadsheet to make — because someone mis-pressed the
