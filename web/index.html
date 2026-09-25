@@ -264,17 +264,9 @@
 <dialog id="dupes">
   <h2>Which of these are the same nest?</h2>
   <div class="dupes-bar">
-    <label class="dupes-filter">
-      <input type="checkbox" id="dupes-same-recordist" checked>
-      same recordist
-    </label>
-    <label class="dupes-filter">
-      <input type="checkbox" id="dupes-same-place">
-      same place (within ~100 m)
-    </label>
     <input type="text" id="dupes-search" autocomplete="off"
-           placeholder="filter by catalog number, date, locality…"
-           aria-label="Filter the contact sheet">
+           placeholder="search by catalog number, date, locality, recordist…"
+           aria-label="Search the contact sheet">
     <span class="dupes-count" id="dupes-count"></span>
   </div>
   <div class="dupes-grid" id="dupes-grid"></div>

@@ -101,8 +101,6 @@ const el = {
   dupes: $('dupes'),
   dupesGrid: $('dupes-grid'),
   dupesSearch: $('dupes-search'),
-  dupesSameRecordist: $('dupes-same-recordist'),
-  dupesSamePlace: $('dupes-same-place'),
   dupesCount: $('dupes-count'),
   dupesCancel: $('dupes-cancel'),
   dupesUngroup: $('dupes-ungroup'),
@@ -2346,10 +2344,16 @@ on(el.jumpSkipped, 'click', () => {
 // is going to beat someone who has just looked at both — so the app's job is
 // to put the candidates in front of them and record what they say.
 //
-// Every tile carries the recordist and the coordinates, because that is the
-// evidence: the same eBirder standing in the same place is most of what makes
-// two photographs probably one nest. The filters default to the first of those
-// for the same reason.
+// It shows the WHOLE spreadsheet, and filters nothing by guesswork. Two
+// earlier heuristics were tried and taken out: same recordist, which assumes
+// one person photographs a nest when two eBirders at the same site is
+// ordinary, and same coordinates, which assumes the coordinates are exact
+// when they are approximate. Both would have hidden real matches, and a
+// candidate hidden by a rule is one the reviewer never gets to judge.
+//
+// Recordist, date and distance still ride on every tile. That is the same
+// evidence, offered rather than enforced: it helps the person decide instead
+// of deciding for them.
 
 /** Metres between two coordinates. Flat-earth maths, fine at this range. */
 function metresApart(a, b) {
@@ -2364,19 +2368,35 @@ const coordsOf = row => ({
   lat: Number.parseFloat(row?.Latitude), lon: Number.parseFloat(row?.Longitude),
 });
 
-/** The rows worth showing, given the filters and what the reviewer typed. */
+/** How far apart, said loosely enough to be honest about the coordinates. */
+function roughDistance(a, b) {
+  const m = metresApart(a, b);
+  if (!Number.isFinite(m)) return 'distance unknown';
+  if (m < 25) return 'same spot';
+  if (m < 1000) return `≈${Math.round(m / 10) * 10} m away`;
+  const km = m / 1000;
+  // Coarser the further out, because "2942 km" claims four figures of
+  // precision about coordinates that do not have them, and at that range the
+  // only thing the reviewer needs is "nowhere near".
+  if (km < 10) return `≈${km.toFixed(1)} km away`;
+  if (km < 100) return `≈${Math.round(km)} km away`;
+  return `≈${Math.round(km / 100) * 100} km away`;
+}
+
+/**
+ * Everything in the spreadsheet, narrowed only by what the reviewer typed.
+ *
+ * An empty search box means every asset, which is the normal case: the point
+ * is to look. The search is there for a file of two hundred when you already
+ * know roughly what you are after, not to decide what deserves showing.
+ */
 function dupeCandidates() {
   const rows = state.catalog?.rows ?? [];
-  const here = rows[state.idx];
-  if (!here) return [];
+  if (!rows[state.idx]) return [];
   const query = el.dupesSearch.value.trim().toLowerCase();
-  const home = coordsOf(here);
   return rows.map((row, i) => ({ row, i })).filter(({ row, i }) => {
-    if (i === state.idx || state.dupePicks.has(i)) return true; // never hide these
-    if (el.dupesSameRecordist.checked
-        && (row.Recordist ?? '') !== (here.Recordist ?? '')) return false;
-    if (el.dupesSamePlace.checked && metresApart(coordsOf(row), home) > 100) return false;
     if (!query) return true;
+    if (i === state.idx || state.dupePicks.has(i)) return true; // never hide these
     return [row[CATALOG_KEY], row.Date, row.Locality, row.Recordist, row.nest_id]
       .some(v => String(v ?? '').toLowerCase().includes(query));
   });
@@ -2384,6 +2404,7 @@ function dupeCandidates() {
 
 function renderDupes() {
   const candidates = dupeCandidates();
+  const home = coordsOf(state.catalog?.rows[state.idx]);
   el.dupesGrid.textContent = '';
   for (const { row, i } of candidates) {
     const mlId = row[CATALOG_KEY];
@@ -2404,8 +2425,13 @@ function renderDupes() {
     who.textContent = row.Recordist || 'unknown recordist';
     const lat = Number.parseFloat(row.Latitude);
     const lon = Number.parseFloat(row.Longitude);
+    // Distance from the row the reviewer came from, because comparing two
+    // decimal coordinate pairs by eye is not a thing people can do. Rounded
+    // hard and prefixed with ≈: the coordinates are approximate, so a figure
+    // that looked precise would be claiming more than the data supports.
+    const away = i === state.idx ? 'this one' : roughDistance(coordsOf(row), home);
     const where = Number.isFinite(lat) && Number.isFinite(lon)
-      ? `${lat.toFixed(4)}, ${lon.toFixed(4)}` : 'no coordinates';
+      ? `${lat.toFixed(4)}, ${lon.toFixed(4)} · ${away}` : 'no coordinates';
     meta.append(who, document.createElement('br'),
                 `${row.Date || 'no date'}`, document.createElement('br'), where);
     tile.append(meta);
@@ -2431,21 +2457,18 @@ function renderDupes() {
   el.dupesCount.textContent =
     `${state.dupePicks.size} selected · ${candidates.length} shown`;
 
-  // A filter that hides everything looks like a broken screen rather than an
-  // answer, and "no other assets by this recordist" is a real answer worth
-  // saying out loud — with the way out attached to it.
-  const filtered = el.dupesSameRecordist.checked || el.dupesSamePlace.checked;
-  if (candidates.length <= state.dupePicks.size && filtered) {
+  // Only a typed search can empty the sheet now, and the way out is to clear
+  // what was typed.
+  if (candidates.length <= state.dupePicks.size && el.dupesSearch.value.trim()) {
     const empty = document.createElement('div');
     empty.className = 'dupes-empty';
-    empty.append('Nothing else matches those filters. ');
+    empty.append('Nothing else matches that search. ');
     const all = document.createElement('button');
     all.type = 'button';
     all.className = 'link-btn';
-    all.textContent = 'show the whole spreadsheet';
+    all.textContent = 'show everything again';
     all.addEventListener('click', () => {
-      el.dupesSameRecordist.checked = false;
-      el.dupesSamePlace.checked = false;
+      el.dupesSearch.value = '';
       renderDupes();
     });
     empty.append(all);
@@ -2463,6 +2486,9 @@ function openDupes() {
   el.dupesSearch.value = '';
   renderDupes();
   el.dupes.showModal();
+  // Two hundred tiles in file order means the row you came from can be well
+  // off-screen. Put it where the reviewer is looking.
+  el.dupesGrid.querySelector('.dupe.current')?.scrollIntoView({ block: 'center' });
 }
 
 function saveDupes() {
@@ -2493,8 +2519,6 @@ el.dupesCancel.addEventListener('click', () => el.dupes.close());
 el.dupesSave.addEventListener('click', saveDupes);
 el.dupesUngroup.addEventListener('click', ungroupDupes);
 el.dupesSearch.addEventListener('input', renderDupes);
-el.dupesSameRecordist.addEventListener('change', renderDupes);
-el.dupesSamePlace.addEventListener('change', renderDupes);
 
 // --------------------------------------------------------------- reporting
 /**

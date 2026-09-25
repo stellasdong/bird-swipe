@@ -313,12 +313,17 @@ again a month later. When you recognise one, the **seen this nest before?**
 button in the nest details row opens a contact sheet of the whole spreadsheet:
 click every photograph that shows the same nest, then **Mark as one nest**.
 
-Every tile carries the **recordist**, the **date** and the **coordinates**,
-because that's the evidence — the same eBirder standing in the same place is
-most of what makes two photographs probably one nest. The sheet starts filtered
-to the same recordist for that reason, with **same place (within ~100 m)** and a
-text filter beside it; if the filters leave nothing, it says so and offers the
-whole spreadsheet in one click.
+**It shows the whole spreadsheet**, scrollable, in file order, with the row you
+came from marked and scrolled into view. Nothing is filtered out by guesswork:
+two eBirders can photograph the same nest, and the coordinates are approximate,
+so a rule built on either would hide real matches. There's a search box for when
+you already know what you're after, and it starts empty.
+
+Every tile carries the **recordist**, the **date**, the **coordinates** and
+roughly **how far away** it is from the one you're on — that's the evidence,
+offered rather than enforced. Distances are deliberately coarse (`same spot`,
+`≈40 m away`, `≈2900 km away`), because the coordinates don't support more
+precision than that.
 
 **Every nest gets a code** — `AAAA`, `AAAB`, `AAAC` — handed out in the order
 you find them, the first time you mark a row as a nest. Grouping assets makes

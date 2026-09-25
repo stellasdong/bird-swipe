@@ -827,13 +827,24 @@ photographs, so the job was to put the candidates in front of them.
 - [x] **seen this nest before?** in the nest details row opens a contact sheet
       of the whole spreadsheet. Click every photograph of the same nest, then
       **Mark as one nest**.
-- [x] Every tile carries **recordist, date and coordinates** — Stella's
-      heuristic, on the tile where the judgement is made.
-- [x] The sheet **starts filtered to the same recordist**, with *same place
-      (within ~100 m)* and a text filter beside it. Recordists repeat enough
-      for this to earn the default: 19 of 194 rows in one real export.
-- [x] A filter that hides everything **says so** and offers the whole
-      spreadsheet in one click, rather than looking like a broken screen.
+- [x] **The whole spreadsheet, scrollable**, in file order, with the row the
+      reviewer came from marked and scrolled into view.
+- [x] Every tile carries **recordist, date, coordinates and rough distance**
+      from the current row — evidence offered, not enforced. Distances are
+      coarse on purpose (`same spot`, `≈40 m away`, `≈2900 km away`): the
+      coordinates do not support more precision, and a figure that looked
+      exact would be claiming they do.
+- [x] A search box for a file of two hundred, starting empty. The only thing
+      that can empty the sheet is a typed search, and it says so with the way
+      out attached.
+
+**Two filters were built and taken out.** *Same recordist* assumed one person
+photographs a nest, when two eBirders at one site is ordinary. *Same place
+within 100 m* assumed the coordinates are exact, when they are approximate and
+are there for the reviewer to weigh rather than for the app to act on. Both
+hid real matches, and a candidate hidden by a rule is one the reviewer never
+gets to judge — which defeats the point of a design that rests on them doing
+the recognising. Stella caught both.
 - [x] Reopening on a nest that already has a group **starts from that group**,
       so adding an eleventh photograph to ten is the same gesture.
       **Ungroup** clears it.
