@@ -28,7 +28,7 @@ import {
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
   NEST_ONLY_COLUMNS, LEGACY_NOT_APPLICABLE, SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
   NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS, locationOptions, CHICK_STAGES,
-  isListedLocation, filterTerms, joinTerms, splitTerms,
+  isListedLocation, filterTerms, joinTerms, splitTerms, PREY_OPTIONS,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
@@ -397,6 +397,63 @@ group('catalog.js — chick stage');
 
   catalog.setSkip(1);
   eq('a skip clears it too', catalog.rows[1].chick_stage, '');
+}
+
+group('catalog.js — provisioning and prey');
+{
+  // Stella's question in two halves: are the parents actively feeding, and if
+  // the food is visible, what kind? The second only exists once the first is
+  // yes. The column is called provisioning, which conventionally means the
+  // wider "bringing food to the nest" — the definition travels on the label.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false,
+                        provisioning: true, preyGroup: ['fish'] });
+  eq('feeding recorded', catalog.rows[0].provisioning, 'yes');
+  eq('and what was being fed', catalog.rows[0].prey_group, 'fish');
+
+  catalog.setLabel(1, { nest: true, structure: false,
+                        provisioning: true, preyGroup: ['mammal', 'invertebrate'] });
+  eq('more than one item rides in one cell',
+     catalog.rows[1].prey_group, 'mammal; invertebrate');
+
+  // "If visible" is the whole reason unidentified exists: a parent feeding
+  // with its bill turned away is a yes with an unidentified item, which is
+  // not the same as nobody answering.
+  check('the list can say the food was not identifiable',
+        PREY_OPTIONS.includes('unidentified'));
+  catalog.setLabel(2, { nest: true, structure: false,
+                        provisioning: true, preyGroup: 'unidentified' });
+  eq('feeding with nothing identifiable is still feeding',
+     [catalog.rows[2].provisioning, catalog.rows[2].prey_group],
+     ['yes', 'unidentified']);
+
+  catalog.setLabel(3, { nest: true, structure: false, provisioning: true });
+  eq('and feeding with nothing picked is blank, not guessed',
+     catalog.rows[3].prey_group, '');
+
+  // The failure mode to rule out: prey left standing under a "not feeding".
+  catalog.setLabel(0, { nest: true, structure: false,
+                        provisioning: false, preyGroup: ['fish'] });
+  eq('answering no drops the prey with it', catalog.rows[0].prey_group, '');
+  eq('and the flag says no', catalog.rows[0].provisioning, 'no');
+
+  catalog.setLabel(1, { nest: false, structure: false, provisioning: true,
+                        preyGroup: ['fish'] });
+  eq('off a nest there is neither',
+     [catalog.rows[1].provisioning, catalog.rows[1].prey_group], ['', '']);
+  for (const col of ['provisioning', 'prey_group']) {
+    check(`${col} is nest-only`, NEST_ONLY_COLUMNS.includes(col));
+    check(`${col} is a label column`, LABEL_COLUMNS.includes(col));
+  }
+
+  catalog.setSkip(2);
+  eq('a skip clears both',
+     [catalog.rows[2].provisioning, catalog.rows[2].prey_group], ['', '']);
+
+  eq('prey is a group, not a kingdom — classes within one',
+     PREY_OPTIONS.slice(0, 6),
+     ['mammal', 'bird', 'reptile', 'amphibian', 'fish', 'invertebrate']);
 }
 
 group('catalog.js — multi-select cells');

@@ -1,8 +1,8 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 through M24 are built; **M14 (prey provisioning) and M25 (duplicate
-images) are the high priorities**, M15 is parked and M26–M27 are low priority.
+M14 and M17 through M24 are built; **M25 (duplicate images) is the high
+priority**, M15 is parked, M26–M27 are low priority, and M28–M29 are small.
 [PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes
 what the app does today. Each item says where it would land in the code,
 because every one of them adds columns to a file researchers may already be
@@ -166,7 +166,7 @@ fixed this definition; it needs to reach whoever analyses the column, because
   suggestions. The file is unaffected (it records the text, never a reference
   into a list), but a shared list would need a file in the OneDrive folder.
 
-## M14 — Prey provisioning — **high priority**
+## M14 — Prey provisioning — **built**
 
 **Two questions, in Stella's words: are the parent birds actively feeding, and
 if the food is visible, what kind?**
@@ -176,18 +176,18 @@ The multi-select picker M17 built for substrate is the thing to reuse: same
 open/filter/confirm behaviour, same `; `-joined cell, already written and
 tested.
 
-- [ ] **Is a parent actively feeding?** `provisioning`, `yes` / `no`. A toggle,
+- [x] **Is a parent actively feeding?** `provisioning`, `yes` / `no`. A toggle,
       answerable from the photograph without judging what the food is.
-- [ ] **If the food is visible, what kind?** A prey-type list: mammal, bird,
+- [x] **If the food is visible, what kind?** A prey-type list: mammal, bird,
       reptile, amphibian, fish, invertebrate, **unidentified**.
-- [ ] `unidentified` is the "if visible" half doing its work — a feeding parent
+- [x] `unidentified` is the "if visible" half doing its work — a feeding parent
       whose bill you can't see into is `provisioning = yes` with
       `prey_group = unidentified`, which is a different fact from a blank. Same
       reasoning as `unclear` in the substrate and location lists (M19).
-- [ ] **Multi-select** — one image can show more than one prey item. Several
+- [x] **Multi-select** — one image can show more than one prey item. Several
       values in one cell, separated by `; ` so a comma never has to be escaped
       to stay readable.
-- [ ] Columns `provisioning` and `prey_group`. Named *group* rather than
+- [x] Columns `provisioning` and `prey_group`. Named *group* rather than
       *kingdom* because mammal/bird/reptile are classes within one kingdom;
       confirmed with Stella.
 
@@ -196,18 +196,21 @@ that's also marked provisioning. The dropdown it needs now exists: M17's
 substrate picker is multi-select and joins with `; `, which is exactly what
 `prey_group` wants.
 
-**One thing to settle before building.** *Actively feeding* and *bringing food
-to the nest* are not the same observation, and `provisioning` is the
-ornithologist's word for the second one. A parent perched at the nest with a
-fish in its bill is provisioning but not yet feeding; a parent passing food to
-a chick is both.
+**Settled: it records active feeding, and the column is still called
+`provisioning`.** Stella's call. Those are not the same thing — a parent
+perched at the nest with a fish in its bill is provisioning in the usual sense
+but is not feeding — so the definition has to travel with the name, and it
+does: the toggle on screen reads **"provisioning — actively feeding"**, and
+`catalog.js`, the README's column table and this note all say which is meant.
+The alternative was renaming the column to `feeding`, which is clearer cold but
+loses the name Stella had already confirmed.
 
-Stella's phrasing is "actively feeding", so that is what this records — but
-then either the column should say so (`feeding`), or the definition has to
-travel with `provisioning` so nobody reads the usual meaning into it. The
-second is cheaper and keeps the name she already confirmed; the first is
-clearer to whoever gets the spreadsheet cold. Worth one sentence from Stella
-before the column exists, since renaming it afterwards means rewriting files.
+**Keys and placement.** Toggle `H` / `9`, prey list `J` / `0` — skipping `G`,
+which is jump. Both sit at the end of the panel rather than beside the bird
+toggle they relate to, because the alternative was moving keys a fourth time.
+The prey list is `hidden` until provisioning is yes, so it stays out of the Tab
+order and its key does nothing until then, the same arrangement chick stage
+has with the chick count.
 
 **Later, not now**
 

@@ -121,6 +121,8 @@ Two things that will otherwise trip you up:
 | `S` / `6` | **count the eggs** — type a number, then `Enter` |
 | `D` / `7` | **count the chicks** — type a number, then `Enter` |
 | `F` / `8` | **chick stage** — only once you've counted a chick; press again to change |
+| `H` / `9` | toggle **provisioning** — a parent actively feeding |
+| `J` / `0` | choose the **prey** — only once provisioning is yes; takes several answers |
 | `Z`       | **zoom** the photo to full size and back — or click it |
 | `G`       | **jump** to another item — or click the `[12 / 194]` readout |
 | `Tab`     | move through the nest details row — `Enter` or `Space` opens or flips what's focused |
@@ -284,6 +286,20 @@ from the box, so counting is `S`, a number, then `→`. A nest can hold both, an
 both are optional; on a nest, leaving a box alone records as none seen. Off a
 nest they aren't asked at all, and stay blank.
 
+**Provisioning is about active feeding.** `H` marks that a parent is *actively
+feeding* — not just present, and not just carrying something. Say yes and a
+**prey** list appears on `J`: mammal, bird, reptile, amphibian, fish,
+invertebrate, unidentified. It takes several answers, since one image can show
+more than one item.
+
+Use **unidentified** when a parent is clearly feeding but you can't see what —
+that's a different fact from leaving it blank, which means nobody answered.
+Answer `H` back to no and the prey answer goes with it.
+
+The column is `provisioning`, which in the literature usually means the wider
+"bringing food to the nest". Here it means feeding, which is why the button
+says both.
+
 **Chick stage.** Once you've counted at least one chick, a chick-stage button
 appears; press `F` to cycle it. **Early is downy, late is feathered** — the
 definition is on the button so two people draw the line in the same place.
@@ -373,6 +389,8 @@ Each row gets these columns appended to the original ones:
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |
 | `egg_count`, `chick_count` | a number |
 | `chick_stage` | `early` (downy), `late` (feathered) or `unclear` — only where chicks were counted |
+| `provisioning` | `yes` / `no` — a parent **actively feeding**, not merely carrying food |
+| `prey_group` | what is being fed — one or more of mammal, bird, reptile, amphibian, fish, invertebrate, unidentified, separated by `; `; only where `provisioning=yes` |
 | `notes`, `reviewed`, `reviewed_at` | |
 | `reviewer` | whoever answered the row **last** |
 | `reviewers` | **everyone** who has answered it, in the order they first did, separated by `; ` |
