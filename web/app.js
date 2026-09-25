@@ -2417,7 +2417,7 @@ function renderDupes() {
     // putting an unreviewed row in it would hand the project a row nobody has
     // looked at. Saying so on the tile beats surprising anyone later.
     const pending = row.reviewed !== REVIEWED ? ' · not reviewed yet' : '';
-    id.textContent = (row.nest_id ? `ML ${mlId} · nest ${row.nest_id}` : `ML ${mlId}`)
+    id.textContent = (row.nest_id ? `ML ${mlId} · ${row.nest_id}` : `ML ${mlId}`)
       + pending;
     tile.append(id);
 
@@ -2485,7 +2485,7 @@ function ungroupDupes() {
   state.writer.schedule(state.catalog);
   el.dupes.close();
   showCurrent();
-  announce('info', 'Grouping cleared.');
+  announce('info', 'Grouping cleared — each nest has its own code again.');
 }
 
 el.dupesOpen.addEventListener('click', openDupes);

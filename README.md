@@ -320,11 +320,15 @@ to the same recordist for that reason, with **same place (within ~100 m)** and a
 text filter beside it; if the filters leave nothing, it says so and offers the
 whole spreadsheet in one click.
 
-The group is written to `nest_id`, which holds **the lowest ML catalog number in
-the group** — so nothing has to hand out identifiers and the value says what it
-is. Reopening the button on a nest that already has a group starts from that
-group, so adding an eleventh photograph to ten is the same gesture. **Ungroup**
-clears it.
+**Every nest gets a code** — `AAAA`, `AAAB`, `AAAC` — handed out in the order
+you find them, the first time you mark a row as a nest. Grouping assets makes
+them share one: the older code wins, so merging into a nest you've already named
+keeps that name. Reopening the button on a nest that already has a group starts
+from that group, so adding an eleventh photograph to ten is the same gesture.
+**Ungroup** gives each one its own code back.
+
+A code is the nest's name, so marking a row "no" and then "yes" again keeps it —
+a mis-press can't rename a nest or break it out of a group you built by hand.
 
 An asset you haven't reviewed yet can be grouped, but the grouping only reaches
 the file when you label it — the tile says **not reviewed yet**, and the
@@ -437,7 +441,7 @@ Each row gets these columns appended to the original ones:
 | `notes`, `reviewed`, `reviewed_at` | |
 | `reviewer` | whoever answered the row **last** |
 | `reviewers` | **everyone** who has answered it, in the order they first did, separated by `; ` |
-| `nest_id` | which nest this is — the lowest ML catalog number among the assets grouped as one nest. Blank until you group something. Unique within one spreadsheet; it means nothing across files |
+| `nest_id` | which nest this is — a four-letter code (`AAAA`, `AAAB`, …) given to every nest, shared by every asset grouped as one. Unique within one spreadsheet; it means nothing across files |
 
 **Every column but `nest_label` is nest-only**, and blank wherever there was no
 nest to ask about. `nest_label` in the same row says which kind of blank it is:

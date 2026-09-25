@@ -252,11 +252,21 @@ All three of the things below exist now. See [M25](#m25--duplicate-images--built
 - [x] A way to assign an ID without retyping — pick from IDs already used, or
       type a new one.
 
-**Settled:** unique within one spreadsheet, and the ID is the **lowest catalog
-number in the group** rather than a generated code — nothing hands IDs out,
-nothing remembers which are taken, and the value says what it is. Project-wide
-is still more useful for analysis and still needs a shared registry two people
-can write at once; that remains undone, and nothing here blocks it.
+**Settled:** unique within one spreadsheet, and the ID is a **four-letter
+code** — `AAAA`, `AAAB` — as this section originally sketched. Short enough to
+say out loud and write down, and it does not imply that one asset in a group is
+the real one, which naming the group after a member's catalog number did.
+
+The counter is **derived from the file**: the next code is one past the highest
+still in it, so resuming picks up where it left off with nothing to keep in
+sync. The price is that a code freed by a merge comes back — harmless inside
+the file, where codes stay unique across the nests that exist, but it means a
+code written on paper can later point at a different nest. A stored high-water
+mark would fix it at the cost of a second source of truth about the column.
+
+Project-wide IDs are still more useful for analysis and still need a shared
+registry two people can write at once; that remains undone, and nothing here
+blocks it.
 
 Separate question for later: should the app *suggest* repeats from matching
 recordist/date/locality, or is spotting them entirely the reviewer's job?
@@ -827,9 +837,16 @@ photographs, so the job was to put the candidates in front of them.
 - [x] Reopening on a nest that already has a group **starts from that group**,
       so adding an eleventh photograph to ten is the same gesture.
       **Ungroup** clears it.
-- [x] Column `nest_id`. Thumbnails come from the Macaulay CDN at 320px
-      (~40 KB) and are lazy-loaded, because an export runs to a couple of
-      hundred rows.
+- [x] Column `nest_id`: a four-letter code, `AAAA` onward, given to **every**
+      nest the first time it is called one, and shared by every asset grouped
+      as one nest. Thumbnails come from the Macaulay CDN at 320px (~40 KB) and
+      are lazy-loaded, because an export runs to a couple of hundred rows.
+- [x] **The older code wins a merge**, so joining an established nest keeps the
+      name it already had rather than renaming it under whoever is on screen.
+      Ungrouping gives each member its own code back, because every nest has
+      one.
+- [x] A code is the nest's **name**: marking a row no and yes again keeps it,
+      so a mis-press cannot rename a nest or break it out of a group.
 
 **`nest_id` is not nest-only**, unlike every observation. It is which nest the
 reviewer says this is, not something they observed, and losing a grouping that

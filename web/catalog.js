@@ -170,25 +170,51 @@ export const PREY_OPTIONS = [
 
 export const MULTI_SEP = '; ';
 
-/**
- * Name a group of assets that show one nest.
- *
- * The id is the **lowest catalog number in the group**, rather than a
- * generated code. Nothing has to hand out ids, nothing has to remember which
- * are taken, and the value says what it is: this nest is the one first seen as
- * ML 660468445. Two reviewers working on different spreadsheets cannot collide
- * because they cannot pick each other's assets in the first place — which is
- * the same reason the id means nothing outside its own file, and is as far as
- * this goes for now.
- *
- * Numeric-aware sort: catalog numbers are digit strings of varying length, and
- * "9" is not above "10".
- */
-export function nestIdFor(catalogNumbers) {
-  const ids = (catalogNumbers ?? []).map(n => String(n ?? '').trim()).filter(Boolean);
-  if (!ids.length) return '';
-  return ids.slice().sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true }))[0];
+// --- nest ids ----------------------------------------------------------------
+// Every nest gets a four-letter code — AAAA, AAAB, AAAC — handed out in the
+// order nests are found, and assets grouped as one nest share one code.
+//
+// Letters rather than the catalog number of a member, which is what this used
+// to do: a code is short enough to say out loud and write on a whiteboard, it
+// doesn't imply one asset is the "real" one, and it survives the group
+// changing shape. Four characters is 456,976 nests, which is not a limit
+// anybody will meet.
+//
+// The counter is derived from the file rather than stored: the next code is
+// one past the highest still in it. Resuming a spreadsheet therefore picks up
+// where it left off with nothing to keep in sync — no high-water mark to
+// store, nothing that can disagree with the column it describes.
+//
+// The price is that a code freed by a merge comes back. Group AAAB into AAAA
+// and AAAB belongs to nothing, so the next nest found takes it. Inside the
+// file that is harmless — codes are unique across the nests that exist, which
+// is what they are for — but it does mean a code written down somewhere else,
+// on paper or in a message, can later point at a different nest. Storing a
+// high-water mark would fix it and would need a second source of truth about
+// the column; that trade has been made in favour of the simpler one.
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+export const NEST_ID_LENGTH = 4;
+
+/** Is this one of ours? Anything else in the column is left alone. */
+export const isNestId = value => /^[A-Z]{4}$/.test(String(value ?? '').trim());
+
+const idToNumber = id => [...id].reduce((n, c) => n * 26 + LETTERS.indexOf(c), 0);
+
+const numberToId = n => {
+  let out = '';
+  let left = n;
+  for (let i = 0; i < NEST_ID_LENGTH; i += 1) {
+    out = LETTERS[left % 26] + out;
+    left = Math.floor(left / 26);
+  }
+  return out;
+};
+
+/** One past the highest code in `used`; AAAA when there is nothing yet. */
+export function nextNestId(used = []) {
+  const numbers = [...used].filter(isNestId).map(v => idToNumber(String(v).trim()));
+  if (!numbers.length) return numberToId(0);
+  return numberToId((Math.max(...numbers) + 1) % (26 ** NEST_ID_LENGTH));
 }
 
 /**
@@ -457,6 +483,13 @@ export class Catalog {
       prey_group: provisioning ? joinTerms(preyGroup) : '',
     };
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
+    // Every nest gets a code, handed out the first time it is called a nest.
+    // Kept, not re-issued, if the row is marked no and then yes again: a code
+    // is the nest's name, and a mis-press must not rename it — or worse, break
+    // it out of a group somebody built by hand.
+    if (nest === true && !isNestId(row.nest_id)) {
+      row.nest_id = nextNestId(this.usedNestIds());
+    }
     // Answered on a nest; blank off one, where the question didn't apply —
     // which is now every observation the app records.
     for (const col of NEST_ONLY_COLUMNS) {
@@ -536,17 +569,33 @@ export class Catalog {
    */
   setNestGroup(indices) {
     const rows = (indices ?? []).map(i => this.rows[i]).filter(Boolean);
-    const id = nestIdFor(rows.map(r => r[CATALOG_KEY]));
+    if (!rows.length) return '';
+    // The oldest code in the group wins, so merging into an established nest
+    // keeps the name it already had rather than renaming it under whoever
+    // happened to be on screen. Codes are never reused, so the one this
+    // absorbs simply retires.
+    const [existing] = rows.map(r => r.nest_id).filter(isNestId).sort();
+    const id = existing ?? nextNestId(this.usedNestIds());
     for (const row of rows) this.#writeNestId(row, id);
     return id;
   }
 
-  /** Undo that, leaving every other answer on the rows alone. */
+  /**
+   * Break a group up. Every member that is still a nest gets a code of its own
+   * again, because every nest has one; anything else is left blank.
+   */
   clearNestGroup(indices) {
     for (const i of indices ?? []) {
       const row = this.rows[i];
-      if (row) this.#writeNestId(row, '');
+      if (!row) continue;
+      this.#writeNestId(row,
+        row.nest_label === 'yes' ? nextNestId(this.usedNestIds()) : '');
     }
+  }
+
+  /** Every code this spreadsheet has handed out. */
+  usedNestIds() {
+    return this.rows.map(r => r.nest_id).filter(isNestId);
   }
 
   #writeNestId(row, id) {

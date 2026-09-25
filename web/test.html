@@ -28,7 +28,8 @@ import {
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
   NEST_ONLY_COLUMNS, LEGACY_NOT_APPLICABLE, SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
   NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS, locationOptions, CHICK_STAGES,
-  isListedLocation, filterTerms, joinTerms, splitTerms, PREY_OPTIONS, nestIdFor,
+  isListedLocation, filterTerms, joinTerms, splitTerms, PREY_OPTIONS,
+  nextNestId, isNestId,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
@@ -725,55 +726,82 @@ group('catalog.js — resume across a reload');
   eq('legacy n/a is not counted as a substrate', legacy.stats().substrates, 0);
 }
 
+group('catalog.js — nest codes');
+{
+  // Four letters, handed out in order, one per nest. Short enough to say out
+  // loud, and it doesn't imply one asset in a group is the "real" one.
+  eq('the first nest is AAAA', nextNestId([]), 'AAAA');
+  eq('and the next is AAAB', nextNestId(['AAAA']), 'AAAB');
+  eq('it counts from the highest, not the count',
+     nextNestId(['AAAA', 'AAAC']), 'AAAD');
+  eq('order of what it is given does not matter',
+     nextNestId(['AAAC', 'AAAA']), 'AAAD');
+  eq('the last letter carries', nextNestId(['AAAZ']), 'AABA');
+  eq('and so does the one before it', nextNestId(['AAZZ']), 'ABAA');
+  eq('anything not a code is ignored',
+     nextNestId(['660468445', '', 'nope', 'AAAA']), 'AAAB');
+
+  check('a code is four capitals', isNestId('AAAA') && isNestId('  ABCD  '));
+  check('and nothing else is',
+        !isNestId('aaaa') && !isNestId('AAA') && !isNestId('AAAAA')
+        && !isNestId('660468445') && !isNestId('') && !isNestId(undefined));
+}
+
 group('catalog.js — naming a nest seen more than once');
 {
-  // The id is the lowest catalog number in the group rather than a generated
-  // code: nothing hands ids out, nothing remembers which are taken, and the
-  // value says what it is.
-  eq('the lowest number names the group',
-     nestIdFor(['660468445', '660468440', '660468999']), '660468440');
-  eq('and it is a numeric comparison, not alphabetical',
-     nestIdFor(['1000', '999']), '999');
-  eq('one asset is its own group', nestIdFor(['42']), '42');
-  eq('blanks are ignored', nestIdFor(['', '  ', '7']), '7');
-  eq('nothing to name, no name', nestIdFor([]), '');
-  eq('and a missing list is not a crash', nestIdFor(undefined), '');
-
   const { catalog } = Catalog.open('s.csv', SAMPLE);
   const numbers = catalog.rows.map(r => r[CATALOG_KEY]);
 
+  // Every nest gets a code the first time it is called one.
   catalog.setLabel(0, { nest: true, structure: false, reviewer: 'mei' });
-  const id = catalog.setNestGroup([0, 2]);
-  eq('the group is named for its lowest member', id, nestIdFor([numbers[0], numbers[2]]));
-  eq('every member carries it', [catalog.rows[0].nest_id, catalog.rows[2].nest_id],
-     [id, id]);
-  eq('and nobody else does', catalog.rows[1].nest_id ?? '', '');
-  eq('the group can be found again', catalog.nestGroup(id), [0, 2]);
-  eq('a name nobody carries finds nobody', catalog.nestGroup('nope'), []);
-  eq('and no name finds nobody either', catalog.nestGroup(''), []);
+  eq('the first nest is AAAA', catalog.rows[0].nest_id, 'AAAA');
+  catalog.setLabel(1, { nest: true, structure: false });
+  eq('the second gets the next code', catalog.rows[1].nest_id, 'AAAB');
+  catalog.setLabel(2, { nest: false, structure: false });
+  eq('a non-nest gets none', catalog.rows[2].nest_id ?? '', '');
 
-  // A reviewed member is written through at once; an unreviewed one is held on
-  // the row until it is labeled, which is the usual case anyway.
-  check('a reviewed member reaches the labeled file',
-        catalog.labeled.get(numbers[0])?.nest_id === id);
-  catalog.setLabel(2, { nest: true, structure: false, reviewer: 'mei' });
-  check('and an unreviewed one does once it is labeled',
-        catalog.labeled.get(numbers[2])?.nest_id === id);
-
-  // It is identity, not an observation, so marking a row "not a nest" leaves
-  // it alone — losing a grouping to a mis-press would cost more than a stray
-  // id, and every observation is cleared anyway.
+  // A code is the nest's name: marking it no and yes again must not rename it,
+  // or a mis-press would silently break a group somebody built by hand.
   catalog.setLabel(0, { nest: false, structure: false });
-  eq('a non-nest row keeps the name it was given', catalog.rows[0].nest_id, id);
-  eq('while its observations go', catalog.rows[0].substrate, '');
+  eq('a no keeps the name', catalog.rows[0].nest_id, 'AAAA');
+  catalog.setLabel(0, { nest: true, structure: false });
+  eq('and coming back does not re-issue it', catalog.rows[0].nest_id, 'AAAA');
+
+  // Grouping: the oldest code wins, so merging into an established nest keeps
+  // the name it already had.
+  const id = catalog.setNestGroup([0, 1]);
+  eq('the group keeps the older code', id, 'AAAA');
+  eq('every member carries it', [catalog.rows[0].nest_id, catalog.rows[1].nest_id],
+     ['AAAA', 'AAAA']);
+  eq('the group can be found again', catalog.nestGroup('AAAA'), [0, 1]);
+  eq('a code nobody carries finds nobody', catalog.nestGroup('ZZZZ'), []);
+
+  // The counter is one past the highest code STILL in the file, so a code
+  // freed by a merge comes back. Harmless inside the file — codes stay unique
+  // across the nests that exist — but it is why a code written down elsewhere
+  // can later point at a different nest. The alternative is storing a
+  // high-water mark, which is a second source of truth about this column.
+  catalog.setLabel(3, { nest: true, structure: false });
+  eq('a code freed by a merge is handed out again',
+     catalog.rows[3].nest_id, 'AAAB');
+  check('and it is unique among the nests that exist',
+        new Set(catalog.rows.map(r => r.nest_id).filter(Boolean)).size
+        === new Set(['AAAA', 'AAAB']).size);
+
+  check('a reviewed member reaches the labeled file',
+        catalog.labeled.get(numbers[0])?.nest_id === 'AAAA');
+
+  // Ungrouping gives each nest its own name back.
+  catalog.clearNestGroup([0, 1]);
+  check('the members no longer share a code',
+        catalog.rows[0].nest_id !== catalog.rows[1].nest_id);
+  check('and both still have one', isNestId(catalog.rows[0].nest_id)
+        && isNestId(catalog.rows[1].nest_id));
+  eq('nothing else on the row moved', catalog.rows[1].nest_label, 'yes');
+
   check('nest_id is not a nest-only column',
         !NEST_ONLY_COLUMNS.includes('nest_id'));
   check('but it is a label column', LABEL_COLUMNS.includes('nest_id'));
-
-  catalog.clearNestGroup([0, 2]);
-  eq('ungrouping clears it', [catalog.rows[0].nest_id, catalog.rows[2].nest_id],
-     ['', '']);
-  eq('and nothing else on the row', catalog.rows[2].nest_label, 'yes');
 }
 
 group('catalog.js — more than one reviewer on a row');
