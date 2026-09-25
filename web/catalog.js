@@ -152,14 +152,20 @@ export const CHICK_STAGES = ['early', 'late', 'unclear'];
 // 'group' rather than 'kingdom' because mammal, bird and reptile are classes
 // within one kingdom. Multi-select: one image can show more than one item.
 //
-// 'unidentified' is the second half of Stella's question — "if visible, what
-// kind?" — doing its work. A parent feeding with its bill turned away is
-// provisioning = yes, prey_group = unidentified, and that is a different fact
-// from a blank, which would say nobody answered. Same reasoning as 'unclear'
-// in the substrate and location lists.
+// 'unclear' is the second half of Stella's question — "if visible, what kind?"
+// — doing its work. A parent feeding with its bill turned away is
+// provisioning = yes, prey_group = unclear, and that is a different fact from
+// a blank, which would say nobody answered. Same word as the substrate and
+// location lists use, for the same reason.
+//
+// Deliberately coarse for now, at Stella's asking: reptile and amphibian share
+// an entry, and everything else — invertebrates included — goes to 'other'.
+// Worth revisiting once there are spreadsheets to look at, because for many
+// species invertebrates are most of what gets carried in, and they will all be
+// sitting in 'other'.
 export const PREY_OPTIONS = [
-  'mammal', 'bird', 'reptile', 'amphibian', 'fish', 'invertebrate',
-  'unidentified',
+  'mammal', 'bird', 'reptile / amphibian', 'fish',
+  'other', 'unclear',
 ];
 
 export const MULTI_SEP = '; ';

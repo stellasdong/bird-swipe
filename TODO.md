@@ -179,8 +179,10 @@ tested.
 - [x] **Is a parent actively feeding?** `provisioning`, `yes` / `no`. A toggle,
       answerable from the photograph without judging what the food is.
 - [x] **If the food is visible, what kind?** A prey-type list: mammal, bird,
-      reptile, amphibian, fish, invertebrate, **unidentified**.
-- [x] `unidentified` is the "if visible" half doing its work — a feeding parent
+      reptile / amphibian, fish, **other**, **unclear**. Deliberately coarse,
+      at Stella's asking — reptile and amphibian share an entry and everything
+      else goes to "other".
+- [x] `unclear` is the "if visible" half doing its work — a feeding parent
       whose bill you can't see into is `provisioning = yes` with
       `prey_group = unidentified`, which is a different fact from a blank. Same
       reasoning as `unclear` in the substrate and location lists (M19).
@@ -222,6 +224,11 @@ has with the chick count.
 
 **Later, not now**
 
+- **Invertebrates are in "other".** For many species they are most of what
+  gets carried in, so that cell may fill up with one kind of thing wearing a
+  generic label. Stella's list, and marked "for now" — worth looking at once
+  there are spreadsheets to count, because splitting it later means the early
+  rows say "other" where the later ones say something useful.
 - Whether prey ever needs to be finer than the class — "rabbit", "snake".
   Deliberately deferred; the same "other, type it in" mechanism from M13 would
   cover it if the answer turns out to be yes.

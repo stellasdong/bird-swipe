@@ -523,20 +523,22 @@ group('catalog.js — provisioning and prey');
   eq('and what was being fed', catalog.rows[0].prey_group, 'fish');
 
   catalog.setLabel(1, { nest: true, structure: false,
-                        provisioning: true, preyGroup: ['mammal', 'invertebrate'] });
+                        provisioning: true, preyGroup: ['mammal', 'fish'] });
   eq('more than one item rides in one cell',
-     catalog.rows[1].prey_group, 'mammal; invertebrate');
+     catalog.rows[1].prey_group, 'mammal; fish');
 
   // "If visible" is the whole reason unidentified exists: a parent feeding
   // with its bill turned away is a yes with an unidentified item, which is
   // not the same as nobody answering.
   check('the list can say the food was not identifiable',
-        PREY_OPTIONS.includes('unidentified'));
+        PREY_OPTIONS.includes('unclear'));
+  check('and that it was something not on the list',
+        PREY_OPTIONS.includes('other'));
   catalog.setLabel(2, { nest: true, structure: false,
-                        provisioning: true, preyGroup: 'unidentified' });
+                        provisioning: true, preyGroup: 'unclear' });
   eq('feeding with nothing identifiable is still feeding',
      [catalog.rows[2].provisioning, catalog.rows[2].prey_group],
-     ['yes', 'unidentified']);
+     ['yes', 'unclear']);
 
   catalog.setLabel(3, { nest: true, structure: false, provisioning: true });
   eq('and feeding with nothing picked is blank, not guessed',
@@ -561,9 +563,15 @@ group('catalog.js — provisioning and prey');
   eq('a skip clears both',
      [catalog.rows[2].provisioning, catalog.rows[2].prey_group], ['', '']);
 
-  eq('prey is a group, not a kingdom — classes within one',
-     PREY_OPTIONS.slice(0, 6),
-     ['mammal', 'bird', 'reptile', 'amphibian', 'fish', 'invertebrate']);
+  // Deliberately coarse for now: reptile and amphibian share an entry, and
+  // everything else — invertebrates included — goes to 'other'. Named 'group'
+  // rather than 'kingdom' because these are classes within one.
+  eq('the list is the coarse one Stella asked for', PREY_OPTIONS,
+     ['mammal', 'bird', 'reptile / amphibian', 'fish', 'other', 'unclear']);
+  check('it uses the same word for "cannot tell" as every other list',
+        PREY_OPTIONS.includes('unclear')
+        && SUBSTRATE_OPTIONS.includes('unclear')
+        && NATURAL_LOCATION_OPTIONS.includes('unclear'));
 }
 
 group('catalog.js — multi-select cells');
