@@ -787,19 +787,28 @@ box down to 11%, without moving anything:
 
 Stella's, and the most important thing outstanding.
 
-**First, what it means.** Three readings, and they are different pieces of
-work, so this needs settling before anything is built:
+**Settled: it is the third reading, plus time.** Stella's words: a burst of
+near-identical frames, "but it also needs to consider the same nest over
+time". So two things, and the second is the harder one:
 
-1. **The same catalog number twice in one export.** A row repeated in the
-   spreadsheet.
-2. **The same photograph uploaded more than once**, under different catalog
-   numbers — so it looks like two assets and is two rows.
-3. **A burst of near-identical frames** of one nest, which is not really
-   duplication so much as redundancy: ten shots, one nest, ten rows to label.
+1. **A burst** — ten shots of one nest, seconds apart, ten rows to label. Not
+   duplication exactly, but redundancy: the answers will be identical, and
+   typing them ten times is ten chances to differ.
+2. **The same nest across dates** — the same nest photographed in May and
+   again in June. The answers are *not* identical there; location and
+   substrate hold, but eggs become chicks, and that change over time is data
+   rather than noise.
 
-Reading 3 overlaps [M15](#m15--repeat-nests--parked) — repeat nests — but is
-not the same thing: M15 is about recognising a nest across *different*
-photographs, this is about the same photograph appearing more than once.
+**This makes M15 a dependency, not an overlap.** [M15](#m15--repeat-nests--parked)
+is "recognise a nest you have seen before", and it is parked on one decision:
+how far a nest ID reaches — unique within a spreadsheet, or project-wide
+through a shared registry. Nothing here can group a burst *and* a
+June revisit without an answer to that, because grouping over time is exactly
+what a nest ID is for. **Unparking M15 is the first move on M25.**
+
+Within a single burst it is easier: same recordist, same date, consecutive
+catalog numbers, near-identical dimensions. That much can be detected from the
+export alone, with no registry and no ID.
 
 **A real bug sits under reading 1, whichever one was meant.** Nothing checks
 for it. `catalog.rows` is the raw list from the file, so a repeated catalog
@@ -810,15 +819,19 @@ counts on the done screen disagree with the file. That is worth fixing on its
 own, and it is small: `validateFieldnames` already has a warnings channel that
 the welcome screen shows.
 
-**Once the reading is settled, the questions it raises:**
+**The questions it raises:**
 
-- Should a duplicate be **detected and skipped**, **detected and shown** ("you
-  have already labeled this one — here is what you said"), or **carried over**
-  automatically?
-- What counts as the same image for reading 2 — same photographer and date and
-  dimensions? That is a guess, not a fact, so it probably has to be shown
-  rather than acted on.
-- Whatever it does must stay honest about what got reviewed: a skipped
+- Should a repeat be **detected and skipped**, **detected and shown** ("you
+  labeled one of these in May — here is what you said"), or **carried over**
+  automatically into the new row for the reviewer to correct?
+- Carrying over is the tempting one and the dangerous one. It is right for
+  location and substrate, which do not change, and wrong for the counts and
+  the chick stage, which are the reason to look again. If anything is carried,
+  it should be the fields that cannot change — and it should be visibly
+  carried, not silently.
+- Detection is a **guess, not a fact**: same recordist, same day, one frame
+  apart. It has to be shown and confirmed rather than acted on.
+- Whatever it does must stay honest about what got reviewed. A skipped
   duplicate still needs a row in the output, or the spreadsheet comes back
   shorter than it went in.
 
@@ -871,6 +884,60 @@ So the honest version of this item is probably not "login" but "somewhere
 shared to put a handful of small files". If it turns out to be genuine accounts
 — a hosted app people sign into, with the spreadsheets server-side — that is a
 rewrite of the storage layer and should be its own plan, not a milestone here.
+
+
+## M28 — Moving progress from the dev site to the real one — **small**
+
+The two copies of the app deliberately don't share anything. `channel.js`
+scopes every storage name — `scoped('bird-swipe')` gives `bird-swipe-dev` on
+the preview and `bird-swipe` on the real site — so the IndexedDB progress
+store, the remembered picker terms, the reviewer name and the hotkeys are all
+separate. That was right: it is what stops a half-finished experiment on the
+preview appearing as real work.
+
+It also means anything labeled on the preview is stranded there. Which matters
+now, because the preview is where everything since M12 lives and the real site
+is still on the old app.
+
+**The good news: they are the same origin.** Both are
+`stellasdong.github.io`, and IndexedDB is scoped to the origin, not the path —
+the separation is our own naming, not the browser's. So a page on either copy
+can open the other's database and read it. No export, no file, no server.
+
+- [ ] A **one-way copy**, dev → real: in-progress spreadsheets, remembered
+      terms, reviewer name, and hotkeys if wanted.
+- [ ] It should be **explicit and one-off**, not a sync. Two copies quietly
+      merging is exactly what the scoping was built to prevent — a button that
+      says what it found and what it will bring across, run once.
+- [ ] **Never overwrite silently.** If the real site already has progress on
+      the same spreadsheet, say so and let the researcher choose; the
+      `reviewed_at` stamps make "which is newer" answerable.
+- [ ] Folder handles are the exception: a `FileSystemDirectoryHandle` is
+      stored in IndexedDB and *can* be copied, but the permission attached to
+      it will not carry, so the researcher has to re-grant the folder. Worth
+      saying on screen rather than letting it fail quietly.
+
+**The simpler answer, if this is only needed once:** finish the spreadsheet on
+the preview and save it out, then open that file on the real site. The app
+already resumes from a labeled file. Worth checking whether the one-off is
+enough before building a migration nobody needs twice.
+
+## M29 — The recordist's name in the info blurb — **small**
+
+The blurb under the photo shows Format, Caption, Behaviors, Date, Locality and
+Asset Tags. It does not show who took the photograph, and the export has it:
+column 7, **`Recordist`** (with a `Recordist 2` alongside for a second
+contributor).
+
+- [ ] Add `Recordist` to that line in `renderMeta`. Literally one entry in the
+      array, since the blurb is generated from a list of column names.
+- [ ] Decide whether `Recordist 2` goes with it. It is usually empty; showing
+      it only when present is what the loop already does for every other field.
+
+Worth more than its size: recordist and date together are how a reviewer
+recognises a nest they have seen before, which is [M15](#m15--repeat-nests--parked)
+and therefore [M25](#m25--duplicate-images--high-priority). This puts half of
+that on screen for free, before either is built.
 
 ---
 
