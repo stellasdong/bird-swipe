@@ -807,8 +807,11 @@ June revisit without an answer to that, because grouping over time is exactly
 what a nest ID is for. **Unparking M15 is the first move on M25.**
 
 Within a single burst it is easier: same recordist, same date, consecutive
-catalog numbers, near-identical dimensions. That much can be detected from the
-export alone, with no registry and no ID.
+catalog numbers, near-identical dimensions — and, strongest of all, the same
+**`eBird Checklist ID`**, which says outright that two photographs came from
+one outing. That much can be detected from the export alone, with no registry
+and no ID. See [M29](#m29--the-recordist-and-their-checklist-in-the-info-blurb--small),
+which puts that column on screen.
 
 **A real bug sits under reading 1, whichever one was meant.** Nothing checks
 for it. `catalog.rows` is the raw list from the file, so a repeated catalog
@@ -922,22 +925,32 @@ the preview and save it out, then open that file on the real site. The app
 already resumes from a labeled file. Worth checking whether the one-off is
 enough before building a migration nobody needs twice.
 
-## M29 — The recordist's name in the info blurb — **small**
+## M29 — The recordist and their checklist in the info blurb — **small**
 
 The blurb under the photo shows Format, Caption, Behaviors, Date, Locality and
-Asset Tags. It does not show who took the photograph, and the export has it:
-column 7, **`Recordist`** (with a `Recordist 2` alongside for a second
-contributor).
+Asset Tags. It shows neither who took the photograph nor which outing it came
+from, and the export has both: column 7 **`Recordist`** (with a `Recordist 2`
+alongside for a second contributor) and column 31 **`eBird Checklist ID`**,
+which holds an `S`-number like `S364779538`.
 
-- [ ] Add `Recordist` to that line in `renderMeta`. Literally one entry in the
-      array, since the blurb is generated from a list of column names.
-- [ ] Decide whether `Recordist 2` goes with it. It is usually empty; showing
-      it only when present is what the loop already does for every other field.
+- [ ] Add `Recordist` to that line in `renderMeta`. One entry in the array,
+      since the blurb is generated from a list of column names.
+- [ ] Add the checklist with it. The plain ID is the cheap version and works
+      the same way.
+- [ ] **Better: make it a link**, `https://ebird.org/checklist/<id>`. The
+      blurb already links the ML asset page, and `macaulay.js` is where that
+      URL is built (`assetPageUrl`) — a `checklistUrl` belongs beside it. One
+      click gets the reviewer the whole outing: the other photos, the notes,
+      what else was seen there. That is worth far more than the number.
+- [ ] Decide whether `Recordist 2` goes with it. It is usually empty, and
+      showing a field only when present is what the loop already does.
 
-Worth more than its size: recordist and date together are how a reviewer
-recognises a nest they have seen before, which is [M15](#m15--repeat-nests--parked)
-and therefore [M25](#m25--duplicate-images--high-priority). This puts half of
-that on screen for free, before either is built.
+Worth more than its size: recordist, date and checklist together are how a
+reviewer recognises a nest they have seen before — and a shared checklist is
+the strongest signal of all that two photographs are the same nest on the same
+visit. That is [M15](#m15--repeat-nests--parked) and therefore
+[M25](#m25--duplicate-images--high-priority), and this puts the evidence on
+screen before either is built.
 
 ---
 
