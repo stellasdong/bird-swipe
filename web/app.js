@@ -97,6 +97,16 @@ const el = {
   },
   nestDetails: $('nest-details'),
   detailsHint: $('details-hint'),
+  dupesOpen: $('dupes-open'),
+  dupes: $('dupes'),
+  dupesGrid: $('dupes-grid'),
+  dupesSearch: $('dupes-search'),
+  dupesSameRecordist: $('dupes-same-recordist'),
+  dupesSamePlace: $('dupes-same-place'),
+  dupesCount: $('dupes-count'),
+  dupesCancel: $('dupes-cancel'),
+  dupesUngroup: $('dupes-ungroup'),
+  dupesSave: $('dupes-save'),
   chickStage: $('y-chick-stage'),
   // Listed in panel order throughout this file: location, substrate, material.
   pickers: {
@@ -309,6 +319,7 @@ const state = {
   // single- and multi-select differ only in how many entries are allowed.
   picks: Object.fromEntries(PICKER_NAMES.map(name => [name, []])),
   chickStage: '',   // '', 'early', 'late' or 'unclear'
+  dupePicks: new Set(), // row indices selected in the contact sheet
   openPicker: null, // which picker is showing its list, if any
   pickerRows: [],   // what the open picker is currently offering
   pickerCursor: -1, // highlighted row in that list; -1 is "none yet"
@@ -2104,7 +2115,8 @@ el.notes.addEventListener('keydown', event => {
 });
 
 document.addEventListener('keydown', event => {
-  if (el.prefs.open || el.jump.open || el.report.open || el.onedriveHelp.open) return;
+  if (el.prefs.open || el.jump.open || el.report.open || el.onedriveHelp.open
+      || el.dupes.open) return;
   if (pickerOpen()) return; // the picker owns the keyboard while it is open
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   const target = event.target;
@@ -2327,6 +2339,162 @@ on(el.jumpSkipped, 'click', () => {
   const skipped = state.catalog.skippedIndices();
   if (skipped.length) goToIndex(skipped[0]);
 });
+
+// ----------------------------------------------------- identify duplicates
+// One nest is often photographed ten times in a burst, and again a month
+// later. The reviewer is the one who recognises it — no comparison of pixels
+// is going to beat someone who has just looked at both — so the app's job is
+// to put the candidates in front of them and record what they say.
+//
+// Every tile carries the recordist and the coordinates, because that is the
+// evidence: the same eBirder standing in the same place is most of what makes
+// two photographs probably one nest. The filters default to the first of those
+// for the same reason.
+
+/** Metres between two coordinates. Flat-earth maths, fine at this range. */
+function metresApart(a, b) {
+  if (![a?.lat, a?.lon, b?.lat, b?.lon].every(Number.isFinite)) return Infinity;
+  const mPerDeg = 111_320;
+  const dy = (a.lat - b.lat) * mPerDeg;
+  const dx = (a.lon - b.lon) * mPerDeg * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+  return Math.hypot(dx, dy);
+}
+
+const coordsOf = row => ({
+  lat: Number.parseFloat(row?.Latitude), lon: Number.parseFloat(row?.Longitude),
+});
+
+/** The rows worth showing, given the filters and what the reviewer typed. */
+function dupeCandidates() {
+  const rows = state.catalog?.rows ?? [];
+  const here = rows[state.idx];
+  if (!here) return [];
+  const query = el.dupesSearch.value.trim().toLowerCase();
+  const home = coordsOf(here);
+  return rows.map((row, i) => ({ row, i })).filter(({ row, i }) => {
+    if (i === state.idx || state.dupePicks.has(i)) return true; // never hide these
+    if (el.dupesSameRecordist.checked
+        && (row.Recordist ?? '') !== (here.Recordist ?? '')) return false;
+    if (el.dupesSamePlace.checked && metresApart(coordsOf(row), home) > 100) return false;
+    if (!query) return true;
+    return [row[CATALOG_KEY], row.Date, row.Locality, row.Recordist, row.nest_id]
+      .some(v => String(v ?? '').toLowerCase().includes(query));
+  });
+}
+
+function renderDupes() {
+  const candidates = dupeCandidates();
+  el.dupesGrid.textContent = '';
+  for (const { row, i } of candidates) {
+    const mlId = row[CATALOG_KEY];
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'dupe' + (i === state.idx ? ' current' : '');
+    tile.setAttribute('aria-pressed', String(state.dupePicks.has(i)));
+
+    const img = document.createElement('img');
+    img.loading = 'lazy';              // an export runs to a couple of hundred
+    img.alt = '';
+    img.src = photoUrl(mlId, 320);
+    tile.append(img);
+
+    const meta = document.createElement('div');
+    meta.className = 'dupe-meta';
+    const who = document.createElement('b');
+    who.textContent = row.Recordist || 'unknown recordist';
+    const lat = Number.parseFloat(row.Latitude);
+    const lon = Number.parseFloat(row.Longitude);
+    const where = Number.isFinite(lat) && Number.isFinite(lon)
+      ? `${lat.toFixed(4)}, ${lon.toFixed(4)}` : 'no coordinates';
+    meta.append(who, document.createElement('br'),
+                `${row.Date || 'no date'}`, document.createElement('br'), where);
+    tile.append(meta);
+
+    const id = document.createElement('div');
+    id.className = 'dupe-id';
+    // An unreviewed row can be grouped, but the grouping only reaches the file
+    // when the row is labeled — the labeled file is completed entries, and
+    // putting an unreviewed row in it would hand the project a row nobody has
+    // looked at. Saying so on the tile beats surprising anyone later.
+    const pending = row.reviewed !== REVIEWED ? ' · not reviewed yet' : '';
+    id.textContent = (row.nest_id ? `ML ${mlId} · nest ${row.nest_id}` : `ML ${mlId}`)
+      + pending;
+    tile.append(id);
+
+    tile.addEventListener('click', () => {
+      if (state.dupePicks.has(i)) state.dupePicks.delete(i);
+      else state.dupePicks.add(i);
+      renderDupes();
+    });
+    el.dupesGrid.append(tile);
+  }
+  el.dupesCount.textContent =
+    `${state.dupePicks.size} selected · ${candidates.length} shown`;
+
+  // A filter that hides everything looks like a broken screen rather than an
+  // answer, and "no other assets by this recordist" is a real answer worth
+  // saying out loud — with the way out attached to it.
+  const filtered = el.dupesSameRecordist.checked || el.dupesSamePlace.checked;
+  if (candidates.length <= state.dupePicks.size && filtered) {
+    const empty = document.createElement('div');
+    empty.className = 'dupes-empty';
+    empty.append('Nothing else matches those filters. ');
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'link-btn';
+    all.textContent = 'show the whole spreadsheet';
+    all.addEventListener('click', () => {
+      el.dupesSameRecordist.checked = false;
+      el.dupesSamePlace.checked = false;
+      renderDupes();
+    });
+    empty.append(all);
+    el.dupesGrid.append(empty);
+  }
+}
+
+function openDupes() {
+  if (!state.catalog || state.idx >= state.catalog.rows.length) return;
+  const row = state.catalog.rows[state.idx];
+  // Reopening a nest that already has a group starts from that group, so this
+  // is how you add a twelfth photograph to eleven rather than starting again.
+  const existing = row.nest_id ? state.catalog.nestGroup(row.nest_id) : [];
+  state.dupePicks = new Set([state.idx, ...existing]);
+  el.dupesSearch.value = '';
+  renderDupes();
+  el.dupes.showModal();
+}
+
+function saveDupes() {
+  const picks = [...state.dupePicks].sort((a, b) => a - b);
+  const later = picks.filter(i => state.catalog.rows[i].reviewed !== REVIEWED).length;
+  const id = state.catalog.setNestGroup(picks);
+  state.writer.schedule(state.catalog);
+  el.dupes.close();
+  showCurrent();
+  const saved = picks.length - later;
+  announce('info',
+    `${picks.length} assets marked as nest ${id}.`
+    + (later ? ` ${saved} saved now; the other ${later} save when you review them.`
+             : ''));
+}
+
+function ungroupDupes() {
+  const picks = [...state.dupePicks];
+  state.catalog.clearNestGroup(picks);
+  state.writer.schedule(state.catalog);
+  el.dupes.close();
+  showCurrent();
+  announce('info', 'Grouping cleared.');
+}
+
+el.dupesOpen.addEventListener('click', openDupes);
+el.dupesCancel.addEventListener('click', () => el.dupes.close());
+el.dupesSave.addEventListener('click', saveDupes);
+el.dupesUngroup.addEventListener('click', ungroupDupes);
+el.dupesSearch.addEventListener('input', renderDupes);
+el.dupesSameRecordist.addEventListener('change', renderDupes);
+el.dupesSamePlace.addEventListener('change', renderDupes);
 
 // --------------------------------------------------------------- reporting
 /**

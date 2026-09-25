@@ -24,11 +24,11 @@
 <script type="module">
 import { parseRows, parseTable, serializeTable } from './csv.js';
 import {
-  Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
+  Catalog, CATALOG_KEY, LabeledFile, validateFieldnames, labeledName, nestName,
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
   NEST_ONLY_COLUMNS, LEGACY_NOT_APPLICABLE, SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
   NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS, locationOptions, CHICK_STAGES,
-  isListedLocation, filterTerms, joinTerms, splitTerms, PREY_OPTIONS,
+  isListedLocation, filterTerms, joinTerms, splitTerms, PREY_OPTIONS, nestIdFor,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
@@ -275,7 +275,8 @@ group('catalog.js — every observation is nest-only');
   }
   eq('only the decision and the provenance columns are not',
      LABEL_COLUMNS.filter(c => !NEST_ONLY_COLUMNS.includes(c)),
-     ['nest_label', 'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers']);
+     ['nest_label', 'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers',
+      'nest_id']);
 }
 
 group('catalog.js — the three list questions');
@@ -722,6 +723,57 @@ group('catalog.js — resume across a reload');
   const { catalog: legacy } = Catalog.open('s.csv', SAMPLE, { labeledText: legacyText });
   eq('a legacy n/a substrate loads blank', legacy.rows[0].substrate, '');
   eq('legacy n/a is not counted as a substrate', legacy.stats().substrates, 0);
+}
+
+group('catalog.js — naming a nest seen more than once');
+{
+  // The id is the lowest catalog number in the group rather than a generated
+  // code: nothing hands ids out, nothing remembers which are taken, and the
+  // value says what it is.
+  eq('the lowest number names the group',
+     nestIdFor(['660468445', '660468440', '660468999']), '660468440');
+  eq('and it is a numeric comparison, not alphabetical',
+     nestIdFor(['1000', '999']), '999');
+  eq('one asset is its own group', nestIdFor(['42']), '42');
+  eq('blanks are ignored', nestIdFor(['', '  ', '7']), '7');
+  eq('nothing to name, no name', nestIdFor([]), '');
+  eq('and a missing list is not a crash', nestIdFor(undefined), '');
+
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+  const numbers = catalog.rows.map(r => r[CATALOG_KEY]);
+
+  catalog.setLabel(0, { nest: true, structure: false, reviewer: 'mei' });
+  const id = catalog.setNestGroup([0, 2]);
+  eq('the group is named for its lowest member', id, nestIdFor([numbers[0], numbers[2]]));
+  eq('every member carries it', [catalog.rows[0].nest_id, catalog.rows[2].nest_id],
+     [id, id]);
+  eq('and nobody else does', catalog.rows[1].nest_id ?? '', '');
+  eq('the group can be found again', catalog.nestGroup(id), [0, 2]);
+  eq('a name nobody carries finds nobody', catalog.nestGroup('nope'), []);
+  eq('and no name finds nobody either', catalog.nestGroup(''), []);
+
+  // A reviewed member is written through at once; an unreviewed one is held on
+  // the row until it is labeled, which is the usual case anyway.
+  check('a reviewed member reaches the labeled file',
+        catalog.labeled.get(numbers[0])?.nest_id === id);
+  catalog.setLabel(2, { nest: true, structure: false, reviewer: 'mei' });
+  check('and an unreviewed one does once it is labeled',
+        catalog.labeled.get(numbers[2])?.nest_id === id);
+
+  // It is identity, not an observation, so marking a row "not a nest" leaves
+  // it alone — losing a grouping to a mis-press would cost more than a stray
+  // id, and every observation is cleared anyway.
+  catalog.setLabel(0, { nest: false, structure: false });
+  eq('a non-nest row keeps the name it was given', catalog.rows[0].nest_id, id);
+  eq('while its observations go', catalog.rows[0].substrate, '');
+  check('nest_id is not a nest-only column',
+        !NEST_ONLY_COLUMNS.includes('nest_id'));
+  check('but it is a label column', LABEL_COLUMNS.includes('nest_id'));
+
+  catalog.clearNestGroup([0, 2]);
+  eq('ungrouping clears it', [catalog.rows[0].nest_id, catalog.rows[2].nest_id],
+     ['', '']);
+  eq('and nothing else on the row', catalog.rows[2].nest_label, 'yes');
 }
 
 group('catalog.js — more than one reviewer on a row');

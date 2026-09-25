@@ -460,6 +460,67 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
    centre it against and it reads as part of the sentence. */
 #meta .link-btn { align-self: auto; vertical-align: baseline; }
 
+/* ------------------------------------------------------ identify duplicates */
+/* A contact sheet of the spreadsheet. Wide, because the judgement is made by
+   eye and small thumbnails do not support it, and scrollable because an export
+   runs to a couple of hundred rows. */
+#dupes {
+  width: min(96vw, 1400px);
+  max-height: 90vh;
+}
+.dupes-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dupes-filter { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.dupes-bar input[type="text"] { flex: 1; min-width: 200px; }
+.dupes-count { font-size: 12px; color: var(--dim); }
+.dupes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  max-height: 62vh;
+  padding: 2px;
+}
+.dupe {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #1a1a1a;
+  padding: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dupe:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.dupe[aria-pressed="true"] { border-color: var(--green); background: #16301a; }
+/* The row the reviewer came from. Always in the sheet, always selected, and
+   marked so they can see where they are among two hundred thumbnails. */
+.dupe.current { border-style: dashed; border-color: #d9a400; }
+.dupe img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 5px;
+  background: #000;
+}
+.dupe-meta { font-size: 11px; line-height: 1.35; color: var(--dim); }
+.dupe-meta b { color: var(--text); font-weight: 600; }
+.dupe-id { font-size: 11px; color: var(--muted); }
+.dupes-empty {
+  grid-column: 1 / -1;
+  padding: 18px 4px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
 /* -------------------------------------------------------------- reporting */
 /* One control, fixed at the bottom centre of every screen. The screens reserve
    room for it below, so it never sits over the hotkey legend or the done

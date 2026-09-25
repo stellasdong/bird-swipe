@@ -308,6 +308,28 @@ There's an **unclear** state for a brood you can't call, including one caught
 mid-moult, so you never have to guess. Set the chick count back to zero and the
 button goes away and takes its answer with it.
 
+**Seen this nest before?** One nest often turns up ten times in a burst, and
+again a month later. When you recognise one, the **seen this nest before?**
+button in the nest details row opens a contact sheet of the whole spreadsheet:
+click every photograph that shows the same nest, then **Mark as one nest**.
+
+Every tile carries the **recordist**, the **date** and the **coordinates**,
+because that's the evidence — the same eBirder standing in the same place is
+most of what makes two photographs probably one nest. The sheet starts filtered
+to the same recordist for that reason, with **same place (within ~100 m)** and a
+text filter beside it; if the filters leave nothing, it says so and offers the
+whole spreadsheet in one click.
+
+The group is written to `nest_id`, which holds **the lowest ML catalog number in
+the group** — so nothing has to hand out identifiers and the value says what it
+is. Reopening the button on a nest that already has a group starts from that
+group, so adding an eleventh photograph to ten is the same gesture. **Ungroup**
+clears it.
+
+An asset you haven't reviewed yet can be grouped, but the grouping only reaches
+the file when you label it — the tile says **not reviewed yet**, and the
+confirmation tells you how many saved now and how many will save later.
+
 **Zoom in before you count.** Photographs taken from a distance rarely show eggs
 or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
 loads at full resolution — scroll to move around, press `Z` or click again to
@@ -415,6 +437,7 @@ Each row gets these columns appended to the original ones:
 | `notes`, `reviewed`, `reviewed_at` | |
 | `reviewer` | whoever answered the row **last** |
 | `reviewers` | **everyone** who has answered it, in the order they first did, separated by `; ` |
+| `nest_id` | which nest this is — the lowest ML catalog number among the assets grouped as one nest. Blank until you group something. Unique within one spreadsheet; it means nothing across files |
 
 **Every column but `nest_label` is nest-only**, and blank wherever there was no
 nest to ask about. `nest_label` in the same row says which kind of blank it is:

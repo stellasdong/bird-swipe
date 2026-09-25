@@ -200,6 +200,8 @@
       </div>
     </div>
 
+    <button class="link-btn" id="dupes-open" type="button">seen this nest before?</button>
+
     <span class="details-hint" id="details-hint"></span>
   </div>
 
@@ -254,6 +256,35 @@
 </button>
 
 <!-- ---------------------------------------------------------- jump to it -->
+<!-- Identify duplicates: a contact sheet of the whole spreadsheet, for saying
+     "these are all the same nest". The reviewer recognises a nest while
+     swiping; this is where they go and find the others. Recordist and
+     coordinates ride on every tile, because the same eBirder at the same
+     place is what makes two photographs probably one nest. -->
+<dialog id="dupes">
+  <h2>Which of these are the same nest?</h2>
+  <div class="dupes-bar">
+    <label class="dupes-filter">
+      <input type="checkbox" id="dupes-same-recordist" checked>
+      same recordist
+    </label>
+    <label class="dupes-filter">
+      <input type="checkbox" id="dupes-same-place">
+      same place (within ~100 m)
+    </label>
+    <input type="text" id="dupes-search" autocomplete="off"
+           placeholder="filter by catalog number, date, locality…"
+           aria-label="Filter the contact sheet">
+    <span class="dupes-count" id="dupes-count"></span>
+  </div>
+  <div class="dupes-grid" id="dupes-grid"></div>
+  <div class="dialog-actions">
+    <button id="dupes-cancel">Cancel</button>
+    <button id="dupes-ungroup">Ungroup</button>
+    <button id="dupes-save" class="primary">Mark as one nest</button>
+  </div>
+</dialog>
+
 <dialog id="jump">
   <h2>Jump to an item</h2>
   <div class="stack" style="align-items:stretch;gap:10px">

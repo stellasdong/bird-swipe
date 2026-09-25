@@ -37,7 +37,7 @@ export const LABEL_COLUMNS = [
   'eggs', 'egg_count', 'chicks', 'chick_count',
   'bird_present', 'substrate', 'anthropogenic_material', 'nest_location',
   'chick_stage', 'provisioning', 'prey_group',
-  'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers',
+  'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers', 'nest_id',
 ];
 
 // Questions that only make sense where there is a nest. They are answered in
@@ -169,6 +169,27 @@ export const PREY_OPTIONS = [
 ];
 
 export const MULTI_SEP = '; ';
+
+/**
+ * Name a group of assets that show one nest.
+ *
+ * The id is the **lowest catalog number in the group**, rather than a
+ * generated code. Nothing has to hand out ids, nothing has to remember which
+ * are taken, and the value says what it is: this nest is the one first seen as
+ * ML 660468445. Two reviewers working on different spreadsheets cannot collide
+ * because they cannot pick each other's assets in the first place — which is
+ * the same reason the id means nothing outside its own file, and is as far as
+ * this goes for now.
+ *
+ * Numeric-aware sort: catalog numbers are digit strings of varying length, and
+ * "9" is not above "10".
+ */
+export function nestIdFor(catalogNumbers) {
+  const ids = (catalogNumbers ?? []).map(n => String(n ?? '').trim()).filter(Boolean);
+  if (!ids.length) return '';
+  return ids.slice().sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true }))[0];
+}
 
 /**
  * Everyone who has labeled a row, kept alongside `reviewer` rather than
@@ -499,6 +520,49 @@ export class Catalog {
   }
 
   /** Reviewers other than `me` who already have rows in the labeled file. */
+  /**
+   * Record that these rows show one nest, and return the id they now share.
+   *
+   * `nest_id` is deliberately **not** a nest-only column. Every observation is
+   * cleared when a row turns out not to be a nest, but this is not an
+   * observation — it is which nest the reviewer says this is, and throwing
+   * that away because someone mis-pressed the "no" key would lose work that
+   * took looking through a whole spreadsheet to do.
+   *
+   * A grouped row that has already been reviewed is written through to the
+   * labeled file at once. One that has not is held on the row and saved when
+   * it is labeled, which is the usual case anyway: you group an asset because
+   * you recognise it, and you recognise it because you have already seen it.
+   */
+  setNestGroup(indices) {
+    const rows = (indices ?? []).map(i => this.rows[i]).filter(Boolean);
+    const id = nestIdFor(rows.map(r => r[CATALOG_KEY]));
+    for (const row of rows) this.#writeNestId(row, id);
+    return id;
+  }
+
+  /** Undo that, leaving every other answer on the rows alone. */
+  clearNestGroup(indices) {
+    for (const i of indices ?? []) {
+      const row = this.rows[i];
+      if (row) this.#writeNestId(row, '');
+    }
+  }
+
+  #writeNestId(row, id) {
+    row.nest_id = id;
+    if (row.reviewed === REVIEWED) this.labeled.upsert(row);
+    if (row.nest_label === 'yes') this.nest.upsert(row);
+    this.dirty = true;
+  }
+
+  /** Every row already named as this nest, as indices into `rows`. */
+  nestGroup(id) {
+    const want = String(id ?? '').trim();
+    if (!want) return [];
+    return this.rows.map((r, i) => (r.nest_id === want ? i : -1)).filter(i => i >= 0);
+  }
+
   otherReviewers(me) {
     const seen = new Set();
     for (const row of this.labeled.rowsById.values()) {

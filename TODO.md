@@ -1,8 +1,8 @@
 # bird-swipe — what's next
 
-The next round of labeling features, from Stella. The flow, M12–M14, M16–M24
-and M29–M30 are built; **M25 (duplicate images) is the high priority**, M15 is
-parked and is what blocks it, M26–M27 are low priority, and M28 is small.
+The next round of labeling features, from Stella. The flow and M12–M25 and
+M29–M30 are built. What is left: **detecting duplicates automatically**, the
+open half of M25; M26–M27 are low priority; M28 is small.
 [PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes
 what the app does today. Each item says where it would land in the code,
 because every one of them adds columns to a file researchers may already be
@@ -233,22 +233,30 @@ has with the chick count.
   Deliberately deferred; the same "other, type it in" mechanism from M13 would
   cover it if the answer turns out to be yes.
 
-## M15 — Repeat nests — **parked**
+## M15 — Repeat nests — **built, as part of M25**
 
-The feature is wanted; the decision that unblocks it isn't made yet.
+**Unparked and delivered.** The decision it waited on — how far a nest ID
+reaches — was settled by the shape of Stella's duplicate-picker: the contact
+sheet can only show assets from the open spreadsheet, so an ID can only ever
+group things inside one file. That is the "unique within one spreadsheet"
+answer, arrived at by building the interaction rather than by deciding the
+question in the abstract.
 
-- [ ] A nest ID shared by every asset of the same nest — `AAAA`, `BBBB`, … in a
+All three of the things below exist now. See [M25](#m25--duplicate-images--built-the-manual-half).
+
+- [x] A nest ID shared by every asset of the same nest — `AAAA`, `BBBB`, … in a
       `nest_id` column.
-- [ ] Show enough metadata on the label screen to recognise a nest you've seen
+- [x] Show enough metadata to recognise a nest you've seen
       already: recordist (the eBirder) and date, both already in the Macaulay
       export, plus location if it's there.
-- [ ] A way to assign an ID without retyping — pick from IDs already used, or
+- [x] A way to assign an ID without retyping — pick from IDs already used, or
       type a new one.
 
-**Blocked on:** how far an ID reaches. Unique within one spreadsheet is
-buildable now and can't collide between researchers; project-wide is more useful
-for analysis but needs a shared registry in the OneDrive folder that two people
-can write at once. Deferred deliberately — revisit before starting.
+**Settled:** unique within one spreadsheet, and the ID is the **lowest catalog
+number in the group** rather than a generated code — nothing hands IDs out,
+nothing remembers which are taken, and the value says what it is. Project-wide
+is still more useful for analysis and still needs a shared registry two people
+can write at once; that remains undone, and nothing here blocks it.
 
 Separate question for later: should the app *suggest* repeats from matching
 recordist/date/locality, or is spotting them entirely the reviewer's job?
@@ -800,13 +808,47 @@ box down to 11%, without moving anything:
   nest, and `Esc` reopens the view.
 
 
-## M25 — Duplicate images — **high priority**
+## M25 — Duplicate images — **built (the manual half)**
 
-Stella's, and the most important thing outstanding.
+**The reviewer does the recognising; the app records what they say.** No
+comparison of pixels is going to beat someone who has just looked at both
+photographs, so the job was to put the candidates in front of them.
 
-**Settled: it is the third reading, plus time.** Stella's words: a burst of
-near-identical frames, "but it also needs to consider the same nest over
-time". So two things, and the second is the harder one:
+- [x] **seen this nest before?** in the nest details row opens a contact sheet
+      of the whole spreadsheet. Click every photograph of the same nest, then
+      **Mark as one nest**.
+- [x] Every tile carries **recordist, date and coordinates** — Stella's
+      heuristic, on the tile where the judgement is made.
+- [x] The sheet **starts filtered to the same recordist**, with *same place
+      (within ~100 m)* and a text filter beside it. Recordists repeat enough
+      for this to earn the default: 19 of 194 rows in one real export.
+- [x] A filter that hides everything **says so** and offers the whole
+      spreadsheet in one click, rather than looking like a broken screen.
+- [x] Reopening on a nest that already has a group **starts from that group**,
+      so adding an eleventh photograph to ten is the same gesture.
+      **Ungroup** clears it.
+- [x] Column `nest_id`. Thumbnails come from the Macaulay CDN at 320px
+      (~40 KB) and are lazy-loaded, because an export runs to a couple of
+      hundred rows.
+
+**`nest_id` is not nest-only**, unlike every observation. It is which nest the
+reviewer says this is, not something they observed, and losing a grouping that
+took a pass through the spreadsheet to make — because someone mis-pressed the
+"no" key — would cost far more than a stray id.
+
+**Known gap: grouping an unreviewed asset.** It is allowed, but the labeled
+file is *completed entries*, so writing an unreviewed row into it would hand
+the project a row nobody has looked at. The id is held on the row and saved
+when it is labeled. The tile says **not reviewed yet** and the confirmation
+counts how many saved now versus later — but until those rows are reviewed,
+the grouping is a session's work that a reload would lose. The usual flow
+doesn't hit this (you group assets *because* you recognise them, which means
+you already reviewed them), and the honest fix is somewhere to persist
+groupings that isn't the labeled CSV.
+
+**One mechanism turned out to cover both halves.** A burst of near-identical
+frames and the same nest photographed a month apart are the same operation —
+"these are one nest" — so grouping answers both:
 
 1. **A burst** — ten shots of one nest, seconds apart, ten rows to label. Not
    duplication exactly, but redundancy: the answers will be identical, and
@@ -816,12 +858,11 @@ time". So two things, and the second is the harder one:
    substrate hold, but eggs become chicks, and that change over time is data
    rather than noise.
 
-**This makes M15 a dependency, not an overlap.** [M15](#m15--repeat-nests--parked)
-is "recognise a nest you have seen before", and it is parked on one decision:
-how far a nest ID reaches — unique within a spreadsheet, or project-wide
-through a shared registry. Nothing here can group a burst *and* a
-June revisit without an answer to that, because grouping over time is exactly
-what a nest ID is for. **Unparking M15 is the first move on M25.**
+**This delivered M15 along the way.** M15 was parked on how far a nest ID
+reaches, and the picker answered it by construction: a contact sheet can only
+offer assets from the open spreadsheet, so an ID can only group within one
+file. The decision that had been waiting in the abstract fell out of building
+the interaction.
 
 Within a single burst it is easier: same recordist, same date, consecutive
 catalog numbers, near-identical dimensions — and, strongest of all, the same
@@ -839,7 +880,21 @@ counts on the done screen disagree with the file. That is worth fixing on its
 own, and it is small: `validateFieldnames` already has a warnings channel that
 the welcome screen shows.
 
-**The questions it raises:**
+**Still open — the automatic half**
+
+Nothing detects anything yet; every group is made by hand. The evidence is all
+there in the export, and a burst needs no nest registry to spot:
+
+- Same **eBird checklist ID** says outright that two photographs came from one
+  outing — the strongest signal in the file.
+- Same recordist, same date, consecutive catalog numbers, near-identical
+  dimensions.
+
+Suggesting is the shape: **offer** a group and let the reviewer confirm it,
+never form one silently. Detection is a guess, and the whole design here rests
+on the reviewer being the one who decides.
+
+**The other questions:**
 
 - Should a repeat be **detected and skipped**, **detected and shown** ("you
   labeled one of these in May — here is what you said"), or **carried over**
