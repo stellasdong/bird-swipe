@@ -36,7 +36,7 @@ export const LABEL_COLUMNS = [
   'nest_label', 'human_structure', 'anthropogenic',
   'eggs', 'egg_count', 'chicks', 'chick_count',
   'bird_present', 'substrate', 'anthropogenic_material', 'nest_location',
-  'chick_stage',
+  'chick_stage', 'provisioning', 'prey_group',
   'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers',
 ];
 
@@ -55,7 +55,7 @@ export const NEST_ONLY_COLUMNS = [
   'human_structure', 'bird_present',
   'eggs', 'egg_count', 'chicks', 'chick_count',
   'substrate', 'anthropogenic', 'anthropogenic_material', 'nest_location',
-  'chick_stage',
+  'chick_stage', 'provisioning', 'prey_group',
 ];
 
 // Only ever read, never written: files labeled before that change still hold
@@ -146,6 +146,21 @@ export function isListedLocation(term) {
 // someone looked and couldn't call it, which is different from nobody having
 // looked, and it is where a mid-moult brood goes rather than forcing a guess.
 export const CHICK_STAGES = ['early', 'late', 'unclear'];
+
+// What a parent is carrying, asked only where one is actively feeding.
+//
+// 'group' rather than 'kingdom' because mammal, bird and reptile are classes
+// within one kingdom. Multi-select: one image can show more than one item.
+//
+// 'unidentified' is the second half of Stella's question — "if visible, what
+// kind?" — doing its work. A parent feeding with its bill turned away is
+// provisioning = yes, prey_group = unidentified, and that is a different fact
+// from a blank, which would say nobody answered. Same reasoning as 'unclear'
+// in the substrate and location lists.
+export const PREY_OPTIONS = [
+  'mammal', 'bird', 'reptile', 'amphibian', 'fish', 'invertebrate',
+  'unidentified',
+];
 
 export const MULTI_SEP = '; ';
 
@@ -372,7 +387,8 @@ export class Catalog {
   setLabel(index, { nest, structure,
                     eggCount = '', chickCount = '', birdPresent = false,
                     substrate = '', anthropogenicMaterial = '', nestLocation = '',
-                    chickStage = '', reviewer = '', notes = '' }) {
+                    chickStage = '', provisioning = false, preyGroup = '',
+                    reviewer = '', notes = '' }) {
     const row = this.rows[index];
     const eggs = normalizeCount(eggCount);
     const chicks = normalizeCount(chickCount);
@@ -402,6 +418,16 @@ export class Catalog {
       // back to zero takes the stage with it, so a stale "late" can never sit
       // under a nest with no chicks in it.
       chick_stage: chicks > 0 ? String(chickStage ?? '').trim() : '',
+      // Stella's question is "are the parent birds actively feeding?" — not
+      // whether food is present, and not whether it has been brought to the
+      // nest. The column keeps the name she confirmed; the definition has to
+      // travel with it, which is why the toggle on screen reads
+      // "provisioning — actively feeding" rather than one or the other.
+      provisioning: provisioning ? 'yes' : 'no',
+      // Only meaningful where something is being fed. Turning provisioning off
+      // takes the prey with it, the same way a zero chick count takes the
+      // stage, so a stale answer can't sit under a "no".
+      prey_group: provisioning ? joinTerms(preyGroup) : '',
     };
     row.nest_label = nest == null ? '' : (nest ? 'yes' : 'no');
     // Answered on a nest; blank off one, where the question didn't apply —
@@ -495,6 +521,7 @@ export class Catalog {
       substrates: count(r => r.substrate && r.substrate !== LEGACY_NOT_APPLICABLE),
       locations: count(r => r.nest_location),
       chickStages: count(r => r.chick_stage),
+      provisioning: count(r => r.provisioning === 'yes'),
       eggTotal: this.rows.reduce((n, r) => n + normalizeCount(r.egg_count), 0),
       chickTotal: this.rows.reduce((n, r) => n + normalizeCount(r.chick_count), 0),
     };

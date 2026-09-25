@@ -9,7 +9,7 @@ import {
   Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
   normalizeCount, filterTerms, joinTerms, splitTerms,
   SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS, locationOptions, isListedLocation,
-  CHICK_STAGES,
+  CHICK_STAGES, PREY_OPTIONS,
 } from './catalog.js';
 import {
   PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, checklistUrl, photoUrl,
@@ -93,6 +93,7 @@ const el = {
   toggles: {
     structure: $('t-structure'),
     bird: $('t-bird'),
+    provisioning: $('t-provisioning'),
   },
   nestDetails: $('nest-details'),
   detailsHint: $('details-hint'),
@@ -110,6 +111,10 @@ const el = {
     anthropogenic_material: {
       wrap: $('p-anthropogenic'), button: $('anthropogenic-open'), pop: $('anthropogenic-pop'),
       filter: $('anthropogenic-filter'), list: $('anthropogenic-list'), foot: $('anthropogenic-foot'),
+    },
+    prey_group: {
+      wrap: $('p-prey'), button: $('prey-open'), pop: $('prey-pop'),
+      filter: $('prey-filter'), list: $('prey-list'), foot: $('prey-foot'),
     },
   },
   counters: {
@@ -165,23 +170,30 @@ const el = {
 const TOGGLE_FIELDS = {
   structure: 'human_structure',
   bird: 'bird_present',
+  provisioning: 'provisioning',
 };
 const TOGGLE_LABELS = {
   // "structure" is about what the nest is ON, which is why it chooses the
   // location list. The material it is built FROM is a separate question.
   structure: 'on a human-made structure',
   bird: 'bird visible',
+  // Stella's question is "are the parent birds actively feeding?", and the
+  // column she confirmed is `provisioning` — which conventionally means
+  // bringing food to the nest, a wider thing. The label carries both so the
+  // definition travels with the name it is stored under.
+  provisioning: 'provisioning — actively feeding',
 };
 // Both the letter and number binding of a toggle map to the same field.
 const TOGGLE_ACTIONS = {
   toggle_structure: 'structure', toggle_structure_num: 'structure',
   toggle_bird: 'bird',
   toggle_bird_num: 'bird',
+  toggle_provisioning: 'provisioning', toggle_provisioning_num: 'provisioning',
 };
 // Every toggle lives in the nest-details panel now, so this is all of them.
 // Kept as a set rather than dropped: it is what stops a key setting a value on
 // a row where the panel is closed and nobody could see it.
-const NEST_ONLY_TOGGLES = new Set(['structure', 'bird']);
+const NEST_ONLY_TOGGLES = new Set(['structure', 'bird', 'provisioning']);
 
 // The three list questions, all nest-only, all answered by the same picker.
 // They were one question until it became clear it was three: what the nest is
@@ -215,6 +227,14 @@ const PICKERS = {
     label: 'man-made material',
     options: ANTHROPOGENIC_OPTIONS, multi: false,
     key: 'pick_anthropogenic', numKey: 'pick_anthropogenic_num',
+  },
+  // The second half of the feeding question — "if visible, what kind?" — so it
+  // only exists once provisioning says yes. Multi-select: one image can show
+  // more than one item.
+  prey_group: {
+    label: 'prey', options: PREY_OPTIONS, multi: true,
+    key: 'pick_prey', numKey: 'pick_prey_num',
+    shownWhen: () => toggleOn('provisioning'),
   },
 };
 const PICKER_NAMES = Object.keys(PICKERS);
@@ -814,6 +834,13 @@ const toggleOn = field => el.toggles[field].getAttribute('aria-pressed') === 'tr
  * term sits on, and throwing away what someone typed is the worse mistake.
  */
 function afterToggle(field) {
+  // Answering "no" to feeding takes the prey answer with it, the same way a
+  // zero chick count takes the stage, so a stale one can't sit under a no.
+  if (field === 'provisioning') {
+    if (state.openPicker === 'prey_group' && !toggleOn('provisioning')) closePicker();
+    renderConditionalPickers();
+    return;
+  }
   if (field !== 'structure') return;
   reconcileLocation();
   closePicker();               // its list just changed underneath it
@@ -917,6 +944,7 @@ function showNestDetails(row) {
       ? `${missing.map(n => PICKERS[n].label).join(' and ')} still needed`
       : `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
     renderPickerButtons();
+    renderConditionalPickers();
     renderChickStage();
   }
 }
@@ -969,6 +997,23 @@ function renderPickerButton(name) {
 
 function renderPickerButtons() {
   for (const name of PICKER_NAMES) renderPickerButton(name);
+}
+
+/**
+ * Hide a picker whose question doesn't apply yet, and drop what it held. Only
+ * prey has one: asking what is being fed before anyone has said feeding is
+ * happening is asking for a guess. Hidden elements aren't focusable, so it
+ * leaves the Tab order on its own.
+ */
+function renderConditionalPickers() {
+  for (const name of PICKER_NAMES) {
+    const shown = PICKERS[name].shownWhen?.() ?? true;
+    el.pickers[name].wrap.hidden = !shown;
+    if (!shown && state.picks[name].length) {
+      state.picks[name] = [];
+      renderPickerButton(name);
+    }
+  }
 }
 
 /**
@@ -1062,6 +1107,7 @@ const pickerOpen = () => state.openPicker !== null;
 
 function openPicker(name) {
   if (el.nestDetails.hidden) return; // nothing to answer on a non-nest row
+  if (el.pickers[name].wrap.hidden) return; // its question hasn't come up yet
   if (state.openPicker && state.openPicker !== name) closePicker();
   const node = el.pickers[name];
   state.openPicker = name;
@@ -1372,6 +1418,9 @@ function renderLegend() {
     [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
     [`${keyDisplay(k.cycle_chick_stage)}/${keyDisplay(k.cycle_chick_stage_num)}`,
      'chick stage'],
+    [`${keyDisplay(k.toggle_provisioning)}/${keyDisplay(k.toggle_provisioning_num)}`,
+     'feeding'],
+    [`${keyDisplay(k.pick_prey)}/${keyDisplay(k.pick_prey_num)}`, 'prey'],
     [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
     [keyDisplay(k.jump), 'jump to…'],
     [keyDisplay(k.close), 'close file'],
@@ -1573,6 +1622,8 @@ function commit(nest, move = true) {
     anthropogenicMaterial: pickValue('anthropogenic_material'),
     nestLocation: pickValue('nest_location'),
     chickStage: state.chickStage,
+    provisioning: toggleOn('provisioning'),
+    preyGroup: pickValue('prey_group'),
     reviewer: getReviewer(),
     notes: el.notes.value.trim(),
   });
@@ -1704,7 +1755,8 @@ function showDone() {
     `nest yes: ${s.yes}   ·   nest no: ${s.no}   ·   skipped: ${s.skipped}`;
   el.doneObservations.textContent =
     `human-made structure: ${s.structure}   ·   anthropogenic: ${s.anthropogenic}` +
-    `   ·   bird visible: ${s.birds}   ·   substrate recorded: ${s.substrates}` +
+    `   ·   bird visible: ${s.birds}   ·   provisioning: ${s.provisioning}` +
+    `   ·   substrate recorded: ${s.substrates}` +
     `   ·   location recorded: ${s.locations}` +
     `   ·   images with eggs: ${s.eggs} (${s.eggTotal} counted)` +
     `   ·   images with chicks: ${s.chicks} (${s.chickTotal} counted)`;
