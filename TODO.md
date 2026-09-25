@@ -865,8 +865,19 @@ the recognising. Stella caught both.
 - [x] A code is the nest's **name**: marking a row no and yes again keeps it,
       so a mis-press cannot rename a nest or break it out of a group.
 
-### Grouped assets arrive pre-filled
+### Grouping fills things in
 
+- [x] **The asset in front of the reviewer fills in the moment they group it.**
+      Saying "this is that nest" is the request; making them walk away and come
+      back to see it take effect would be absurd. This needed its own path:
+      marking a row yes counts as reviewing it, so the rule below — never touch
+      a reviewed row — would otherwise have refused the very row they were
+      looking at.
+- [x] **It fills gaps, it does not overrule.** A field the reviewer has already
+      answered is a judgement about the photograph in front of them and wins;
+      everything they have not answered takes the nest's value. In the ordinary
+      case — a row marked yes seconds ago, with nothing of its own — the whole
+      panel fills.
 - [x] An **unreviewed** member of a group starts filled in from the group's
       **most recently answered** member — the freshest judgement about that
       nest, which on a revisit is closest to what is on screen now.

@@ -1315,6 +1315,64 @@ function carriedFrom(row) {
     String(b.reviewed_at ?? '').localeCompare(String(a.reviewed_at ?? '')))[0];
 }
 
+/**
+ * The best-answered other member of a group — what a newly grouped asset
+ * should adopt. Excludes the row itself, which on the press that groups them
+ * is the most recently reviewed one and would otherwise be its own source.
+ */
+function groupAnswers(row) {
+  if (!row?.nest_id) return null;
+  const mates = state.catalog.nestGroup(row.nest_id)
+    .map(i => state.catalog.rows[i])
+    .filter(r => r !== row && r.reviewed === REVIEWED && r.nest_label === 'yes');
+  if (!mates.length) return null;
+  return mates.sort((a, b) =>
+    String(b.reviewed_at ?? '').localeCompare(String(a.reviewed_at ?? '')))[0];
+}
+
+/**
+ * Adopt a nest's answers into the panel, without overwriting anything the
+ * reviewer has already said about this photograph.
+ *
+ * Grouping is the reviewer declaring "this is that nest", so filling the panel
+ * in is what they asked for — but a field they have already answered is a
+ * judgement about the image in front of them, and that wins. In the ordinary
+ * case, a row marked yes seconds ago has nothing of its own and the whole
+ * panel fills.
+ *
+ * Returns what it filled, so the reviewer can be told rather than left to
+ * notice.
+ */
+function adoptGroupAnswers(source) {
+  if (!source) return 0;
+  let filled = 0;
+  for (const [field, column] of Object.entries(TOGGLE_FIELDS)) {
+    if (!toggleOn(field) && source[column] === 'yes') {
+      setToggle(field, true);
+      filled += 1;
+    }
+  }
+  for (const [field, column] of Object.entries(COUNTER_FIELDS)) {
+    if (normalizeCount(countOf(field)) === 0 && normalizeCount(source[column]) > 0) {
+      setCount(field, source[column]);
+      filled += 1;
+    }
+  }
+  for (const name of PICKER_NAMES) {
+    if (pickValue(name) === '' && (source[name] ?? '') !== '') {
+      setPick(name, source[name]);
+      filled += 1;
+    }
+  }
+  if (!state.chickStage && source.chick_stage) {
+    setChickStage(source.chick_stage);
+    filled += 1;
+  }
+  renderConditionalPickers();
+  renderChickStage();
+  return filled;
+}
+
 function updateChip(row) {
   // The code sits with the decision rather than in the details panel, because
   // the button that groups nests does too — and a reviewer checking whether
@@ -2552,12 +2610,26 @@ function saveDupes() {
   const picks = [...state.dupePicks].sort((a, b) => a - b);
   const later = picks.filter(i => state.catalog.rows[i].reviewed !== REVIEWED).length;
   const id = state.catalog.setNestGroup(picks);
-  state.writer.schedule(state.catalog);
   el.dupes.close();
   showCurrent();
+
+  // The asset in front of the reviewer adopts the nest's answers straight
+  // away. Saying "this is that nest" is the request; making them then walk
+  // somewhere else and come back to see it take effect would be absurd.
+  const row = state.catalog.rows[state.idx];
+  const filled = row?.nest_label === 'yes' ? adoptGroupAnswers(groupAnswers(row)) : 0;
+  if (filled) {
+    state.carriedFrom = id;
+    showNestDetails(row);
+    updateChip(row);
+    saveOpenRow();
+  }
+  state.writer.schedule(state.catalog);
+
   const saved = picks.length - later;
   announce('info',
     `${picks.length} assets marked as nest ${id}.`
+    + (filled ? ` This one filled in from the nest — check the counts.` : '')
     + (later ? ` ${saved} saved now; the other ${later} save when you review them.`
              : ''));
 }

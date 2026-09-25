@@ -340,8 +340,14 @@ from that group, so adding an eleventh photograph to ten is the same gesture.
 A code is the nest's name, so marking a row "no" and then "yes" again keeps it —
 a mis-press can't rename a nest or break it out of a group you built by hand.
 
-**Grouped assets arrive pre-filled.** Once a nest has been answered, the other
-assets in its group start from those answers — structure, location, substrate,
+**Grouping fills the image you're on, straight away.** Say "this is the same
+nest as that one" and the panel in front of you fills in from it — structure,
+location, substrate, material, counts — and says **filled in from nest AAAA —
+check the counts**. Anything you'd already answered about *this* photograph is
+kept: the nest's answers fill the gaps, they don't overrule you.
+
+**And every later asset in the group arrives pre-filled too.** Once a nest has
+been answered, the other assets in its group start from those answers — structure, location, substrate,
 material, the lot — so you don't retype the same nest ten times for a burst.
 The panel says **filled in from nest AAAA — check the counts**, and the chip row
 says **answers ready** before you've even decided.
