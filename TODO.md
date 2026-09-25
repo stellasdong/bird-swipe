@@ -867,6 +867,12 @@ the recognising. Stella caught both.
 
 ### Grouping fills things in
 
+- [x] **Grouping an undecided asset with an answered nest marks it a nest**
+      and opens the panel filled. You cannot say "this is that nest" about
+      something that is not a nest — and since the panel is hidden until the
+      decision, it was the only way the inherited answers were visible at all.
+      Without it, grouping before deciding looked like it did nothing, which
+      is exactly what Stella reported. `←` still disagrees, as always.
 - [x] **The asset in front of the reviewer fills in the moment they group it.**
       Saying "this is that nest" is the request; making them walk away and come
       back to see it take effect would be absurd. This needed its own path:

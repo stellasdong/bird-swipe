@@ -340,8 +340,11 @@ from that group, so adding an eleventh photograph to ten is the same gesture.
 A code is the nest's name, so marking a row "no" and then "yes" again keeps it —
 a mis-press can't rename a nest or break it out of a group you built by hand.
 
-**Grouping fills the image you're on, straight away.** Say "this is the same
-nest as that one" and the panel in front of you fills in from it — structure,
+**Grouping fills the image you're on, straight away** — whichever order you do
+it in. Group before deciding and the nest details row opens filled, already
+marked as a nest, because saying "this is that nest" is saying it's a nest.
+Group after deciding and the open panel fills in front of you. Either way the
+panel fills from the other image — structure,
 location, substrate, material, counts — and says **filled in from nest AAAA —
 check the counts**. Anything you'd already answered about *this* photograph is
 kept: the nest's answers fill the gaps, they don't overrule you.

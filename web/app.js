@@ -1779,11 +1779,21 @@ function nestYes() {
     const missing = missingRequired();
     if (missing.length) { promptForRequired(missing); return; }
   }
+  // A row grouped BEFORE the decision — which is the ordinary way round now
+  // that "seen this nest before?" sits above the nest buttons — adopts its
+  // nest's answers as it becomes a nest. Done before the commit, so the
+  // values are what gets written rather than a blank row saved and corrected
+  // a moment later.
+  const row = state.catalog.rows[state.idx];
+  if (!alreadyYes && adoptGroupAnswers(groupAnswers(row))) {
+    state.carriedFrom = row.nest_id;
+  }
   commit(true, alreadyYes);
   // Marking a nest opens the first thing it owes, rather than presenting a
   // panel of seven buttons and leaving the reviewer to remember which two
   // matter. Only on the press that opens the panel — stepping back onto a
   // half-finished nest shouldn't have a list jump out during navigation.
+  // Nothing is owed if the nest just filled itself in, so nothing opens.
   if (!alreadyYes) chainToNextRequired();
 }
 
@@ -2617,12 +2627,24 @@ function saveDupes() {
   // away. Saying "this is that nest" is the request; making them then walk
   // somewhere else and come back to see it take effect would be absurd.
   const row = state.catalog.rows[state.idx];
-  const filled = row?.nest_label === 'yes' ? adoptGroupAnswers(groupAnswers(row)) : 0;
-  if (filled) {
-    state.carriedFrom = id;
-    showNestDetails(row);
-    updateChip(row);
-    saveOpenRow();
+  const source = groupAnswers(row);
+  let filled = 0;
+  if (source && row.nest_label !== 'yes') {
+    // Grouping an undecided asset with a nest that has already been answered
+    // IS the decision: you cannot say "this is that nest" about something
+    // that is not a nest. Marking it opens the panel, which is the only way
+    // the answers it just inherited are visible at all — otherwise grouping
+    // looks like it did nothing. `←` still disagrees, as it always did.
+    nestYes();
+    filled = 1;
+  } else if (row?.nest_label === 'yes') {
+    filled = adoptGroupAnswers(source);
+    if (filled) {
+      state.carriedFrom = id;
+      showNestDetails(row);
+      updateChip(row);
+      saveOpenRow();
+    }
   }
   state.writer.schedule(state.catalog);
 
