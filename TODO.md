@@ -1,8 +1,8 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12, M13, M16,
-M17 through M24 are built; **M25 (duplicate images) is the high priority**,
-M14 is next after it, M15 is parked and M26–M27 are low priority.
+M17 through M24 are built; **M14 (prey provisioning) and M25 (duplicate
+images) are the high priorities**, M15 is parked and M26–M27 are low priority.
 [PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes
 what the app does today. Each item says where it would land in the code,
 because every one of them adds columns to a file researchers may already be
@@ -166,19 +166,26 @@ fixed this definition; it needs to reach whoever analyses the column, because
   suggestions. The file is unaffected (it records the text, never a reference
   into a list), but a shared list would need a file in the OneDrive folder.
 
-## M14 — Prey provisioning — **next**
+## M14 — Prey provisioning — **high priority**
+
+**Two questions, in Stella's words: are the parent birds actively feeding, and
+if the food is visible, what kind?**
 
 Hotkey when built: `H` / `9` — `F` / `8` went to chick stage, and `G` is jump.
-The multi-select picker
-M17 built for substrate is the thing to reuse: same open/filter/confirm
-behaviour, same `; `-joined cell, already written and tested.
+The multi-select picker M17 built for substrate is the thing to reuse: same
+open/filter/confirm behaviour, same `; `-joined cell, already written and
+tested.
 
-- [ ] Mark whether parents are bringing food to the nest: `provisioning`,
-      `yes` / `no`.
-- [ ] If yes, a prey-type list: mammal, bird, reptile, amphibian, fish,
-      invertebrate, unidentified.
+- [ ] **Is a parent actively feeding?** `provisioning`, `yes` / `no`. A toggle,
+      answerable from the photograph without judging what the food is.
+- [ ] **If the food is visible, what kind?** A prey-type list: mammal, bird,
+      reptile, amphibian, fish, invertebrate, **unidentified**.
+- [ ] `unidentified` is the "if visible" half doing its work — a feeding parent
+      whose bill you can't see into is `provisioning = yes` with
+      `prey_group = unidentified`, which is a different fact from a blank. Same
+      reasoning as `unclear` in the substrate and location lists (M19).
 - [ ] **Multi-select** — one image can show more than one prey item. Several
-      values in one cell, separated by `;` so a comma never has to be escaped
+      values in one cell, separated by `; ` so a comma never has to be escaped
       to stay readable.
 - [ ] Columns `provisioning` and `prey_group`. Named *group* rather than
       *kingdom* because mammal/bird/reptile are classes within one kingdom;
@@ -188,6 +195,19 @@ A conditional inside a conditional — the prey list only exists on a nest row
 that's also marked provisioning. The dropdown it needs now exists: M17's
 substrate picker is multi-select and joins with `; `, which is exactly what
 `prey_group` wants.
+
+**One thing to settle before building.** *Actively feeding* and *bringing food
+to the nest* are not the same observation, and `provisioning` is the
+ornithologist's word for the second one. A parent perched at the nest with a
+fish in its bill is provisioning but not yet feeding; a parent passing food to
+a chick is both.
+
+Stella's phrasing is "actively feeding", so that is what this records — but
+then either the column should say so (`feeding`), or the definition has to
+travel with `provisioning` so nobody reads the usual meaning into it. The
+second is cheaper and keeps the name she already confirmed; the first is
+clearer to whoever gets the spreadsheet cold. Worth one sentence from Stella
+before the column exists, since renaming it afterwards means rewriting files.
 
 **Later, not now**
 
