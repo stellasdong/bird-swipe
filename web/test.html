@@ -607,6 +607,14 @@ group('catalog.js — anthropogenic is derived, not asked');
   eq('the material is recorded', catalog.rows[0].anthropogenic_material, 'plastic');
   eq('and the old column follows it', catalog.rows[0].anthropogenic, 'yes');
 
+  // A nest can hold plastic twine and wire at once, so this takes several
+  // answers like substrate does — and the derived flag still follows.
+  catalog.setLabel(2, { nest: true, structure: false,
+                        anthropogenicMaterial: ['plastic', 'metal'] });
+  eq('more than one material rides in one cell',
+     catalog.rows[2].anthropogenic_material, 'plastic; metal');
+  eq('and the flag still follows it', catalog.rows[2].anthropogenic, 'yes');
+
   catalog.setLabel(1, { nest: true, structure: false });
   eq('no material named means no', catalog.rows[1].anthropogenic, 'no');
   eq('and the material cell is blank', catalog.rows[1].anthropogenic_material, '');

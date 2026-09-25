@@ -116,7 +116,7 @@ Two things that will otherwise trip you up:
 | `Q` / `1` | toggle **on a human-made structure** — and it chooses the location list |
 | `W` / `2` | choose the **nest location** — where the nest sits |
 | `E` / `3` | choose the **substrate** — what the nest is made of; takes several answers |
-| `R` / `4` | choose the **man-made material** built into the nest — plastic, metal, other |
+| `R` / `4` | choose the **man-made material** built into the nest — takes several answers |
 | `A` / `5` | toggle **bird visible** |
 | `S` / `6` | **count the eggs** — type a number, then `Enter` |
 | `D` / `7` | **count the chicks** — type a number, then `Enter` |
@@ -223,11 +223,12 @@ pole is three different answers:
 The column is still called `anthropogenic_material`, because spreadsheets
 already carry that name.
 
-**Substrate takes several answers.** A nest is often twigs *and* mud *and* a fur
-lining, so picking a material adds it and leaves the list open for the next one
-— pick again to remove it, `Esc` when you're done. They go into one cell
-separated by `; `. The other two lists take a single answer and close as soon as
-you pick.
+**Substrate and man-made material take several answers.** A nest is often twigs
+*and* mud *and* a fur lining, and can hold plastic twine *and* wire at once — so
+picking adds a term and leaves the list open for the next one. Pick again to
+remove it, `Enter` or `Esc` when you're done. They go into one cell separated by
+`; `. Location takes a single answer and closes as soon as you pick, because a
+nest is in one place.
 
 You are not asked separately whether there is man-made material: naming one
 answers it. The `anthropogenic` column still says `yes` / `no`, worked out from
@@ -403,7 +404,7 @@ Each row gets these columns appended to the original ones:
 | `human_structure` | `yes` / `no` — also chooses which location list is offered |
 | `bird_present` | `yes` / `no` |
 | `substrate` | what the nest is **made of** — one or more terms from the list or typed in, separated by `; ` |
-| `anthropogenic_material` | the **man-made** material in it — plastic, metal, other, or typed in |
+| `anthropogenic_material` | the **man-made** material in it — one or more of plastic, metal, other, or typed in, separated by `; ` |
 | `anthropogenic` | `yes` / `no` — derived from `anthropogenic_material`, so they can't disagree |
 | `nest_location` | where the nest **sits** — a term from whichever list `human_structure` selected, or typed in |
 | `eggs`, `chicks` | `yes` / `no` — derived from the counts, so they can't disagree |

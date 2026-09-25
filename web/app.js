@@ -223,9 +223,14 @@ const PICKERS = {
   // material the nest is built from — the twine and wire woven into it — and
   // not the man-made thing it is sitting on, which is the structure toggle
   // and the location picker between them.
+  // Multi-select for the same reason substrate is: a nest can hold plastic
+  // twine and wire at once, and making the reviewer choose one would throw the
+  // other away. It was single-select until Stella asked; nothing in the file
+  // format had to change, because the cell was already being written through
+  // joinTerms.
   anthropogenic_material: {
     label: 'man-made material',
-    options: ANTHROPOGENIC_OPTIONS, multi: false,
+    options: ANTHROPOGENIC_OPTIONS, multi: true,
     key: 'pick_anthropogenic', numKey: 'pick_anthropogenic_num',
   },
   // The second half of the feeding question — "if visible, what kind?" — so it

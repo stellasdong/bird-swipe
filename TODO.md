@@ -384,10 +384,12 @@ means one thing in the file and another in the comments.
 
 **Still open**
 
-- **Is `anthropogenic_material` single-select the right call?** Plastic twine
-  and wire in the same nest is plausible. Left single because only substrate
-  was confirmed multi; the machinery is now there either way, so it is a
-  one-line change.
+- ~~**Is `anthropogenic_material` single-select the right call?**~~ No — it is
+  multi-select now, at Stella's asking. Plastic twine and wire in one nest is
+  ordinary, and making the reviewer pick one threw the other away. Nothing in
+  the file format changed: the cell was already written through `joinTerms`,
+  so the whole fix was `multi: true` and an `aria-multiselectable` on the
+  list. Location stays single — a nest is in one place.
 - ~~**`human_structure` is now largely redundant**, since natural vs man-made
   is derivable from `nest_location`.~~ Settled by M18, and the other way up:
   it is now the question that *chooses* the location list, so it earns its
