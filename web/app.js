@@ -98,6 +98,7 @@ const el = {
   nestDetails: $('nest-details'),
   detailsHint: $('details-hint'),
   dupesOpen: $('dupes-open'),
+  nestCode: $('nest-code'),
   dupes: $('dupes'),
   dupesGrid: $('dupes-grid'),
   dupesSearch: $('dupes-search'),
@@ -1272,6 +1273,13 @@ function saveOpenRow() {
 }
 
 function updateChip(row) {
+  // The code sits with the decision rather than in the details panel, because
+  // the button that groups nests does too — and a reviewer checking whether
+  // they have seen this nest wants to know what it is already called.
+  const others = row.nest_id ? state.catalog.nestGroup(row.nest_id).length - 1 : 0;
+  el.nestCode.textContent = row.nest_id
+    ? `nest ${row.nest_id}${others > 0 ? ` · with ${others} more` : ''}`
+    : '';
   const label = row.nest_label ?? '';
   el.nestYes.setAttribute('aria-pressed', String(label === 'yes'));
   el.nestNo.setAttribute('aria-pressed', String(label === 'no'));

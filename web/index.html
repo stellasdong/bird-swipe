@@ -108,6 +108,11 @@
     <button class="chip nest-btn" id="nest-yes" type="button"></button>
     <button class="chip nest-btn" id="nest-no" type="button"></button>
     <span class="chip skip-pill" id="nest-skip" hidden>skipped</span>
+    <!-- Above the decision, not inside the nest details: recognising a nest
+         you have seen before happens while looking at the photograph, not
+         after committing to calling it one. -->
+    <button class="link-btn" id="dupes-open" type="button">seen this nest before?</button>
+    <span class="nest-code" id="nest-code"></span>
   </div>
 
   <!-- Questions that only apply where there is a nest. Shown exactly when the
@@ -199,8 +204,6 @@
         <div class="picker-foot" id="prey-foot"></div>
       </div>
     </div>
-
-    <button class="link-btn" id="dupes-open" type="button">seen this nest before?</button>
 
     <span class="details-hint" id="details-hint"></span>
   </div>

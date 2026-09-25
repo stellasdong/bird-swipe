@@ -410,7 +410,10 @@ export class Catalog {
     const labeled = new LabeledFile(labeledName(inputName), labeledText);
     const nest = new LabeledFile(nestName(inputName), nestText);
     const catalog = new Catalog(rows, fieldnames, labeled, nest, inputName);
-    if (resume) catalog._restoreFromLabeled();
+    if (resume) {
+      catalog._restoreFromLabeled();
+      catalog._assignMissingNestIds();
+    }
     return { catalog, validation };
   }
 
@@ -432,6 +435,27 @@ export class Catalog {
         for (const col of LABEL_COLUMNS) row[col] = prior[col] ?? '';
         dropLegacyNotApplicable(row);
       }
+    }
+  }
+
+  /**
+   * Give a code to every nest that hasn't got one.
+   *
+   * Nests are named as they are found, but spreadsheets labeled before codes
+   * existed are full of nests with nothing in the column. Rather than leave
+   * them nameless until somebody happens to re-label them — which would mean
+   * a file where some nests can be grouped and others cannot — they are named
+   * on the way in, in the order they appear.
+   *
+   * This writes to the labeled file, so opening an old spreadsheet and saving
+   * it adds codes to rows nobody touched this session. That is the point
+   * rather than a side effect: a code is how a nest is referred to, and a file
+   * where only half of them have one is worse than either extreme.
+   */
+  _assignMissingNestIds() {
+    for (const row of this.rows) {
+      if (row.nest_label !== 'yes' || isNestId(row.nest_id)) continue;
+      this.#writeNestId(row, nextNestId(this.usedNestIds()));
     }
   }
 

@@ -309,9 +309,12 @@ mid-moult, so you never have to guess. Set the chick count back to zero and the
 button goes away and takes its answer with it.
 
 **Seen this nest before?** One nest often turns up ten times in a burst, and
-again a month later. When you recognise one, the **seen this nest before?**
-button in the nest details row opens a contact sheet of the whole spreadsheet:
-click every photograph that shows the same nest, then **Mark as one nest**.
+again a month later. The **seen this nest before?** button sits next to the
+nest YES / NO buttons — above the decision, because recognising a nest happens
+while you're looking at the photograph, not after you've committed to calling it
+one. It opens a contact sheet of the whole spreadsheet: click every photograph
+that shows the same nest, then **Mark as one nest**. The nest's code shows
+beside it, with how many other assets share it.
 
 **It shows the whole spreadsheet**, scrollable, in file order, with the row you
 came from marked and scrolled into view. Nothing is filtered out by guesswork:
@@ -326,7 +329,9 @@ offered rather than enforced. Distances are deliberately coarse (`same spot`,
 precision than that.
 
 **Every nest gets a code** — `AAAA`, `AAAB`, `AAAC` — handed out in the order
-you find them, the first time you mark a row as a nest. Grouping assets makes
+you find them, the first time you mark a row as a nest. Opening a spreadsheet
+labeled before codes existed names its nests on the way in, so you never get a
+file where some can be grouped and others can't. Grouping assets makes
 them share one: the older code wins, so merging into a nest you've already named
 keeps that name. Reopening the button on a nest that already has a group starts
 from that group, so adding an eleventh photograph to ten is the same gesture.

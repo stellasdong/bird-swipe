@@ -460,6 +460,14 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
    centre it against and it reads as part of the sentence. */
 #meta .link-btn { align-self: auto; vertical-align: baseline; }
 
+/* The nest's code, beside the decision it belongs to. Quiet: it is a label,
+   not an answer anybody has to give. */
+.nest-code {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: .08em;
+}
+
 /* ------------------------------------------------------ identify duplicates */
 /* A contact sheet of the spreadsheet. Wide, because the judgement is made by
    eye and small thumbnails do not support it, and scrollable because an export

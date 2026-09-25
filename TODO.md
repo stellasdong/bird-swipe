@@ -824,9 +824,15 @@ box down to 11%, without moving anything:
 comparison of pixels is going to beat someone who has just looked at both
 photographs, so the job was to put the candidates in front of them.
 
-- [x] **seen this nest before?** in the nest details row opens a contact sheet
-      of the whole spreadsheet. Click every photograph of the same nest, then
-      **Mark as one nest**.
+- [x] **seen this nest before?** sits beside the nest YES / NO buttons —
+      **above** the decision, because recognising a nest happens while looking
+      at the photograph, not after committing to calling it one. It works on an
+      undecided row. The nest's code shows next to it, with how many other
+      assets share it.
+- [x] Opening a spreadsheet labeled **before codes existed** names its nests on
+      the way in, in the order they appear. This writes codes into rows nobody
+      touched that session, which is deliberate: a file where only half the
+      nests can be grouped is worse than either extreme.
 - [x] **The whole spreadsheet, scrollable**, in file order, with the row the
       reviewer came from marked and scrolled into view.
 - [x] Every tile carries **recordist, date, coordinates and rough distance**

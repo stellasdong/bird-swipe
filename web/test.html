@@ -726,6 +726,40 @@ group('catalog.js — resume across a reload');
   eq('legacy n/a is not counted as a substrate', legacy.stats().substrates, 0);
 }
 
+group('catalog.js — naming nests that were labeled before codes existed');
+{
+  // A spreadsheet labeled before this feature is full of nests with nothing
+  // in the column. Leaving them nameless would mean a file where some nests
+  // can be grouped and others cannot, so they are named on the way in.
+  const first = Catalog.open('s.csv', SAMPLE).catalog;
+  first.setLabel(0, { nest: true, structure: false, reviewer: 'mei' });
+  first.setLabel(1, { nest: false, structure: false, reviewer: 'mei' });
+  first.setLabel(2, { nest: true, structure: false, reviewer: 'mei' });
+
+  // Strip the codes, the way a file written by the older app would have them.
+  const older = first.labeled.serialize().replace(/AAA[A-Z]/g, '');
+  check('the older file really has none', !/AAA[A-Z]/.test(older));
+
+  const { catalog } = Catalog.open('s.csv', SAMPLE, { labeledText: older });
+  eq('the first nest is named on the way in', catalog.rows[0].nest_id, 'AAAA');
+  eq('and the next nest gets the next code', catalog.rows[2].nest_id, 'AAAB');
+  eq('a non-nest row is left alone', catalog.rows[1].nest_id ?? '', '');
+  eq('an unreached row too', catalog.rows[3].nest_id ?? '', '');
+  check('and the names reach the labeled file, not just the screen',
+        isNestId(catalog.labeled.get(catalog.rows[0][CATALOG_KEY])?.nest_id));
+
+  // Codes already in a file are kept; naming is only for what is missing.
+  const kept = Catalog.open('s.csv', SAMPLE,
+                            { labeledText: first.labeled.serialize() }).catalog;
+  eq('an existing code survives reopening', kept.rows[0].nest_id, 'AAAA');
+  eq('and so does its neighbour', kept.rows[2].nest_id, 'AAAB');
+
+  // Opening without resuming has nothing to name.
+  const fresh = Catalog.open('s.csv', SAMPLE,
+                             { labeledText: older, resume: false }).catalog;
+  eq('resume:false names nothing', fresh.rows[0].nest_id ?? '', '');
+}
+
 group('catalog.js — nest codes');
 {
   // Four letters, handed out in order, one per nest. Short enough to say out
