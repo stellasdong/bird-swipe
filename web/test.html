@@ -34,6 +34,7 @@ import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
   Folder, SUBMIT_DIR,
 } from './storage.js';
+import { checklistUrl } from './macaulay.js';
 import {
   DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay,
   getRememberedTerms, rememberTerm, setRememberedTerms,
@@ -397,6 +398,22 @@ group('catalog.js — chick stage');
 
   catalog.setSkip(1);
   eq('a skip clears it too', catalog.rows[1].chick_stage, '');
+}
+
+group('macaulay.js — the checklist link');
+{
+  // The export carries the eBird checklist an asset came from. A link is worth
+  // more than the S-number: it opens the whole outing — the other photographs,
+  // the notes, what else was seen there — which is how a reviewer recognises a
+  // nest they have already labeled.
+  eq('builds an eBird checklist URL', checklistUrl('S364779538'),
+     'https://ebird.org/checklist/S364779538');
+  eq('trims what the spreadsheet gives it', checklistUrl('  S1  '),
+     'https://ebird.org/checklist/S1');
+  // Plenty of Macaulay rows have no checklist, and a link to nowhere is worse
+  // than no link — renderMeta skips the field when this comes back blank.
+  eq('no checklist, no link', checklistUrl(''), '');
+  eq('and the same for a missing column', checklistUrl(undefined), '');
 }
 
 group('catalog.js — multi-select cells');

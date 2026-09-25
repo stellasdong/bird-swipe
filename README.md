@@ -296,6 +296,11 @@ or chicks clearly at fit-to-window size. Press `Z` or click the photo and it
 loads at full resolution — scroll to move around, press `Z` or click again to
 fit.
 
+**The blurb under the photo** names the **recordist** — the eBirder who took it
+— and links their **eBird checklist**, which opens the whole outing: the other
+photographs, the notes, what else was seen there. Recordist, date and checklist
+together are how you recognise a nest you've labeled before.
+
 If a photo won't load, bird-swipe retries once by itself and then offers a
 **Try again** button — so a patchy connection doesn't push you into skipping an
 item you never actually saw.

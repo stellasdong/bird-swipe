@@ -930,7 +930,7 @@ the preview and save it out, then open that file on the real site. The app
 already resumes from a labeled file. Worth checking whether the one-off is
 enough before building a migration nobody needs twice.
 
-## M29 — The recordist and their checklist in the info blurb — **small**
+## M29 — The recordist and their checklist in the info blurb — **built**
 
 The blurb under the photo shows Format, Caption, Behaviors, Date, Locality and
 Asset Tags. It shows neither who took the photograph nor which outing it came
@@ -938,17 +938,17 @@ from, and the export has both: column 7 **`Recordist`** (with a `Recordist 2`
 alongside for a second contributor) and column 31 **`eBird Checklist ID`**,
 which holds an `S`-number like `S364779538`.
 
-- [ ] Add `Recordist` to that line in `renderMeta`. One entry in the array,
+- [x] Add `Recordist` to that line in `renderMeta`. One entry in the array,
       since the blurb is generated from a list of column names.
-- [ ] Add the checklist with it. The plain ID is the cheap version and works
-      the same way.
-- [ ] **Better: make it a link**, `https://ebird.org/checklist/<id>`. The
+- [x] Add the checklist with it, beside the date rather than at the end —
+      recordist, date and checklist read as one thought.
+- [x] **Better: made it a link**, `https://ebird.org/checklist/<id>`. The
       blurb already links the ML asset page, and `macaulay.js` is where that
       URL is built (`assetPageUrl`) — a `checklistUrl` belongs beside it. One
       click gets the reviewer the whole outing: the other photos, the notes,
       what else was seen there. That is worth far more than the number.
-- [ ] Decide whether `Recordist 2` goes with it. It is usually empty, and
-      showing a field only when present is what the loop already does.
+- [x] `Recordist 2` goes with it. It is usually empty, and showing a
+      field only when present is what the loop already did.
 
 Worth more than its size: recordist, date and checklist together are how a
 reviewer recognises a nest they have seen before — and a shared checklist is

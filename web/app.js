@@ -12,7 +12,8 @@ import {
   CHICK_STAGES,
 } from './catalog.js';
 import {
-  PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, photoUrl, videoUrl,
+  PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, checklistUrl, photoUrl,
+  videoUrl,
 } from './macaulay.js';
 import {
   AUTOSAVE_DIR, DebouncedWriter, ExportHandles, Folder, Progress,
@@ -1234,10 +1235,26 @@ function renderMeta(row) {
   head.append(strong, ' · ', link);
   el.meta.append(head);
 
+  // Recordist, date and checklist sit together, because that is how a
+  // reviewer recognises a nest they have seen before: the same person, out
+  // on the same day, on the same list. The checklist is a link — one click
+  // is the whole outing, which is worth more than the S-number itself.
   const inline = document.createElement('div');
-  for (const key of ['Format', 'Caption', 'Behaviors', 'Date', 'Locality', 'Asset Tags']) {
-    if (!row[key]) continue;
+  for (const key of ['Format', 'Caption', 'Behaviors',
+                     'Recordist', 'Recordist 2', 'Date', 'eBird Checklist ID',
+                     'Locality', 'Asset Tags']) {
+    if (!row[key]) continue;          // every field shows only when present
     const b = document.createElement('b');
+    if (key === 'eBird Checklist ID') {
+      b.textContent = 'Checklist: ';
+      const a = document.createElement('a');
+      a.href = checklistUrl(row[key]);
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = row[key];
+      inline.append(b, a, `   `);
+      continue;
+    }
     b.textContent = `${key}: `;
     inline.append(b, `${row[key]}   `);
   }
