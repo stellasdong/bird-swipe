@@ -183,22 +183,6 @@
     <button class="cycle" id="y-chick-stage" data-empty="true" type="button"
             hidden></button>
 
-    <!-- Is a parent actively feeding? And if the food is visible, what is it?
-         The prey list only exists once the answer to the first is yes. -->
-    <button class="toggle" id="t-provisioning" aria-pressed="false" type="button"></button>
-
-    <div class="picker" id="p-prey" data-empty="true" hidden>
-      <button class="picker-btn" id="prey-open" type="button"
-              aria-haspopup="listbox" aria-expanded="false"></button>
-      <div class="picker-pop" id="prey-pop" hidden>
-        <input type="text" id="prey-filter" autocomplete="off" spellcheck="false"
-               placeholder="type to narrow, or type anything new"
-               aria-label="Prey — what is being fed; type to narrow the list">
-        <ul class="picker-list" id="prey-list" role="listbox" aria-multiselectable="true"></ul>
-        <div class="picker-foot" id="prey-foot"></div>
-      </div>
-    </div>
-
     <span class="details-hint" id="details-hint"></span>
   </div>
 

@@ -56,12 +56,6 @@ export const DEFAULT_KEYS = {
   // block. Only reachable when that count is above zero.
   cycle_chick_stage: 'f',
   cycle_chick_stage_num: '8',
-  // H and J rather than G, which is jump. The prey list only opens once
-  // provisioning is yes, so its key does nothing until then.
-  toggle_provisioning: 'h',
-  toggle_provisioning_num: '9',
-  pick_prey: 'j',
-  pick_prey_num: '0',
   zoom: 'z',
   jump: 'g',
   close: 'Escape',
@@ -91,10 +85,6 @@ export const ACTION_LABELS = {
   count_chicks_num: 'Chick count — nest details (number)',
   cycle_chick_stage: 'Chick stage — nest details (letter)',
   cycle_chick_stage_num: 'Chick stage — nest details (number)',
-  toggle_provisioning: 'Provisioning / feeding — nest details (letter)',
-  toggle_provisioning_num: 'Provisioning / feeding — nest details (number)',
-  pick_prey: 'Prey — nest details (letter)',
-  pick_prey_num: 'Prey — nest details (number)',
   zoom: 'Zoom the photo in / out',
   jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this
