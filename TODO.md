@@ -1,9 +1,10 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12–M25 and
-M29–M30 are built. What is left: **M31**, short media notes not translating, a
-bug in M30; **detecting duplicates automatically**, the open half of M25;
-M26–M27 are low priority; M28 is small.
+M29–M30 are built. Two bugs are open: **M32**, the structure hotkey swallowed
+by the location list, which can write a wrong answer; and **M31**, short media
+notes not translating. Then **detecting duplicates automatically**, the open
+half of M25; M26–M27 are low priority; M28 is small.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
 Unbuilt items carry a priority: **high priority** first, then whatever is
@@ -1203,6 +1204,55 @@ and short notes are not the rare case here; they are most of the column.
 
 Whatever is chosen, the fix wants a test with a **short** note in it — the
 existing ones all use full sentences, which is why this got through.
+
+
+## M32 — The structure hotkey doesn't work while the location list is open — **bug**
+
+Stella: marking a nest opens the location list, and pressing `Q` / `1` to say
+it's a human-made structure goes into the dropdown instead of the toggle.
+
+**Confirmed in the browser, and the number form is the worse half:**
+
+| Key | What the reviewer meant | What happens |
+|---|---|---|
+| `Q` | human-made structure | types a `q` into the filter, narrowing the list to nothing |
+| `1` | human-made structure | **records "tree" as the location and closes the list** |
+
+The letter is a nuisance. The digit silently writes a wrong answer to a
+required column and moves on, and `1` is the likelier press of the two for
+anyone using the number pad.
+
+**Why it happens.** An open list owns the keyboard (M20) — letters type,
+digits pick off the list — which is what makes type-to-filter work at all. And
+the chain (M22) opens the location list the instant a nest is marked. So the
+app puts the reviewer in a state where the toggle is visible, is labelled
+**(Q/1)**, and neither key does what the label says. The instinct is not a
+mistake; the app is advertising a key it has just disabled.
+
+`←` / `→` inside the list already switch natural and man-made, and that *is*
+the structure answer (M22). It works. It is just not what the panel tells you
+to press.
+
+**Options:**
+
+- [ ] **Make `Q` and `1` switch the list** while it is open — the same thing
+      `←` / `→` do. The cost is that `1` stops picking the first row in that
+      one list, which is a real loss, but a small one against silently
+      recording a location nobody chose. Recommended.
+- [ ] **Stop advertising the key**: render the structure toggle as **(←→)**
+      while the location list is open. Honest and tiny, and it fixes nothing
+      for someone who presses `1` from muscle memory before reading.
+- [ ] **Don't auto-open the location list**, so the toggle is reachable first.
+      Gives back the problem M22 was built to solve.
+- [ ] Both of the first two, which is probably the right answer: make the keys
+      work *and* stop the panel lying about them.
+
+**Worth checking while fixing:** the same trap exists for every nest-details
+hotkey, not just structure. Any of `A S D F H J` pressed while a list is open
+types a letter, and any digit picks a row. Structure is the one that bites
+because the chain puts a list in front of the reviewer at exactly the moment
+they want to answer it — but a test that presses each panel key with a list
+open would say how wide the problem really is.
 
 ---
 
