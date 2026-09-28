@@ -1,12 +1,9 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12–M25 and
-M29–M30 are built. What is left: **detecting duplicates automatically**, the
-open half of M25; M26–M27 are low priority; M28 is small.
-[PLAN.md](PLAN.md) is the original design; [README.md](README.md) describes
-what the app does today. Each item says where it would land in the code,
-because every one of them adds columns to a file researchers may already be
-half way through labeling.
+M29–M30 are built. What is left: **M31**, short media notes not translating, a
+bug in M30; **detecting duplicates automatically**, the open half of M25;
+M26–M27 are low priority; M28 is small.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
 Unbuilt items carry a priority: **high priority** first, then whatever is
@@ -1164,6 +1161,48 @@ throughout with no change.
   `Map` keyed by catalog number would fix it if it ever does.
 - The language a note is translated *to* is hardcoded English. Right for this
   project; wrong the moment a non-English-speaking reviewer uses it.
+
+
+## M31 — Short notes don't translate — **bug, small**
+
+Stella: *"Tres huevos isn't translating, other instances I've noticed."*
+
+**Almost certainly the confidence threshold.** `translate.js` refuses to
+translate unless the language detector is at least **0.6** sure, and a
+two-word note is exactly where a detector is least sure. "Tres huevos" gives
+it four syllables to work with; it will answer Spanish, and it will not answer
+Spanish with much confidence.
+
+That threshold was a deliberate choice and the reasoning is in the file: notes
+are short, so detection is genuinely uncertain, and translating a note that
+was English all along would corrupt the reviewer's understanding of it. That
+part still holds.
+
+**What the reasoning missed** is that it guards one direction only. A false
+positive — translating English — is prevented. A false negative leaves the
+reviewer looking at a note they cannot read with **no way to ask**, and no
+indication that anything was even considered. The guard has no escape hatch,
+and short notes are not the rare case here; they are most of the column.
+
+**Options, roughly in order of how much I'd trust them:**
+
+- [ ] **Always offer the button.** When a note isn't confidently *English*,
+      show *translate to English* whether or not the detector cleared 0.6.
+      Auto-translation stays conservative; the reviewer gets to ask. This
+      fixes the whole class rather than this one note, and it cannot translate
+      anything behind their back.
+- [ ] **Read the whole result list**, not just the top one. The detector
+      returns every candidate ranked. If English is absent or far down, a
+      low-confidence Spanish answer is much better evidence than its own
+      number suggests.
+- [ ] **Lower the threshold.** Simplest, and the one to be most careful with:
+      it trades this bug for the opposite one, silently, across every note.
+- [ ] Worth logging what the detector actually returns for a handful of real
+      notes before choosing. This is a guess about a model's behaviour, and
+      the export has 11 rows with media notes to test against.
+
+Whatever is chosen, the fix wants a test with a **short** note in it — the
+existing ones all use full sentences, which is why this got through.
 
 ---
 
