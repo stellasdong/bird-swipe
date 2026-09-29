@@ -399,9 +399,20 @@ detected as something other than English is translated, labelled **"Media notes
 one click away and is always what the spreadsheet holds; the translation is a
 reading aid and is never written to a file.
 
+**A short note gets offered rather than translated.** "Tres huevos" is two
+words, and no language detector is confident about two words — so instead of
+translating it unasked, the note shows **translate from Spanish?** and waits.
+Say yes once and every later note in that language translates on sight. A note
+the detector calls English is left alone with no button at all.
+
+That split is deliberate: translating an English note unasked would replace
+what the eBirder wrote with a machine's guess at it, and you might not notice.
+Offering a button you didn't want costs a button.
+
 The first note of a session needs one click on **translate to English** —
-Chrome won't build a translation model without a gesture. After that it is
-automatic for every note in that language. It needs **Chrome 138 or newer on
+Chrome won't build a translation model without a gesture, and until it has one
+nothing knows what language the note is in, which is why that first button is
+worded generally. After that it is automatic for every note in that language. It needs **Chrome 138 or newer on
 desktop**, and it runs entirely on your own machine: nothing is uploaded, which
 is the only reason it's in here at all — field notes are the researcher's data.
 On any browser without it, the note simply shows as written.

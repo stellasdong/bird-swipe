@@ -1,9 +1,8 @@
 # bird-swipe — what's next
 
-The next round of labeling features, from Stella. The flow and M12–M25,
-M29–M30 and M32 are built. What is left: **M31**, short media notes not
-translating, a bug in M30; **detecting duplicates automatically**, the open
-half of M25; M26–M27 are low priority; M28 is small.
+The next round of labeling features, from Stella. The flow and M12–M25 and
+M29–M32 are built. What is left: **detecting duplicates automatically**, the
+open half of M25; M26–M27 are low priority; M28 is small.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
 Unbuilt items carry a priority: **high priority** first, then whatever is
@@ -1163,7 +1162,7 @@ throughout with no change.
   project; wrong the moment a non-English-speaking reviewer uses it.
 
 
-## M31 — Short notes don't translate — **bug, small**
+## M31 — Short notes don't translate — **fixed**
 
 Stella: *"Tres huevos isn't translating, other instances I've noticed."*
 
@@ -1184,25 +1183,32 @@ reviewer looking at a note they cannot read with **no way to ask**, and no
 indication that anything was even considered. The guard has no escape hatch,
 and short notes are not the rare case here; they are most of the column.
 
-**Options, roughly in order of how much I'd trust them:**
+**Fixed by splitting the one gate into two**, because the costs are not
+symmetric. Translating an English note unasked replaces what the eBirder wrote
+with a machine's guess at it and the reviewer may never notice; offering a
+button nobody wanted costs a button. So:
 
-- [ ] **Always offer the button.** When a note isn't confidently *English*,
-      show *translate to English* whether or not the detector cleared 0.6.
-      Auto-translation stays conservative; the reviewer gets to ask. This
-      fixes the whole class rather than this one note, and it cannot translate
-      anything behind their back.
-- [ ] **Read the whole result list**, not just the top one. The detector
-      returns every candidate ranked. If English is absent or far down, a
-      low-confidence Spanish answer is much better evidence than its own
-      number suggests.
-- [ ] **Lower the threshold.** Simplest, and the one to be most careful with:
-      it trades this bug for the opposite one, silently, across every note.
-- [ ] Worth logging what the detector actually returns for a handful of real
-      notes before choosing. This is a guess about a model's behaviour, and
-      the export has 11 rows with media notes to test against.
+- [x] `pickLanguage` still needs 0.6 and still governs what is translated
+      **unasked**. Nothing became more willing to translate on its own.
+- [x] `suggestLanguage` consults no confidence at all and governs what is
+      **offered**. A weak Spanish guess now puts up *translate from Spanish?*
+      instead of doing nothing.
+- [x] Only the top candidate counts, so a note the detector calls English
+      first is left alone with no button, whatever it lists underneath.
+- [x] **Saying yes once is enough.** A language whose translator already
+      exists this session translates on sight, weak detection or not — having
+      accepted Spanish, the reviewer is not asked about Spanish again.
+- [x] The threshold was **not** lowered, which was the third option and the
+      one that would have traded this bug for its opposite silently across
+      every note.
 
-Whatever is chosen, the fix wants a test with a **short** note in it — the
-existing ones all use full sentences, which is why this got through.
+The lowered threshold is still available if offering turns out to be a
+nuisance, but it should not be reached for first: a button is reversible and a
+wrong translation, shown in place of the original, is not obviously wrong to
+anyone who cannot read the original.
+
+Tested with a **short** note, which is what the old tests lacked — they all
+used full sentences, which is exactly how this got through.
 
 
 ## M32 — The structure hotkey doesn't work while the location list is open — **fixed**

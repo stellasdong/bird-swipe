@@ -46,19 +46,43 @@ export function languageName(code) {
 // a note that was probably English all along.
 const MIN_CONFIDENCE = 0.6;
 
+const isEnglish = code => code === 'en' || code.startsWith('en-');
+
 /**
- * The language worth translating from, or null to leave the note alone.
+ * The most likely language of a note, English and "don't know" aside.
  *
- * Null covers three cases that all mean "show it as written": nothing
- * detected, English already, and a detection too weak to act on.
+ * Confidence is not consulted. This is the answer to "what would this be, if
+ * it is anything?", and it is deliberately easy to satisfy — see below.
  */
-export function pickLanguage(results, minConfidence = MIN_CONFIDENCE) {
+export function suggestLanguage(results) {
   const [best] = Array.isArray(results) ? results : [];
   if (!best) return null;
   const code = String(best.detectedLanguage ?? '');
-  if (!code || code === 'und') return null;
+  if (!code || code === 'und' || isEnglish(code)) return null;
+  return code;
+}
+
+/**
+ * The language worth translating from **without being asked**.
+ *
+ * Same answer as suggestLanguage, but only when the detector is sure. The two
+ * exist separately because the cost of being wrong is not symmetric:
+ *
+ *   Translating an English note unasked replaces what the eBirder wrote with
+ *   a machine's guess at it, and the reviewer may not notice.
+ *   Offering a button nobody wanted costs a button.
+ *
+ * So the threshold guards the doing, and nothing guards the offering. That is
+ * the fix for notes like "Tres huevos" — two words, correctly detected as
+ * Spanish, and never with enough confidence to clear the bar. The old code
+ * had one gate for both and left the reviewer looking at a note they could
+ * not read with no way to ask.
+ */
+export function pickLanguage(results, minConfidence = MIN_CONFIDENCE) {
+  const [best] = Array.isArray(results) ? results : [];
+  const code = suggestLanguage(results);
+  if (!code) return null;
   if ((best.confidence ?? 0) < minConfidence) return null;
-  if (code === 'en' || code.startsWith('en-')) return null;
   return code;
 }
 
@@ -81,12 +105,18 @@ export class Translators {
     this.byLanguage = new Map();
   }
 
+  /**
+   * What to do with a note: `auto` is a language confident enough to translate
+   * unasked, `suggested` is the best guess at any confidence. Both null means
+   * leave it alone.
+   */
   async detect(text) {
     if (!canTranslate(this.api)) return null;
     if (!this.detector) {
       this.detector = await this.#build(() => this.api.LanguageDetector.create());
     }
-    return pickLanguage(await this.detector.detect(text));
+    const results = await this.detector.detect(text);
+    return { auto: pickLanguage(results), suggested: suggestLanguage(results) };
   }
 
   async translate(text, sourceLanguage) {

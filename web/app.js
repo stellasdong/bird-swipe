@@ -1511,12 +1511,50 @@ async function offerTranslation(line, label, text, mlId) {
   if (!canTranslate()) return;
   const stale = () => state.catalog?.rows[state.idx]?.[CATALOG_KEY] !== mlId;
 
-  const run = async () => {
-    const language = await translators.detect(text);
-    if (!language) return true;             // English, or too unsure to act
+  const linkButton = (text2, onClick) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'link-btn';
+    button.textContent = text2;
+    button.addEventListener('click', onClick);
+    line.append(' ', button);
+    return button;
+  };
+
+  const translateNow = async (language) => {
     const english = await translators.translate(text, language);
-    if (stale() || !english || english === text) return true;
+    if (stale() || !english || english === text) return;
     showNote(line, label, { original: text, english, language, showing: 'english' });
+  };
+
+  const run = async () => {
+    const found = await translators.detect(text);
+    if (!found) return true;
+    // Confident, or a language this reviewer has already accepted once this
+    // session — either way, translate it. The second case is what makes a run
+    // of short notes in one language cost a single click rather than one
+    // each: having said yes to Spanish, they are not asked about Spanish
+    // again.
+    if (found.auto || (found.suggested && translators.ready(found.suggested))) {
+      await translateNow(found.auto ?? found.suggested);
+      return true;
+    }
+    // A guess too weak to act on is still worth offering. Two words of Spanish
+    // will never convince a detector, and the reviewer left staring at a note
+    // they cannot read is the worse failure.
+    if (found.suggested) {
+      const name = languageName(found.suggested);
+      linkButton(`translate from ${name}?`, async event => {
+        event.target.disabled = true;
+        event.target.textContent = 'translating…';
+        try {
+          await translateNow(found.suggested);
+        } catch (err) {
+          noteHandledError('translate media notes failed', err);
+          event.target.textContent = 'translation unavailable';
+        }
+      });
+    }
     return true;
   };
 
@@ -1527,23 +1565,21 @@ async function offerTranslation(line, label, text, mlId) {
       noteHandledError('translate media notes failed', err);
       return;
     }
-    // Chrome wants a click first. Offer one; it is also the gesture.
+    // Chrome wants a click first, and until it has had one there is no
+    // detector, so nothing here knows what language the note is in — hence
+    // the general wording. Every note after this one can be specific.
     if (stale()) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'link-btn';
-    button.textContent = 'translate to English';
-    button.addEventListener('click', async () => {
+    const button = linkButton('translate to English', async () => {
       button.disabled = true;
       button.textContent = 'translating…';
       try {
         await run();
+        if (button.isConnected) button.remove(); // run() put up its own
       } catch (e) {
         noteHandledError('translate media notes failed', e);
         button.textContent = 'translation unavailable';
       }
     });
-    line.append(' ', button);
   }
 }
 

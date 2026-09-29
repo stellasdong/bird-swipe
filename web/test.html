@@ -37,7 +37,8 @@ import {
 } from './storage.js';
 import { checklistUrl } from './macaulay.js';
 import {
-  canTranslate, languageName, pickLanguage, NeedsGestureError, Translators,
+  canTranslate, languageName, pickLanguage, suggestLanguage,
+  NeedsGestureError, Translators,
 } from './translate.js';
 import {
   DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay,
@@ -411,6 +412,18 @@ group('translate.js — deciding whether to translate a note');
   // the line that says whether it is a nest. But they are short — "nest w/ 2
   // eggs" is barely a sentence — so detection is genuinely uncertain, and
   // translating on a coin-flip would corrupt a note that was English already.
+  // Two questions, not one, because the costs are not symmetric: translating
+  // an English note unasked replaces what the eBirder wrote with a machine's
+  // guess at it, while offering a button nobody wanted costs a button.
+  //
+  // "Tres huevos" is the case that drove this. Two words, correctly detected
+  // as Spanish, and never with enough confidence to clear the bar — so under
+  // one gate for both it silently did nothing at all.
+  const tresHuevos = [{ detectedLanguage: 'es', confidence: 0.32 },
+                      { detectedLanguage: 'pt', confidence: 0.2 }];
+  eq('a short note is not translated unasked', pickLanguage(tresHuevos), null);
+  eq('but it is worth offering', suggestLanguage(tresHuevos), 'es');
+
   eq('a confident foreign detection is worth translating',
      pickLanguage([{ detectedLanguage: 'es', confidence: 0.98 }]), 'es');
   eq('the most likely one wins',
@@ -427,6 +440,23 @@ group('translate.js — deciding whether to translate a note');
      pickLanguage([{ detectedLanguage: 'und', confidence: 0.99 }]), null);
   eq('nothing detected, nothing done', pickLanguage([]), null);
   eq('and a missing result is not a crash', pickLanguage(undefined), null);
+
+  // Nothing is offered where there is nothing to offer, so a button never
+  // appears on a note that is already readable.
+  eq('English is not offered either',
+     suggestLanguage([{ detectedLanguage: 'en', confidence: 0.3 }]), null);
+  eq('nor a regional English',
+     suggestLanguage([{ detectedLanguage: 'en-AU', confidence: 0.2 }]), null);
+  eq('nor "undetermined"',
+     suggestLanguage([{ detectedLanguage: 'und', confidence: 0.9 }]), null);
+  eq('nor nothing at all', suggestLanguage([]), null);
+  eq('and a missing result is not a crash here either',
+     suggestLanguage(undefined), null);
+  // Only the top candidate counts. A note the detector calls English first is
+  // English, whatever else it lists underneath.
+  eq('a runner-up does not get offered',
+     suggestLanguage([{ detectedLanguage: 'en', confidence: 0.4 },
+                      { detectedLanguage: 'es', confidence: 0.35 }]), null);
 
   // The reviewer has to be told what they are reading a translation of.
   eq('a tag becomes a name', languageName('es'), 'Spanish');
@@ -460,7 +490,9 @@ group('translate.js — one gesture, then automatic');
     },
   };
   const t = new Translators(fake);
-  await t.detect('hola');
+  const found = await t.detect('hola');
+  eq('detection answers both questions at once',
+     [found.auto, found.suggested], ['es', 'es']);
   await t.detect('adios');
   eq('the detector is built once, not per note', calls.detector, 1);
   eq('translating goes through', await t.translate('hola', 'es'), 'EN(hola)');
