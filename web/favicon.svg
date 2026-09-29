@@ -27,8 +27,14 @@
   <g transform="translate(32 32) scale(.86) translate(-31.25 -32.5)">
 
   <!-- Tail first, so the body overlaps its root and it reads as attached.
-       Angled down and back: a tail level with the body looks like a fish. -->
-  <path fill="#fff" d="M39 32.5 61.5 38.5 59 46.5 37.5 42.5Z"/>
+       Angled down and back: a tail level with the body looks like a fish.
+       Tapered from a broad root to a narrow tip, with a shallow fork bitten
+       out of the end — a parallel-sided one is a plank, not a tail. The fork
+       fills in by 16px and only the taper survives, which is the right thing
+       to lose. -->
+  <path fill="#fff"
+        d="M38.5 31.5c9.5 1 17.4 3.9 23 8.7l-6.2 2.6 3.9 5.6
+           c-8.8-1.3-16.1-2.9-21.9-4.8z"/>
 
   <!-- Body. -->
   <ellipse fill="#fff" cx="32.5" cy="36.5" rx="14.5" ry="11.5"/>
