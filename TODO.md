@@ -1,8 +1,9 @@
 # bird-swipe — what's next
 
 The next round of labeling features, from Stella. The flow and M12–M25 and
-M29–M32 are built. What is left: **detecting duplicates automatically**, the
-open half of M25; M26–M27 are low priority; M28 is small.
+M29–M32 are built, and M24 is settled as it stands. What is left: **detecting
+duplicates automatically**, the open half of M25; M26–M27 are low priority;
+M28 is small.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
 Unbuilt items carry a priority: **high priority** first, then whatever is
@@ -770,7 +771,12 @@ hidden elements are not focusable, so it joins and leaves the order on its own.
   count box and a focused-and-typing one look alike.
 
 
-## M24 — An open list covers the photo — **open, one attempt reverted**
+## M24 — An open list covers the photo — **settled at 11%**
+
+**Closed.** Stella: *"11% is fine, leave M24 as is."* The shrink below is
+where this stops; the ideas at the bottom stay written down in case the
+overlap ever starts to matter, but nobody should act on them without being
+asked.
 
 M22 made the location list open by itself on every nest, which turned a
 tolerable overlap into a constant one. Measured at 1440×900: the popup hangs
@@ -804,7 +810,7 @@ box down to 11%, without moving anything:
       46vh to 34vh. Nine terms still fit without scrolling, which is every
       list there is.
 
-**Still to solve.** It is smaller, not gone. Ideas not yet tried:
+**Not being solved further**, by decision. Recorded in case that changes:
 
 - A **bottom sheet** — the list along the bottom, photo above it, so the
   overlap is at the edge of the frame rather than the middle.
