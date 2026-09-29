@@ -576,13 +576,14 @@ Labels stay in memory in that mode and are never written to disk.
 
 ### Tests
 
-Open **http://localhost:8000/web/test.html** — 228 assertions covering the CSV
+Open **http://localhost:8000/web/test.html** — 404 assertions covering the CSV
 parser, the label scheme, the nest-only columns, the three term lists and their
-filter, resume, the truncation guard,
-the debounced writer,
-the in-browser progress store, autosave mirroring, the output folder layout and
-the problem report, plus round-trips of every real export in `test/`. The page title shows a ✓ or ✗
-and the pass/fail count.
+filter, nest codes and grouping, provisioning and prey, chick stage, the
+reviewer list, language detection and the translation caches, the eBird
+checklist link, resume, the truncation guard, the debounced writer, the
+in-browser progress store, autosave mirroring, the output folder layout and the
+problem report, plus round-trips of every real export in `test/`. The page title
+shows a ✓ or ✗ and the pass/fail count.
 
 ### The folder-access spike
 
