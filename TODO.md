@@ -1147,14 +1147,16 @@ throughout with no change.
 - [x] Translate on a weak detection. Notes are short — "nest w/ 2 eggs" is
       barely a sentence — so anything under 0.6 confidence is left alone.
       Translating an English note on a coin-flip is worse than not translating.
-- [x] Touch `Observation Details`, which is the same kind of free text and the
-      obvious next candidate. Left alone deliberately: Stella asked for media
-      notes, and one field is enough to find out whether this helps.
+- [x] ~~Left `Observation Details` alone deliberately.~~ That was the wrong
+      call, and it is what Stella was actually hitting when she reported
+      "Tres huevos" untranslated: the phrase is in Observation Details, not
+      Media notes, and across the real exports the eBirders' Spanish lands in
+      that column **three times as often** — 12 rows against 4. Translating
+      one free-text field and not the other meant the line she was looking at
+      stayed in Spanish. Both are translated now.
 
 **Still open**
 
-- `Observation Details` gets the same treatment if this proves useful. Same
-  function, one more call site.
 - Nothing caches a translation across rows, so stepping back onto a note
   re-translates it. On-device and near-instant, so it has not mattered; a
   `Map` keyed by catalog number would fix it if it ever does.

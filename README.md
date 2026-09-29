@@ -391,10 +391,11 @@ fit.
 photographs, the notes, what else was seen there. Recordist, date and checklist
 together are how you recognise a nest you've labeled before.
 
-**Media notes are shown in English** where the browser can manage it. The note
-is what the eBirder wrote about the photograph, in whatever language they use,
-and it is often the line that says whether it is a nest at all — so a note
-detected as something other than English is translated, labelled **"Media notes
+**The eBirder's own words are shown in English** where the browser can manage
+it — both **Observation Details** and **Media notes**. They're what the eBirder
+wrote about the photograph, in whatever language they use,
+and often the line that says whether it is a nest at all — so text detected as
+something other than English is translated, labelled **"Observation Details
 (translated from Spanish)"**, with **show original** next to it. The original is
 one click away and is always what the spreadsheet holds; the translation is a
 reading aid and is never written to a file.

@@ -1462,7 +1462,11 @@ function renderMeta(row) {
     b.textContent = `${key}: `;
     line.append(b, row[key]);
     el.meta.append(line);
-    if (key === 'Media notes') offerTranslation(line, b, row[key], mlId);
+    // Both free-text fields, not just one. Media notes was the field Stella
+    // named, but the eBirders' own words land in Observation Details three
+    // times as often — translating one and not the other meant the note she
+    // was actually looking at stayed in Spanish.
+    offerTranslation(line, b, row[key], mlId, key);
   }
 }
 
@@ -1479,12 +1483,12 @@ function renderMeta(row) {
 const translators = new Translators();
 
 /** Swap a rendered note between the original and its translation. */
-function showNote(line, label, { original, english, language, showing }) {
+function showNote(line, label, { field, original, english, language, showing }) {
   const name = languageName(language);
   line.textContent = '';
   label.textContent = showing === 'english'
-    ? `Media notes (translated from ${name}): `
-    : `Media notes (${name}): `;
+    ? `${field} (translated from ${name}): `
+    : `${field} (${name}): `;
   line.append(label, showing === 'english' ? english : original);
 
   const button = document.createElement('button');
@@ -1493,21 +1497,24 @@ function showNote(line, label, { original, english, language, showing }) {
   button.textContent = showing === 'english'
     ? `show original (${name})` : 'show translation';
   button.addEventListener('click', () => showNote(line, label, {
-    original, english, language,
+    field, original, english, language,
     showing: showing === 'english' ? 'original' : 'english',
   }));
   line.append(' ', button);
 }
 
 /**
- * Translate one note in place, if this browser can and the note isn't English.
+ * Translate one free-text field in place, if the browser can and it isn't
+ * English. Called for both Observation Details and Media notes — they are the
+ * same kind of text, written by the same person, and either can be the line
+ * that says whether it is a nest.
  *
  * Everything here is best-effort: a browser without the APIs, a language with
  * no model, a detection too weak to trust, or an outright failure all leave
  * the note exactly as the eBirder wrote it. `mlId` guards against a slow
  * translation landing on whatever row the reviewer has since moved to.
  */
-async function offerTranslation(line, label, text, mlId) {
+async function offerTranslation(line, label, text, mlId, field) {
   if (!canTranslate()) return;
   const stale = () => state.catalog?.rows[state.idx]?.[CATALOG_KEY] !== mlId;
 
@@ -1524,7 +1531,8 @@ async function offerTranslation(line, label, text, mlId) {
   const translateNow = async (language) => {
     const english = await translators.translate(text, language);
     if (stale() || !english || english === text) return;
-    showNote(line, label, { original: text, english, language, showing: 'english' });
+    showNote(line, label, { field, original: text, english, language,
+                            showing: 'english' });
   };
 
   const run = async () => {
