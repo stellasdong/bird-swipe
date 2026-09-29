@@ -673,3 +673,29 @@ pyinstaller packaging/bird_swipe.spec --noconfirm   # build the bundles
 - [x] M9 — save local and save to OneDrive as separate, explicit steps
 - [x] M10 — error catching and a problem report researchers can email
 - [x] M11 — zoom, faster counting, and colour-blind-safe toggles
+
+**4.0 — the nest-details round.** Every observation moved behind the nest
+decision, and the spreadsheet gained the columns to go with it.
+
+- [x] M12 — bird present, and a nest-details panel to put it in
+- [x] M13 — substrate *(superseded by M17)*
+- [x] M14 — provisioning and prey
+- [x] M15 — repeat nests *(delivered as part of M25)*
+- [x] M16 — chick stage: early, late, unclear
+- [x] M17 — one question split into three: substrate, man-made material, location
+- [x] M18 — every observation is nest-only; structure chooses the location list
+- [x] M19 — location and substrate are required, with `unclear` to keep it honest
+- [x] M20 — `Enter` finishes a list; plainer labels on the lists themselves
+- [x] M21 — every reviewer of a row is kept, not just the last
+- [x] M22 — marking a nest opens the questions it owes, in a run
+- [x] M23 — `Tab` walks the panel
+- [x] M24 — an open list covers 11% of the photo; settled there
+- [x] M25 — duplicate nests, grouped by hand from a contact sheet
+- [ ] M25b — suggesting those groups automatically, from the eBird checklist
+- [ ] M26 — iPad *(doesn't run: no File System Access API on iOS)*
+- [ ] M27 — login and accounts
+- [ ] M28 — copying in-progress work from the preview to the real site
+- [x] M29 — the recordist and their eBird checklist, in the info blurb
+- [x] M30 — the eBirder's own words shown in English, on the device
+- [x] M31 — short notes offer a translation instead of skipping it
+- [x] M32 — the structure keys answer from inside the location list

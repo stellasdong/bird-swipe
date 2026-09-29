@@ -33,7 +33,7 @@ import {
 } from './settings.js';
 import { IS_DEV } from './channel.js';
 
-export const VERSION = '3.0.0';
+export const VERSION = '4.0.0';
 const BUILD = '__BUILD__'; // replaced with the short git SHA at deploy time
 
 // Where the written protocol lives. Fill this in and the setup dialog links to

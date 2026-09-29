@@ -16,7 +16,13 @@ const STORE_KEY = `${scoped('bird-swipe')}:settings`;
 // Adding a *new* action doesn't need a bump: getKeys() merges saved bindings
 // over the defaults, so an action nobody has a saved binding for simply takes
 // its default. Only changing what an existing action means does.
-export const KEYS_VERSION = 3;
+// Bumped to 4 for the 4.0 rework: every nest question moved into the details
+// panel and the whole layout was re-keyed (Q W E R / A S D F), one action —
+// the anthropogenic toggle — stopped existing, and several new ones appeared.
+// A saved v3 config would bind 'w' to the chick count while the new default
+// puts the location list there, which is a silent conflict rather than a
+// preference. Resetting to the new defaults is the predictable answer.
+export const KEYS_VERSION = 4;
 
 // action -> default KeyboardEvent.key. The three observation toggles each have
 // a letter and a number binding (the number pad mirror), so both are rebindable.
