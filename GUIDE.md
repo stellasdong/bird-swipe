@@ -1,5 +1,3 @@
-<img src="web/favicon.svg" alt="" width="76" align="right">
-
 # bird-swipe — using it
 
 Everything a reviewer needs: opening a spreadsheet, the keys, what each
