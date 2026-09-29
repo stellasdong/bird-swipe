@@ -101,12 +101,76 @@
     <div class="progress-fill" id="progress-fill"></div>
   </div>
 
+  <!-- The decision, and nothing else. Every observation this app records only
+       makes sense where there is a nest, so they all live in the panel below
+       and a non-nest image costs exactly one press. -->
   <div class="chips">
     <button class="chip nest-btn" id="nest-yes" type="button"></button>
     <button class="chip nest-btn" id="nest-no" type="button"></button>
     <span class="chip skip-pill" id="nest-skip" hidden>skipped</span>
+    <!-- Above the decision, not inside the nest details: recognising a nest
+         you have seen before happens while looking at the photograph, not
+         after committing to calling it one. -->
+    <button class="link-btn" id="dupes-open" type="button">seen this nest before?</button>
+    <span class="nest-code" id="nest-code"></span>
+  </div>
+
+  <!-- Questions that only apply where there is a nest. Shown exactly when the
+       current row is nest = yes; marking yes opens it without advancing. -->
+  <div class="chips nest-details" id="nest-details" hidden>
+    <span class="details-label">nest details</span>
+
+    <!-- In the order you would describe a nest in: where it is, what it is
+         built from, what is in it. The keys run along the top row in that same
+         order — Q W E R T Y U — with each number binding directly above its
+         own letter, so the row can be read off the screen rather than learned.
+
+         Structure comes first because it decides which list the location
+         picker offers. The pickers show what is recorded and open a
+         keyboard-first list: typing narrows it, and nothing is set until it is
+         confirmed. Substrate takes several answers at once, since a nest is
+         often twigs and mud and fur. -->
     <button class="toggle" id="t-structure" aria-pressed="false" type="button"></button>
-    <button class="toggle" id="t-anthropogenic" aria-pressed="false" type="button"></button>
+
+    <div class="picker" id="p-location" data-empty="true" data-required="true">
+      <button class="picker-btn" id="location-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="location-pop" hidden>
+        <input type="text" id="location-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Nest location — where the nest sits; type to narrow the list">
+        <ul class="picker-list" id="location-list" role="listbox"></ul>
+        <div class="picker-foot" id="location-foot"></div>
+      </div>
+    </div>
+
+    <div class="picker" id="p-substrate" data-empty="true" data-required="true">
+      <button class="picker-btn" id="substrate-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="substrate-pop" hidden>
+        <input type="text" id="substrate-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Substrate — what the nest is made of; type to narrow the list">
+        <ul class="picker-list" id="substrate-list" role="listbox" aria-multiselectable="true"></ul>
+        <div class="picker-foot" id="substrate-foot"></div>
+      </div>
+    </div>
+
+    <div class="picker" id="p-anthropogenic" data-empty="true">
+      <button class="picker-btn" id="anthropogenic-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="anthropogenic-pop" hidden>
+        <input type="text" id="anthropogenic-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Anthropogenic material — type to narrow the list">
+        <ul class="picker-list" id="anthropogenic-list" role="listbox"
+            aria-multiselectable="true"></ul>
+        <div class="picker-foot" id="anthropogenic-foot"></div>
+      </div>
+    </div>
+
+    <button class="toggle" id="t-bird" aria-pressed="false" type="button"></button>
+
     <div class="counter" id="c-eggs" data-empty="true">
       <span class="counter-label"></span>
       <input type="number" id="count-eggs" min="0" step="1" inputmode="numeric"
@@ -117,6 +181,31 @@
       <input type="number" id="count-chicks" min="0" step="1" inputmode="numeric"
              placeholder="0" aria-label="Number of chicks">
     </div>
+
+    <!-- Only shown once the chick count is above zero: a stage is a fact about
+         chicks, so asking for one where there are none is asking for a guess.
+         Three states on one key, and the definition rides on the label so two
+         reviewers draw the line in the same place. -->
+    <button class="cycle" id="y-chick-stage" data-empty="true" type="button"
+            hidden></button>
+
+    <!-- Is a parent actively feeding? And if the food is visible, what is it?
+         The prey list only exists once the answer to the first is yes. -->
+    <button class="toggle" id="t-provisioning" aria-pressed="false" type="button"></button>
+
+    <div class="picker" id="p-prey" data-empty="true" hidden>
+      <button class="picker-btn" id="prey-open" type="button"
+              aria-haspopup="listbox" aria-expanded="false"></button>
+      <div class="picker-pop" id="prey-pop" hidden>
+        <input type="text" id="prey-filter" autocomplete="off" spellcheck="false"
+               placeholder="type to narrow, or type anything new"
+               aria-label="Prey — what is being fed; type to narrow the list">
+        <ul class="picker-list" id="prey-list" role="listbox" aria-multiselectable="true"></ul>
+        <div class="picker-foot" id="prey-foot"></div>
+      </div>
+    </div>
+
+    <span class="details-hint" id="details-hint"></span>
   </div>
 
   <div class="media" id="media">
@@ -170,6 +259,27 @@
 </button>
 
 <!-- ---------------------------------------------------------- jump to it -->
+<!-- Identify duplicates: a contact sheet of the whole spreadsheet, for saying
+     "these are all the same nest". The reviewer recognises a nest while
+     swiping; this is where they go and find the others. Recordist and
+     coordinates ride on every tile, because the same eBirder at the same
+     place is what makes two photographs probably one nest. -->
+<dialog id="dupes">
+  <h2>Which of these are the same nest?</h2>
+  <div class="dupes-bar">
+    <input type="text" id="dupes-search" autocomplete="off"
+           placeholder="search by catalog number, date, locality, recordist…"
+           aria-label="Search the contact sheet">
+    <span class="dupes-count" id="dupes-count"></span>
+  </div>
+  <div class="dupes-grid" id="dupes-grid"></div>
+  <div class="dialog-actions">
+    <button id="dupes-cancel">Cancel</button>
+    <button id="dupes-ungroup">Ungroup</button>
+    <button id="dupes-save" class="primary">Mark as one nest</button>
+  </div>
+</dialog>
+
 <dialog id="jump">
   <h2>Jump to an item</h2>
   <div class="stack" style="align-items:stretch;gap:10px">

@@ -16,7 +16,13 @@ const STORE_KEY = `${scoped('bird-swipe')}:settings`;
 // Adding a *new* action doesn't need a bump: getKeys() merges saved bindings
 // over the defaults, so an action nobody has a saved binding for simply takes
 // its default. Only changing what an existing action means does.
-export const KEYS_VERSION = 3;
+// Bumped to 4 for the 4.0 rework: every nest question moved into the details
+// panel and the whole layout was re-keyed (Q W E R / A S D F), one action —
+// the anthropogenic toggle — stopped existing, and several new ones appeared.
+// A saved v3 config would bind 'w' to the chick count while the new default
+// puts the location list there, which is a silent conflict rather than a
+// preference. Resetting to the new defaults is the predictable answer.
+export const KEYS_VERSION = 4;
 
 // action -> default KeyboardEvent.key. The three observation toggles each have
 // a letter and a number binding (the number pad mirror), so both are rebindable.
@@ -26,14 +32,42 @@ export const DEFAULT_KEYS = {
   forward: 'ArrowDown',
   back: 'ArrowUp',
   notes: 'Enter',
+  // Every question below is a nest-details question, reachable only once a row
+  // is marked nest = yes: off a nest there is nothing to observe.
+  //
+  // They are listed in the order they appear on screen, and keyed in that same
+  // order: Q W E R along the top row, then A S D on the home row below it. One
+  // block the left hand covers without moving — a single run of seven would
+  // have reached out to T Y U, which is a hand shift halfway through the
+  // panel. The numbers stay 1-7 in the same order for the number-pad mirror.
+  //
+  // The order is the order you'd describe a nest in: where it is, what it's
+  // built from, what's in it. Structure comes first because it decides which
+  // location list the next question offers.
   toggle_structure: 'q',
   toggle_structure_num: '1',
-  toggle_anthropogenic: 'w',
-  toggle_anthropogenic_num: '2',
-  count_eggs: 'e',
-  count_eggs_num: '3',
-  count_chicks: 'r',
-  count_chicks_num: '4',
+  pick_location: 'w',
+  pick_location_num: '2',
+  pick_substrate: 'e',
+  pick_substrate_num: '3',
+  pick_anthropogenic: 'r',
+  pick_anthropogenic_num: '4',
+  toggle_bird: 'a',
+  toggle_bird_num: '5',
+  count_eggs: 's',
+  count_eggs_num: '6',
+  count_chicks: 'd',
+  count_chicks_num: '7',
+  // Next to the chick count it depends on, completing the Q W E R / A S D F
+  // block. Only reachable when that count is above zero.
+  cycle_chick_stage: 'f',
+  cycle_chick_stage_num: '8',
+  // H and J rather than G, which is jump. The prey list only opens once
+  // provisioning is yes, so its key does nothing until then.
+  toggle_provisioning: 'h',
+  toggle_provisioning_num: '9',
+  pick_prey: 'j',
+  pick_prey_num: '0',
   zoom: 'z',
   jump: 'g',
   close: 'Escape',
@@ -47,14 +81,26 @@ export const ACTION_LABELS = {
   forward: 'Forward  (skip if undecided)',
   back: 'Back  (previous item)',
   notes: 'Edit notes',
-  toggle_structure: 'Human-made structure (letter)',
-  toggle_structure_num: 'Human-made structure (number)',
-  toggle_anthropogenic: 'Anthropogenic material (letter)',
-  toggle_anthropogenic_num: 'Anthropogenic material (number)',
-  count_eggs: 'Egg count (letter)',
-  count_eggs_num: 'Egg count (number)',
-  count_chicks: 'Chick count (letter)',
-  count_chicks_num: 'Chick count (number)',
+  toggle_structure: 'Human-made structure — nest details (letter)',
+  toggle_structure_num: 'Human-made structure — nest details (number)',
+  pick_location: 'Nest location — nest details (letter)',
+  pick_location_num: 'Nest location — nest details (number)',
+  pick_substrate: 'Substrate / material — nest details (letter)',
+  pick_substrate_num: 'Substrate / material — nest details (number)',
+  pick_anthropogenic: 'Anthropogenic material — nest details (letter)',
+  pick_anthropogenic_num: 'Anthropogenic material — nest details (number)',
+  toggle_bird: 'Bird visible — nest details (letter)',
+  toggle_bird_num: 'Bird visible — nest details (number)',
+  count_eggs: 'Egg count — nest details (letter)',
+  count_eggs_num: 'Egg count — nest details (number)',
+  count_chicks: 'Chick count — nest details (letter)',
+  count_chicks_num: 'Chick count — nest details (number)',
+  cycle_chick_stage: 'Chick stage — nest details (letter)',
+  cycle_chick_stage_num: 'Chick stage — nest details (number)',
+  toggle_provisioning: 'Provisioning / feeding — nest details (letter)',
+  toggle_provisioning_num: 'Provisioning / feeding — nest details (number)',
+  pick_prey: 'Prey — nest details (letter)',
+  pick_prey_num: 'Prey — nest details (number)',
   zoom: 'Zoom the photo in / out',
   jump: 'Jump to another item',
   // The desktop app quit here. A web page can't close its own tab, so this
@@ -150,3 +196,57 @@ export function setReviewer(name) {
   save(cfg);
 }
 
+
+// --- remembered picker terms -------------------------------------------------
+// A term typed into a picker instead of picked off its list is written to the
+// spreadsheet verbatim and remembered here, so the second one is a pick rather
+// than retyping. Kept per field: what someone types as a nest location has no
+// business turning up in the material list.
+//
+// Deliberately per-browser. A list shared between researchers would have to
+// live in the OneDrive folder, and two people writing it at once is a
+// different job — meanwhile the column stays honest either way, because the
+// file records what was typed, not a reference into some list.
+const REMEMBERED_LIMIT = 40;
+
+function rememberedAll() {
+  const cfg = load();
+  const terms = (cfg.terms && typeof cfg.terms === 'object') ? { ...cfg.terms } : {};
+  // Terms remembered before substrate was split into three questions were
+  // answers to "what is the nest on?", which is now nest_location. Moved once
+  // rather than dropped, so nobody's typed-in terms vanish.
+  if (Array.isArray(cfg.substrates) && cfg.substrates.length && !terms.nest_location) {
+    terms.nest_location = cfg.substrates;
+  }
+  return terms;
+}
+
+export function getRememberedTerms(field) {
+  const v = rememberedAll()[field];
+  return Array.isArray(v) ? v.filter(t => typeof t === 'string' && t) : [];
+}
+
+/** Replace one field's remembered list outright (Preferences, and the tests). */
+export function setRememberedTerms(field, terms) {
+  const cfg = load();
+  cfg.terms = rememberedAll();
+  cfg.terms[field] = (Array.isArray(terms) ? terms : [])
+    .map(t => String(t ?? '').trim())
+    .filter(Boolean)
+    .slice(0, REMEMBERED_LIMIT);
+  delete cfg.substrates; // migrated into cfg.terms above
+  save(cfg);
+}
+
+/** Most recent first, no duplicates, oldest dropped past the limit. */
+export function rememberTerm(field, term) {
+  const value = String(term ?? '').trim();
+  if (!value) return;
+  const cfg = load();
+  cfg.terms = rememberedAll();
+  const kept = getRememberedTerms(field).filter(
+    t => t.toLowerCase() !== value.toLowerCase());
+  cfg.terms[field] = [value, ...kept].slice(0, REMEMBERED_LIMIT);
+  delete cfg.substrates;
+  save(cfg);
+}

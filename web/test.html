@@ -24,14 +24,26 @@
 <script type="module">
 import { parseRows, parseTable, serializeTable } from './csv.js';
 import {
-  Catalog, LabeledFile, validateFieldnames, labeledName, nestName,
+  Catalog, CATALOG_KEY, LabeledFile, validateFieldnames, labeledName, nestName,
   LABEL_COLUMNS, REVIEWED, SKIPPED, normalizeCount,
+  NEST_ONLY_COLUMNS, LEGACY_NOT_APPLICABLE, SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
+  NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS, locationOptions, CHICK_STAGES,
+  isListedLocation, filterTerms, joinTerms, splitTerms, PREY_OPTIONS,
+  nextNestId, isNestId,
 } from './catalog.js';
 import {
   assertReadLooksComplete, TruncatedReadError, DebouncedWriter, Progress, mirrorSink,
   Folder, SUBMIT_DIR,
 } from './storage.js';
-import { DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay } from './settings.js';
+import { checklistUrl } from './macaulay.js';
+import {
+  canTranslate, languageName, pickLanguage, suggestLanguage,
+  NeedsGestureError, Translators,
+} from './translate.js';
+import {
+  DEFAULT_KEYS, actionForEvent, duplicateKey, keyDisplay,
+  getRememberedTerms, rememberTerm, setRememberedTerms,
+} from './settings.js';
 import { buildReport, missingAnswers, recordError, clearErrors } from './report.js';
 
 const out = document.getElementById('out');
@@ -147,7 +159,7 @@ group('catalog.js — labeling');
   eq('egg count recorded', catalog.rows[0].egg_count, '2');
   eq('no chicks entered means zero, not blank', catalog.rows[0].chick_count, '0');
   eq('chicks flag follows the count', catalog.rows[0].chicks, 'no');
-  eq('anthropogenic defaults to no', catalog.rows[0].anthropogenic, 'no');
+  eq('anthropogenic is no with no material named', catalog.rows[0].anthropogenic, 'no');
   eq('marked reviewed', catalog.rows[0].reviewed, REVIEWED);
   eq('reviewer stamped', catalog.rows[0].reviewer, 'stella');
   check('reviewed_at matches Python isoformat(timespec="seconds")',
@@ -178,6 +190,493 @@ group('catalog.js — labeling');
   eq('stats skipped', st.skipped, 1);
 }
 
+group('catalog.js — nest-only questions');
+{
+  // The questions that only apply where there is a nest: answered on a yes,
+  // blank everywhere else. nest_label is what says why a blank is blank — no,
+  // skip, or never decided — so the column itself doesn't have to. See
+  // TODO.md.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false, birdPresent: true,
+                        substrate: 'twig', nestLocation: 'cactus' });
+  eq('bird recorded on a nest', catalog.rows[0].bird_present, 'yes');
+  eq('substrate recorded on a nest', catalog.rows[0].substrate, 'twig');
+  eq('location recorded on a nest', catalog.rows[0].nest_location, 'cactus');
+
+  catalog.setLabel(1, { nest: true, structure: false });
+  eq('unanswered on a nest is no, not blank', catalog.rows[1].bird_present, 'no');
+  // A toggle has a default; a picker has none, so unanswered stays blank —
+  // still meaning "nobody answered", never "none". ("none" is a real answer in
+  // the substrate list and records as that text.)
+  eq('an unanswered substrate stays blank', catalog.rows[1].substrate, '');
+  eq('an unanswered location stays blank', catalog.rows[1].nest_location, '');
+
+  catalog.setLabel(2, { nest: false, structure: false, birdPresent: true });
+  eq('a non-nest row is blank', catalog.rows[2].bird_present, '');
+  eq('and nest_label says why', catalog.rows[2].nest_label, 'no');
+
+  catalog.setSkip(3);
+  eq('a skip is blank too', catalog.rows[3].bird_present, '');
+  eq('a non-nest substrate is blank', catalog.rows[2].substrate, '');
+  eq('a non-nest location is blank too', catalog.rows[2].nest_location, '');
+  eq('substrate is trimmed', (() => {
+    catalog.setLabel(3, { nest: true, structure: false, substrate: '  leaves  ' });
+    return catalog.rows[3].substrate;
+  })(), 'leaves');
+
+  // Flipping a yes to a no has to drop the answer, not leave it standing.
+  catalog.setLabel(0, { nest: false, structure: false });
+  eq('flipping to no blanks it', catalog.rows[0].bird_present, '');
+  eq('and the substrate with it', catalog.rows[0].substrate, '');
+  eq('and the location', catalog.rows[0].nest_location, '');
+
+  eq('every nest-only column is a label column',
+     NEST_ONLY_COLUMNS.every(c => LABEL_COLUMNS.includes(c)), true);
+
+  const st = catalog.stats();
+  eq('stats counts birds', st.birds, 0);
+  catalog.setLabel(0, { nest: true, structure: false, birdPresent: true });
+  eq('and follows a re-label', catalog.stats().birds, 1);
+}
+
+group('catalog.js — every observation is nest-only');
+{
+  // Off a nest there is nothing to observe: no structure to judge, nothing to
+  // count, nowhere for a nest to sit. Only nest_label is written, and the row
+  // costs one press. Structure, eggs and chicks were top-row questions asked
+  // on every image until this landed.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: true,
+                        eggCount: '2', chickCount: '1' });
+  eq('structure recorded on a nest', catalog.rows[0].human_structure, 'yes');
+  eq('eggs recorded on a nest', catalog.rows[0].egg_count, '2');
+  eq('chicks recorded on a nest', catalog.rows[0].chick_count, '1');
+
+  catalog.setLabel(1, { nest: true, structure: false });
+  eq('a nest nobody counted still says zero, not blank',
+     catalog.rows[1].egg_count, '0');
+  eq('because on a nest, looking and seeing none is an observation',
+     catalog.rows[1].eggs, 'no');
+
+  // The behaviour change with teeth: these columns used to carry yes/no/0 on
+  // every reviewed row, and three labeled spreadsheets already hold them that
+  // way. Rows relabeled from here on go blank off a nest.
+  catalog.setLabel(2, { nest: false, structure: true,
+                        eggCount: '4', chickCount: '4' });
+  eq('structure is blank off a nest', catalog.rows[2].human_structure, '');
+  eq('so is the egg count', catalog.rows[2].egg_count, '');
+  eq('and the chick count', catalog.rows[2].chick_count, '');
+  eq('and their yes/no flags', catalog.rows[2].eggs, '');
+  eq('the decision itself is still recorded', catalog.rows[2].nest_label, 'no');
+
+  for (const col of ['human_structure', 'eggs', 'egg_count',
+                     'chicks', 'chick_count']) {
+    check(`${col} is nest-only`, NEST_ONLY_COLUMNS.includes(col));
+  }
+  eq('only the decision and the provenance columns are not',
+     LABEL_COLUMNS.filter(c => !NEST_ONLY_COLUMNS.includes(c)),
+     ['nest_label', 'notes', 'reviewed', 'reviewed_at', 'reviewer', 'reviewers',
+      'nest_id']);
+}
+
+group('catalog.js — the three list questions');
+{
+  // One question became three: what the nest is made of, what man-made
+  // material is in it, and where it sits. The lists must not overlap, or the
+  // reviewer has to guess which picker an answer belongs in.
+  eq('each list is short enough to read',
+     [SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS,
+      NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS]
+       .every(l => l.length <= 20), true);
+  check('substrate holds natural materials, not places',
+        SUBSTRATE_OPTIONS.includes('twig') && SUBSTRATE_OPTIONS.includes('animal fur'));
+  check('"none" is a real substrate answer rather than a blank',
+        SUBSTRATE_OPTIONS.includes('none'));
+  check('location holds places, not materials',
+        NATURAL_LOCATION_OPTIONS.includes('cactus')
+        && MANMADE_LOCATION_OPTIONS.includes('telephone pole'));
+  check('man-made materials live only in their own list',
+        ANTHROPOGENIC_OPTIONS.includes('plastic')
+        && !SUBSTRATE_OPTIONS.includes('plastic')
+        && !NATURAL_LOCATION_OPTIONS.includes('plastic')
+        && !MANMADE_LOCATION_OPTIONS.includes('plastic'));
+  // No real term may sit in two lists, or the reviewer has to guess which
+  // picker it belongs in. The generic escape hatches are the exception, and
+  // every list needs both: "other" for an answer that is real but unlisted,
+  // "unclear" for a photo that doesn't show it.
+  const GENERIC = ['other', 'unclear'];
+  const real = l => l.filter(t => !GENERIC.includes(t));
+  check('no real term appears in two lists at once',
+        !real(SUBSTRATE_OPTIONS).some(
+          t => real(NATURAL_LOCATION_OPTIONS).includes(t)
+            || real(MANMADE_LOCATION_OPTIONS).includes(t)));
+  check('every list can say "the photo does not show it"',
+        [SUBSTRATE_OPTIONS, NATURAL_LOCATION_OPTIONS, MANMADE_LOCATION_OPTIONS]
+          .every(l => l.includes('unclear')));
+
+  eq('no filter offers everything',
+     filterTerms(NATURAL_LOCATION_OPTIONS, '').length,
+     NATURAL_LOCATION_OPTIONS.length);
+
+  // "b" starts building, bridge and the "box" in nest box — all word starts,
+  // in list order. That ordering is what makes the top offer safe to trust.
+  eq('word-start matches lead', filterTerms(MANMADE_LOCATION_OPTIONS, 'b'),
+     ['building or ledge', 'bridge', 'nest box or platform']);
+  // In the natural list "b" starts nothing and sits mid-word in shrub, which
+  // still has to be reachable — just not ahead of a real word-start match.
+  eq('mid-word matches still appear', filterTerms(NATURAL_LOCATION_OPTIONS, 'b'),
+     ['shrub']);
+  // A word start counts anywhere in the term, not just at the front, so
+  // "tree cavity" answers to "c" as readily as "cactus" does.
+  eq('any word may start the match', filterTerms(NATURAL_LOCATION_OPTIONS, 'c'),
+     ['tree cavity', 'cactus', 'cliff or rock ledge', 'unclear']);
+
+  eq('case is ignored', filterTerms(NATURAL_LOCATION_OPTIONS, 'CACTUS'), ['cactus']);
+  eq('nonsense matches nothing, which is the "other" path',
+     filterTerms(NATURAL_LOCATION_OPTIONS, 'zzzz'), []);
+
+  const withExtra = filterTerms(MANMADE_LOCATION_OPTIONS, 'cattle', ['cattle panel']);
+  eq('a remembered term is offered', withExtra, ['cattle panel']);
+  eq('a remembered duplicate is not listed twice',
+     filterTerms(ANTHROPOGENIC_OPTIONS, 'metal', ['metal']), ['metal']);
+}
+
+group('catalog.js — the structure answer chooses the location list');
+{
+  // A location is one place and that place is either man-made or it isn't, so
+  // asking first halves the list. This is the opposite of the substrate rule,
+  // where the two kinds cross freely and one list is right.
+  eq('no is the natural list', locationOptions(false), NATURAL_LOCATION_OPTIONS);
+  eq('yes is the man-made list', locationOptions(true), MANMADE_LOCATION_OPTIONS);
+  check('a tree is never offered as a man-made place',
+        !MANMADE_LOCATION_OPTIONS.includes('tree'));
+  check('and a telephone pole is never offered as a natural one',
+        !NATURAL_LOCATION_OPTIONS.includes('telephone pole'));
+  check('both lists are shorter than the single list they replace',
+        NATURAL_LOCATION_OPTIONS.length < 10 && MANMADE_LOCATION_OPTIONS.length < 10);
+
+  // Flipping the toggle strands whatever was picked off the list now hidden.
+  // isListedLocation is what tells those apart from a typed-in term.
+  check('a listed natural term is recognised', isListedLocation('tree'));
+  check('a listed man-made term is recognised', isListedLocation('bridge'));
+  check('case and spacing do not matter', isListedLocation('  Tree  '));
+  check('a typed term belongs to neither list, so it is kept',
+        !isListedLocation('cattle panel'));
+  check('"other" is not a real location either', !isListedLocation('other'));
+  check('and neither is nothing at all', !isListedLocation(''));
+}
+
+group('catalog.js — chick stage');
+{
+  // Early is downy, late is feathered. A stage is a fact about chicks, so it
+  // is only asked where chicks were counted — and 'unclear' is a recorded
+  // answer, not a blank: someone looked and couldn't call it.
+  eq('three states, in cycling order', CHICK_STAGES, ['early', 'late', 'unclear']);
+
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false,
+                        chickCount: '3', chickStage: 'late' });
+  eq('a stage is recorded alongside the count', catalog.rows[0].chick_stage, 'late');
+  eq('and the count still stands', catalog.rows[0].chick_count, '3');
+
+  catalog.setLabel(1, { nest: true, structure: false,
+                        chickCount: '2', chickStage: 'unclear' });
+  eq('unclear is a real answer', catalog.rows[1].chick_stage, 'unclear');
+  check('so it is not blank', catalog.rows[1].chick_stage !== '');
+
+  // The failure mode this has to rule out: a stale stage under a nest whose
+  // chicks were counted and then corrected back to none.
+  catalog.setLabel(0, { nest: true, structure: false,
+                        chickCount: '0', chickStage: 'late' });
+  eq('clearing the count clears the stage', catalog.rows[0].chick_stage, '');
+
+  catalog.setLabel(2, { nest: true, structure: false, chickCount: '4' });
+  eq('chicks with no stage picked is blank, not guessed',
+     catalog.rows[2].chick_stage, '');
+
+  catalog.setLabel(3, { nest: false, structure: false,
+                        chickCount: '2', chickStage: 'early' });
+  eq('and off a nest there is nothing at all', catalog.rows[3].chick_stage, '');
+  check('chick_stage is nest-only', NEST_ONLY_COLUMNS.includes('chick_stage'));
+
+  catalog.setSkip(1);
+  eq('a skip clears it too', catalog.rows[1].chick_stage, '');
+}
+
+group('translate.js — deciding whether to translate a note');
+{
+  // Media notes come in whatever language the eBirder writes in, and are often
+  // the line that says whether it is a nest. But they are short — "nest w/ 2
+  // eggs" is barely a sentence — so detection is genuinely uncertain, and
+  // translating on a coin-flip would corrupt a note that was English already.
+  // Two questions, not one, because the costs are not symmetric: translating
+  // an English note unasked replaces what the eBirder wrote with a machine's
+  // guess at it, while offering a button nobody wanted costs a button.
+  //
+  // "Tres huevos" is the case that drove this. Two words, correctly detected
+  // as Spanish, and never with enough confidence to clear the bar — so under
+  // one gate for both it silently did nothing at all.
+  const tresHuevos = [{ detectedLanguage: 'es', confidence: 0.32 },
+                      { detectedLanguage: 'pt', confidence: 0.2 }];
+  eq('a short note is not translated unasked', pickLanguage(tresHuevos), null);
+  eq('but it is worth offering', suggestLanguage(tresHuevos), 'es');
+
+  eq('a confident foreign detection is worth translating',
+     pickLanguage([{ detectedLanguage: 'es', confidence: 0.98 }]), 'es');
+  eq('the most likely one wins',
+     pickLanguage([{ detectedLanguage: 'pt', confidence: 0.9 },
+                   { detectedLanguage: 'es', confidence: 0.1 }]), 'pt');
+
+  eq('English is left alone',
+     pickLanguage([{ detectedLanguage: 'en', confidence: 0.99 }]), null);
+  eq('and so is a regional English',
+     pickLanguage([{ detectedLanguage: 'en-GB', confidence: 0.99 }]), null);
+  eq('a weak guess is not acted on',
+     pickLanguage([{ detectedLanguage: 'es', confidence: 0.3 }]), null);
+  eq('nor is "undetermined"',
+     pickLanguage([{ detectedLanguage: 'und', confidence: 0.99 }]), null);
+  eq('nothing detected, nothing done', pickLanguage([]), null);
+  eq('and a missing result is not a crash', pickLanguage(undefined), null);
+
+  // Nothing is offered where there is nothing to offer, so a button never
+  // appears on a note that is already readable.
+  eq('English is not offered either',
+     suggestLanguage([{ detectedLanguage: 'en', confidence: 0.3 }]), null);
+  eq('nor a regional English',
+     suggestLanguage([{ detectedLanguage: 'en-AU', confidence: 0.2 }]), null);
+  eq('nor "undetermined"',
+     suggestLanguage([{ detectedLanguage: 'und', confidence: 0.9 }]), null);
+  eq('nor nothing at all', suggestLanguage([]), null);
+  eq('and a missing result is not a crash here either',
+     suggestLanguage(undefined), null);
+  // Only the top candidate counts. A note the detector calls English first is
+  // English, whatever else it lists underneath.
+  eq('a runner-up does not get offered',
+     suggestLanguage([{ detectedLanguage: 'en', confidence: 0.4 },
+                      { detectedLanguage: 'es', confidence: 0.35 }]), null);
+
+  // The reviewer has to be told what they are reading a translation of.
+  eq('a tag becomes a name', languageName('es'), 'Spanish');
+  eq('a regional tag too', languageName('pt-BR'), 'Brazilian Portuguese');
+  eq('an unknown tag is shown as-is rather than hidden',
+     languageName('zzz'), 'zzz');
+  eq('and nothing is nothing', languageName(''), '');
+
+  check('feature detection answers either way without throwing',
+        typeof canTranslate() === 'boolean');
+}
+
+group('translate.js — one gesture, then automatic');
+{
+  // Chrome wants a user gesture before it will build a model, so the first
+  // note in a language can't translate itself. Everything after it should,
+  // which is what caching the built models buys.
+  const calls = { detector: 0, translator: [] };
+  const fake = {
+    LanguageDetector: {
+      create: async () => {
+        calls.detector += 1;
+        return { detect: async () => [{ detectedLanguage: 'es', confidence: 0.9 }] };
+      },
+    },
+    Translator: {
+      create: async ({ sourceLanguage }) => {
+        calls.translator.push(sourceLanguage);
+        return { translate: async t => `EN(${t})` };
+      },
+    },
+  };
+  const t = new Translators(fake);
+  const found = await t.detect('hola');
+  eq('detection answers both questions at once',
+     [found.auto, found.suggested], ['es', 'es']);
+  await t.detect('adios');
+  eq('the detector is built once, not per note', calls.detector, 1);
+  eq('translating goes through', await t.translate('hola', 'es'), 'EN(hola)');
+  await t.translate('adios', 'es');
+  eq('and its model is built once per language', calls.translator, ['es']);
+  await t.translate('bonjour', 'fr');
+  eq('a new language needs its own', calls.translator, ['es', 'fr']);
+  check('and it knows when it is ready', t.ready('es'));
+  check('but not for one it has never built', !t.ready('de'));
+
+  // A refusal for want of a gesture is not a failure; it is "ask me from a
+  // click". It gets its own type so the app can offer a button instead of
+  // reporting something broken.
+  const refuses = {
+    LanguageDetector: { create: async () => {
+      const e = new Error('needs activation'); e.name = 'NotAllowedError'; throw e;
+    } },
+    Translator: { create: async () => ({}) },
+  };
+  let caught = null;
+  try { await new Translators(refuses).detect('hola'); } catch (e) { caught = e; }
+  check('a missing gesture is its own kind of answer',
+        caught instanceof NeedsGestureError);
+
+  // A browser without the APIs — which is most of them, and every browser on
+  // an iPad. The whole feature stays out of the way and the note shows as
+  // written.
+  const bare = new Translators({});
+  eq('no APIs, no detection', await bare.detect('hola'), null);
+  eq('no APIs, no translation', await bare.translate('hola', 'es'), null);
+  check('and the check says so up front', !canTranslate({}));
+  check('half of it is not enough', !canTranslate({ Translator: {} }));
+}
+
+group('macaulay.js — the checklist link');
+{
+  // The export carries the eBird checklist an asset came from. A link is worth
+  // more than the S-number: it opens the whole outing — the other photographs,
+  // the notes, what else was seen there — which is how a reviewer recognises a
+  // nest they have already labeled.
+  eq('builds an eBird checklist URL', checklistUrl('S364779538'),
+     'https://ebird.org/checklist/S364779538');
+  eq('trims what the spreadsheet gives it', checklistUrl('  S1  '),
+     'https://ebird.org/checklist/S1');
+  // Plenty of Macaulay rows have no checklist, and a link to nowhere is worse
+  // than no link — renderMeta skips the field when this comes back blank.
+  eq('no checklist, no link', checklistUrl(''), '');
+  eq('and the same for a missing column', checklistUrl(undefined), '');
+}
+
+group('catalog.js — provisioning and prey');
+{
+  // Stella's question in two halves: are the parents actively feeding, and if
+  // the food is visible, what kind? The second only exists once the first is
+  // yes. The column is called provisioning, which conventionally means the
+  // wider "bringing food to the nest" — the definition travels on the label.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false,
+                        provisioning: true, preyGroup: ['fish'] });
+  eq('feeding recorded', catalog.rows[0].provisioning, 'yes');
+  eq('and what was being fed', catalog.rows[0].prey_group, 'fish');
+
+  catalog.setLabel(1, { nest: true, structure: false,
+                        provisioning: true, preyGroup: ['mammal', 'fish'] });
+  eq('more than one item rides in one cell',
+     catalog.rows[1].prey_group, 'mammal; fish');
+
+  // "If visible" is the whole reason unidentified exists: a parent feeding
+  // with its bill turned away is a yes with an unidentified item, which is
+  // not the same as nobody answering.
+  check('the list can say the food was not identifiable',
+        PREY_OPTIONS.includes('unclear'));
+  check('and that it was something not on the list',
+        PREY_OPTIONS.includes('other'));
+  catalog.setLabel(2, { nest: true, structure: false,
+                        provisioning: true, preyGroup: 'unclear' });
+  eq('feeding with nothing identifiable is still feeding',
+     [catalog.rows[2].provisioning, catalog.rows[2].prey_group],
+     ['yes', 'unclear']);
+
+  catalog.setLabel(3, { nest: true, structure: false, provisioning: true });
+  eq('and feeding with nothing picked is blank, not guessed',
+     catalog.rows[3].prey_group, '');
+
+  // The failure mode to rule out: prey left standing under a "not feeding".
+  catalog.setLabel(0, { nest: true, structure: false,
+                        provisioning: false, preyGroup: ['fish'] });
+  eq('answering no drops the prey with it', catalog.rows[0].prey_group, '');
+  eq('and the flag says no', catalog.rows[0].provisioning, 'no');
+
+  catalog.setLabel(1, { nest: false, structure: false, provisioning: true,
+                        preyGroup: ['fish'] });
+  eq('off a nest there is neither',
+     [catalog.rows[1].provisioning, catalog.rows[1].prey_group], ['', '']);
+  for (const col of ['provisioning', 'prey_group']) {
+    check(`${col} is nest-only`, NEST_ONLY_COLUMNS.includes(col));
+    check(`${col} is a label column`, LABEL_COLUMNS.includes(col));
+  }
+
+  catalog.setSkip(2);
+  eq('a skip clears both',
+     [catalog.rows[2].provisioning, catalog.rows[2].prey_group], ['', '']);
+
+  // Deliberately coarse for now: reptile and amphibian share an entry, and
+  // everything else — invertebrates included — goes to 'other'. Named 'group'
+  // rather than 'kingdom' because these are classes within one.
+  eq('the list is the coarse one Stella asked for', PREY_OPTIONS,
+     ['mammal', 'bird', 'reptile / amphibian', 'fish', 'other', 'unclear']);
+  check('it uses the same word for "cannot tell" as every other list',
+        PREY_OPTIONS.includes('unclear')
+        && SUBSTRATE_OPTIONS.includes('unclear')
+        && NATURAL_LOCATION_OPTIONS.includes('unclear'));
+}
+
+group('catalog.js — multi-select cells');
+{
+  // A nest is often twigs and mud and a fur lining. Several answers ride in
+  // one cell, joined with ';' so a comma never has to be escaped to stay
+  // readable — the same separator M14 will use for prey.
+  eq('terms join with a semicolon', joinTerms(['twig', 'mud / clay / feces']),
+     'twig; mud / clay / feces');
+  eq('a single term looks like a plain value', joinTerms(['twig']), 'twig');
+  eq('nothing chosen is blank, not a stray separator', joinTerms([]), '');
+  eq('blanks and whitespace are dropped', joinTerms(['  twig ', '', '   ']), 'twig');
+  eq('duplicates collapse, case-insensitively',
+     joinTerms(['twig', 'TWIG', 'leaves']), 'twig; leaves');
+
+  eq('a cell splits back into terms', splitTerms('twig; leaves'), ['twig', 'leaves']);
+  eq('a plain single value splits to one term', splitTerms('twig'), ['twig']);
+  eq('a blank cell is no terms at all', splitTerms(''), []);
+  eq('round-trips through the file', joinTerms(splitTerms('twig; animal fur')),
+     'twig; animal fur');
+
+  // The file is what round-trips, so setLabel has to accept either shape.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+  catalog.setLabel(0, { nest: true, structure: false,
+                        substrate: ['twig', 'animal fur'] });
+  eq('a list of materials lands in one cell',
+     catalog.rows[0].substrate, 'twig; animal fur');
+  catalog.setLabel(1, { nest: true, structure: false, substrate: 'twig; leaves' });
+  eq('and so does an already-joined cell', catalog.rows[1].substrate, 'twig; leaves');
+}
+
+group('catalog.js — anthropogenic is derived, not asked');
+{
+  // It was a top-level toggle until the material list replaced it. Keeping the
+  // column but deriving it is the same arrangement as eggs/egg_count: the
+  // yes/no and the detail cannot disagree, and old files keep their meaning.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false,
+                        anthropogenicMaterial: 'plastic' });
+  eq('the material is recorded', catalog.rows[0].anthropogenic_material, 'plastic');
+  eq('and the old column follows it', catalog.rows[0].anthropogenic, 'yes');
+
+  // A nest can hold plastic twine and wire at once, so this takes several
+  // answers like substrate does — and the derived flag still follows.
+  catalog.setLabel(2, { nest: true, structure: false,
+                        anthropogenicMaterial: ['plastic', 'metal'] });
+  eq('more than one material rides in one cell',
+     catalog.rows[2].anthropogenic_material, 'plastic; metal');
+  eq('and the flag still follows it', catalog.rows[2].anthropogenic, 'yes');
+
+  catalog.setLabel(1, { nest: true, structure: false });
+  eq('no material named means no', catalog.rows[1].anthropogenic, 'no');
+  eq('and the material cell is blank', catalog.rows[1].anthropogenic_material, '');
+
+  catalog.setLabel(0, { nest: true, structure: false, anthropogenicMaterial: '' });
+  eq('clearing the material clears the flag with it',
+     catalog.rows[0].anthropogenic, 'no');
+
+  // Off a nest it is blank like every other panel answer — it used to be
+  // written yes/no on every reviewed row, which is the one behaviour change.
+  catalog.setLabel(2, { nest: false, structure: false });
+  eq('a non-nest row is blank, not no', catalog.rows[2].anthropogenic, '');
+  check('anthropogenic is a nest-only column now',
+        NEST_ONLY_COLUMNS.includes('anthropogenic'));
+
+  catalog.setSkip(3);
+  eq('a skip clears it too', catalog.rows[3].anthropogenic, '');
+  eq('and the material with it', catalog.rows[3].anthropogenic_material, '');
+}
+
 group('catalog.js — egg and chick counts');
 {
   eq('a number parses', normalizeCount('3'), 3);
@@ -199,11 +698,17 @@ group('catalog.js — egg and chick counts');
   eq('chicks without eggs', [catalog.rows[1].eggs, catalog.rows[1].chicks], ['no', 'yes']);
   eq('zero eggs is recorded as 0', catalog.rows[1].egg_count, '0');
 
-  catalog.setLabel(2, { nest: false, structure: false });
-  eq('an unanswered count on a reviewed row is 0, not blank',
+  // On a nest, an unanswered count is 0: someone looked and saw none. Off a
+  // nest it is blank, because there was nothing to count in the first place —
+  // counts became nest-only when every observation did.
+  catalog.setLabel(2, { nest: true, structure: false });
+  eq('an unanswered count on a nest is 0, not blank',
      [catalog.rows[2].egg_count, catalog.rows[2].chick_count], ['0', '0']);
-  check('so a blank count only ever means not-reviewed',
-        catalog.rows[3].egg_count === '' && !catalog.isReviewed(3));
+  catalog.setLabel(3, { nest: false, structure: false });
+  eq('but a non-nest row has no count at all',
+     [catalog.rows[3].egg_count, catalog.rows[3].chick_count], ['', '']);
+  check('and a blank count never means "none seen"',
+        catalog.rows[3].nest_label === 'no');
 
   const st = catalog.stats();
   eq('counts images with eggs', st.eggs, 1);
@@ -215,8 +720,10 @@ group('catalog.js — egg and chick counts');
 group('catalog.js — resume across a reload');
 {
   const first = Catalog.open('s.csv', SAMPLE).catalog;
-  first.setLabel(0, { nest: true, structure: false, anthropogenic: true,
-                      eggCount: '3', chickCount: '1',
+  first.setLabel(0, { nest: true, structure: false,
+                      eggCount: '3', chickCount: '1', birdPresent: true,
+                      substrate: ['twig', 'animal fur'],
+                      anthropogenicMaterial: 'plastic', nestLocation: 'telephone pole',
                       reviewer: 'stella', notes: 'wrong species id' });
   first.setSkip(1, { reviewer: 'stella' });
   const labeledText = first.labeled.serialize();
@@ -227,6 +734,13 @@ group('catalog.js — resume across a reload');
   eq('anthropogenic restored', again.rows[0].anthropogenic, 'yes');
   eq('egg count restored', again.rows[0].egg_count, '3');
   eq('chick count restored', again.rows[0].chick_count, '1');
+  eq('bird present restored', again.rows[0].bird_present, 'yes');
+  eq('substrate restored', again.rows[0].substrate, 'twig; animal fur');
+  eq('a multi-select cell survives the round trip',
+     splitTerms(again.rows[0].substrate), ['twig', 'animal fur']);
+  eq('anthropogenic material restored',
+     again.rows[0].anthropogenic_material, 'plastic');
+  eq('location restored', again.rows[0].nest_location, 'telephone pole');
   eq('notes restored', again.rows[0].notes, 'wrong species id');
   eq('skip restored', again.rows[1].nest_label, SKIPPED);
   eq('resumes at the first unreviewed row', again.firstUnreviewed(), 2);
@@ -235,6 +749,162 @@ group('catalog.js — resume across a reload');
 
   const noResume = Catalog.open('s.csv', SAMPLE, { labeledText, resume: false }).catalog;
   eq('resume:false ignores prior labels', noResume.firstUnreviewed(), 0);
+
+  // Files labeled before the n/a filler was dropped still carry it. Loading one
+  // must read it as blank, or 'n/a' comes back as a substrate by that name.
+  const legacyText = labeledText.replace('twig; animal fur', LEGACY_NOT_APPLICABLE);
+  const { catalog: legacy } = Catalog.open('s.csv', SAMPLE, { labeledText: legacyText });
+  eq('a legacy n/a substrate loads blank', legacy.rows[0].substrate, '');
+  eq('legacy n/a is not counted as a substrate', legacy.stats().substrates, 0);
+}
+
+group('catalog.js — naming nests that were labeled before codes existed');
+{
+  // A spreadsheet labeled before this feature is full of nests with nothing
+  // in the column. Leaving them nameless would mean a file where some nests
+  // can be grouped and others cannot, so they are named on the way in.
+  const first = Catalog.open('s.csv', SAMPLE).catalog;
+  first.setLabel(0, { nest: true, structure: false, reviewer: 'mei' });
+  first.setLabel(1, { nest: false, structure: false, reviewer: 'mei' });
+  first.setLabel(2, { nest: true, structure: false, reviewer: 'mei' });
+
+  // Strip the codes, the way a file written by the older app would have them.
+  const older = first.labeled.serialize().replace(/AAA[A-Z]/g, '');
+  check('the older file really has none', !/AAA[A-Z]/.test(older));
+
+  const { catalog } = Catalog.open('s.csv', SAMPLE, { labeledText: older });
+  eq('the first nest is named on the way in', catalog.rows[0].nest_id, 'AAAA');
+  eq('and the next nest gets the next code', catalog.rows[2].nest_id, 'AAAB');
+  eq('a non-nest row is left alone', catalog.rows[1].nest_id ?? '', '');
+  eq('an unreached row too', catalog.rows[3].nest_id ?? '', '');
+  check('and the names reach the labeled file, not just the screen',
+        isNestId(catalog.labeled.get(catalog.rows[0][CATALOG_KEY])?.nest_id));
+
+  // Codes already in a file are kept; naming is only for what is missing.
+  const kept = Catalog.open('s.csv', SAMPLE,
+                            { labeledText: first.labeled.serialize() }).catalog;
+  eq('an existing code survives reopening', kept.rows[0].nest_id, 'AAAA');
+  eq('and so does its neighbour', kept.rows[2].nest_id, 'AAAB');
+
+  // Opening without resuming has nothing to name.
+  const fresh = Catalog.open('s.csv', SAMPLE,
+                             { labeledText: older, resume: false }).catalog;
+  eq('resume:false names nothing', fresh.rows[0].nest_id ?? '', '');
+}
+
+group('catalog.js — nest codes');
+{
+  // Four letters, handed out in order, one per nest. Short enough to say out
+  // loud, and it doesn't imply one asset in a group is the "real" one.
+  eq('the first nest is AAAA', nextNestId([]), 'AAAA');
+  eq('and the next is AAAB', nextNestId(['AAAA']), 'AAAB');
+  eq('it counts from the highest, not the count',
+     nextNestId(['AAAA', 'AAAC']), 'AAAD');
+  eq('order of what it is given does not matter',
+     nextNestId(['AAAC', 'AAAA']), 'AAAD');
+  eq('the last letter carries', nextNestId(['AAAZ']), 'AABA');
+  eq('and so does the one before it', nextNestId(['AAZZ']), 'ABAA');
+  eq('anything not a code is ignored',
+     nextNestId(['660468445', '', 'nope', 'AAAA']), 'AAAB');
+
+  check('a code is four capitals', isNestId('AAAA') && isNestId('  ABCD  '));
+  check('and nothing else is',
+        !isNestId('aaaa') && !isNestId('AAA') && !isNestId('AAAAA')
+        && !isNestId('660468445') && !isNestId('') && !isNestId(undefined));
+}
+
+group('catalog.js — naming a nest seen more than once');
+{
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+  const numbers = catalog.rows.map(r => r[CATALOG_KEY]);
+
+  // Every nest gets a code the first time it is called one.
+  catalog.setLabel(0, { nest: true, structure: false, reviewer: 'mei' });
+  eq('the first nest is AAAA', catalog.rows[0].nest_id, 'AAAA');
+  catalog.setLabel(1, { nest: true, structure: false });
+  eq('the second gets the next code', catalog.rows[1].nest_id, 'AAAB');
+  catalog.setLabel(2, { nest: false, structure: false });
+  eq('a non-nest gets none', catalog.rows[2].nest_id ?? '', '');
+
+  // A code is the nest's name: marking it no and yes again must not rename it,
+  // or a mis-press would silently break a group somebody built by hand.
+  catalog.setLabel(0, { nest: false, structure: false });
+  eq('a no keeps the name', catalog.rows[0].nest_id, 'AAAA');
+  catalog.setLabel(0, { nest: true, structure: false });
+  eq('and coming back does not re-issue it', catalog.rows[0].nest_id, 'AAAA');
+
+  // Grouping: the oldest code wins, so merging into an established nest keeps
+  // the name it already had.
+  const id = catalog.setNestGroup([0, 1]);
+  eq('the group keeps the older code', id, 'AAAA');
+  eq('every member carries it', [catalog.rows[0].nest_id, catalog.rows[1].nest_id],
+     ['AAAA', 'AAAA']);
+  eq('the group can be found again', catalog.nestGroup('AAAA'), [0, 1]);
+  eq('a code nobody carries finds nobody', catalog.nestGroup('ZZZZ'), []);
+
+  // The counter is one past the highest code STILL in the file, so a code
+  // freed by a merge comes back. Harmless inside the file — codes stay unique
+  // across the nests that exist — but it is why a code written down elsewhere
+  // can later point at a different nest. The alternative is storing a
+  // high-water mark, which is a second source of truth about this column.
+  catalog.setLabel(3, { nest: true, structure: false });
+  eq('a code freed by a merge is handed out again',
+     catalog.rows[3].nest_id, 'AAAB');
+  check('and it is unique among the nests that exist',
+        new Set(catalog.rows.map(r => r.nest_id).filter(Boolean)).size
+        === new Set(['AAAA', 'AAAB']).size);
+
+  check('a reviewed member reaches the labeled file',
+        catalog.labeled.get(numbers[0])?.nest_id === 'AAAA');
+
+  // Ungrouping gives each nest its own name back.
+  catalog.clearNestGroup([0, 1]);
+  check('the members no longer share a code',
+        catalog.rows[0].nest_id !== catalog.rows[1].nest_id);
+  check('and both still have one', isNestId(catalog.rows[0].nest_id)
+        && isNestId(catalog.rows[1].nest_id));
+  eq('nothing else on the row moved', catalog.rows[1].nest_label, 'yes');
+
+  check('nest_id is not a nest-only column',
+        !NEST_ONLY_COLUMNS.includes('nest_id'));
+  check('but it is a label column', LABEL_COLUMNS.includes('nest_id'));
+}
+
+group('catalog.js — more than one reviewer on a row');
+{
+  // reviewer is whoever answered it last; reviewers is everyone who has. A
+  // second pass over a spreadsheet used to overwrite the first name with
+  // nothing to show the row had been looked at twice.
+  const { catalog } = Catalog.open('s.csv', SAMPLE);
+
+  catalog.setLabel(0, { nest: true, structure: false, substrate: 'twig',
+                        nestLocation: 'tree', reviewer: 'mei' });
+  eq('the first reviewer is recorded', catalog.rows[0].reviewer, 'mei');
+  eq('and listed', catalog.rows[0].reviewers, 'mei');
+
+  catalog.setLabel(0, { nest: true, structure: false, substrate: 'twig',
+                        nestLocation: 'cactus', reviewer: 'stella' });
+  eq('a correction becomes the current reviewer', catalog.rows[0].reviewer, 'stella');
+  eq('but the first name is still there', catalog.rows[0].reviewers, 'mei; stella');
+
+  catalog.setLabel(0, { nest: true, structure: false, reviewer: 'mei' });
+  eq('and re-labeling adds no duplicate', catalog.rows[0].reviewers, 'mei; stella');
+
+  // A skip is a decision somebody made, so it counts.
+  catalog.setSkip(1, { reviewer: 'mei' });
+  eq('a skip records its reviewer', catalog.rows[1].reviewers, 'mei');
+  catalog.setSkip(1, { reviewer: 'stella' });
+  eq('and a second look adds to it', catalog.rows[1].reviewers, 'mei; stella');
+
+  // An unnamed reviewer must not leave an empty entry behind.
+  catalog.setLabel(2, { nest: false, structure: false, reviewer: '' });
+  eq('no name means no entry', catalog.rows[2].reviewers, '');
+  catalog.setLabel(2, { nest: false, structure: false, reviewer: 'mei' });
+  eq('and naming one later still starts clean', catalog.rows[2].reviewers, 'mei');
+
+  eq('it rides with the other provenance columns, not the nest ones',
+     NEST_ONLY_COLUMNS.includes('reviewers'), false);
+  check('and it is a label column', LABEL_COLUMNS.includes('reviewers'));
 }
 
 group('catalog.js — reviewer collision detection');
@@ -244,6 +914,12 @@ group('catalog.js — reviewer collision detection');
   const { catalog: b } = Catalog.open('s.csv', SAMPLE, { labeledText: a.labeled.serialize() });
   eq('sees the other reviewer', b.otherReviewers('stella'), ['alex']);
   eq('does not flag yourself', b.otherReviewers('alex'), []);
+
+  // A name labeled over is still a name that touched the file, so the warning
+  // has to read the full list rather than only whoever went last.
+  a.setLabel(0, { nest: true, structure: false, reviewer: 'stella' });
+  const { catalog: c } = Catalog.open('s.csv', SAMPLE, { labeledText: a.labeled.serialize() });
+  eq('an earlier reviewer still counts', c.otherReviewers('stella'), ['alex']);
 }
 
 group('catalog.js — column union growth');
@@ -365,6 +1041,46 @@ group('settings.js — hotkeys');
   eq('arrows display as glyphs', keyDisplay('ArrowRight'), '→');
   eq('letters display uppercase', keyDisplay('q'), 'Q');
 }
+
+group('settings.js — remembered picker terms');
+{
+  // Typed terms come back next time, so the second cattle panel is a pick.
+  // Stored per browser: the file always records the text, never a reference
+  // into a list, so a researcher without the list still reads the column.
+  const before = getRememberedTerms('nest_location');
+  const beforeSub = getRememberedTerms('substrate');
+  rememberTerm('nest_location', 'cattle panel');
+  check('a typed term is remembered',
+        getRememberedTerms('nest_location').includes('cattle panel'));
+
+  rememberTerm('nest_location', 'irrigation pivot');
+  eq('most recent first', getRememberedTerms('nest_location')[0], 'irrigation pivot');
+
+  rememberTerm('nest_location', 'cattle panel');
+  eq('re-picking moves it to the front, not a duplicate',
+     getRememberedTerms('nest_location').filter(t => t === 'cattle panel').length, 1);
+
+  rememberTerm('nest_location', '   ');
+  check('blank is not remembered', !getRememberedTerms('nest_location').includes(''));
+  rememberTerm('nest_location', '  spaced  ');
+  check('and terms are trimmed', getRememberedTerms('nest_location').includes('spaced'));
+
+  // Kept per field. A place someone typed has no business turning up in the
+  // list of what a nest is built from — that mixing is what M13 got wrong.
+  rememberTerm('substrate', 'horsehair');
+  check('a material is remembered against its own field',
+        getRememberedTerms('substrate').includes('horsehair'));
+  check('and does not leak into another picker',
+        !getRememberedTerms('nest_location').includes('horsehair'));
+
+  // Leave the browser as it was found, so running the tests doesn't pollute
+  // the list the app offers. Through the setter, so this keeps working on the
+  // dev preview, where the storage key is scoped differently.
+  setRememberedTerms('nest_location', before);
+  setRememberedTerms('substrate', beforeSub);
+  eq('tests clean up after themselves', getRememberedTerms('nest_location'), before);
+}
+
 
 group('storage.js — progress kept in the browser');
 {

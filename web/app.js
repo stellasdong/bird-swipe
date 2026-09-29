@@ -7,11 +7,17 @@
 
 import {
   Catalog, CATALOG_KEY, REVIEWED, SKIPPED, ValidationError, labeledName, nestName,
-  normalizeCount,
+  normalizeCount, filterTerms, joinTerms, splitTerms,
+  SUBSTRATE_OPTIONS, ANTHROPOGENIC_OPTIONS, locationOptions, isListedLocation,
+  CHICK_STAGES, PREY_OPTIONS,
 } from './catalog.js';
 import {
-  PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, photoUrl, videoUrl,
+  PHOTO_SIZE_DEFAULT, PHOTO_SIZE_HIGH, assetPageUrl, checklistUrl, photoUrl,
+  videoUrl,
 } from './macaulay.js';
+import {
+  canTranslate, languageName, NeedsGestureError, Translators,
+} from './translate.js';
 import {
   AUTOSAVE_DIR, DebouncedWriter, ExportHandles, Folder, Progress,
   TruncatedReadError, ensureReadable, isSupported, mirrorSink, pickExport, readText,
@@ -22,11 +28,12 @@ import {
 } from './report.js';
 import {
   ACTION_LABELS, ACTION_ORDER, DEFAULT_KEYS, actionForEvent, duplicateKey,
-  getKeys, getReviewer, keyDisplay, setKeys, setReviewer,
+  getKeys, getReviewer, getRememberedTerms, keyDisplay, rememberTerm,
+  setKeys, setReviewer,
 } from './settings.js';
 import { IS_DEV } from './channel.js';
 
-export const VERSION = '3.0.0';
+export const VERSION = '4.0.0';
 const BUILD = '__BUILD__'; // replaced with the short git SHA at deploy time
 
 // Where the written protocol lives. Fill this in and the setup dialog links to
@@ -85,7 +92,39 @@ const el = {
   nestSkip: $('nest-skip'),
   toggles: {
     structure: $('t-structure'),
-    anthropogenic: $('t-anthropogenic'),
+    bird: $('t-bird'),
+    provisioning: $('t-provisioning'),
+  },
+  nestDetails: $('nest-details'),
+  detailsHint: $('details-hint'),
+  dupesOpen: $('dupes-open'),
+  nestCode: $('nest-code'),
+  dupes: $('dupes'),
+  dupesGrid: $('dupes-grid'),
+  dupesSearch: $('dupes-search'),
+  dupesCount: $('dupes-count'),
+  dupesCancel: $('dupes-cancel'),
+  dupesUngroup: $('dupes-ungroup'),
+  dupesSave: $('dupes-save'),
+  chickStage: $('y-chick-stage'),
+  // Listed in panel order throughout this file: location, substrate, material.
+  pickers: {
+    nest_location: {
+      wrap: $('p-location'), button: $('location-open'), pop: $('location-pop'),
+      filter: $('location-filter'), list: $('location-list'), foot: $('location-foot'),
+    },
+    substrate: {
+      wrap: $('p-substrate'), button: $('substrate-open'), pop: $('substrate-pop'),
+      filter: $('substrate-filter'), list: $('substrate-list'), foot: $('substrate-foot'),
+    },
+    anthropogenic_material: {
+      wrap: $('p-anthropogenic'), button: $('anthropogenic-open'), pop: $('anthropogenic-pop'),
+      filter: $('anthropogenic-filter'), list: $('anthropogenic-list'), foot: $('anthropogenic-foot'),
+    },
+    prey_group: {
+      wrap: $('p-prey'), button: $('prey-open'), pop: $('prey-pop'),
+      filter: $('prey-filter'), list: $('prey-list'), foot: $('prey-foot'),
+    },
   },
   counters: {
     eggs: { box: $('c-eggs'), input: $('count-eggs') },
@@ -136,16 +175,117 @@ const el = {
   prefsSave: $('prefs-save'),
 };
 
-const TOGGLE_FIELDS = { structure: 'human_structure', anthropogenic: 'anthropogenic' };
+// Panel order again: structure leads, bird sits after the three lists.
+const TOGGLE_FIELDS = {
+  structure: 'human_structure',
+  bird: 'bird_present',
+  provisioning: 'provisioning',
+};
 const TOGGLE_LABELS = {
-  structure: 'human-made structure',
-  anthropogenic: 'anthropogenic material',
+  // "structure" is about what the nest is ON, which is why it chooses the
+  // location list. The material it is built FROM is a separate question.
+  structure: 'on a human-made structure',
+  bird: 'bird visible',
+  // Stella's question is "are the parent birds actively feeding?", and the
+  // column she confirmed is `provisioning` — which conventionally means
+  // bringing food to the nest, a wider thing. The label carries both so the
+  // definition travels with the name it is stored under.
+  provisioning: 'provisioning — actively feeding',
 };
 // Both the letter and number binding of a toggle map to the same field.
 const TOGGLE_ACTIONS = {
   toggle_structure: 'structure', toggle_structure_num: 'structure',
-  toggle_anthropogenic: 'anthropogenic', toggle_anthropogenic_num: 'anthropogenic',
+  toggle_bird: 'bird',
+  toggle_bird_num: 'bird',
+  toggle_provisioning: 'provisioning', toggle_provisioning_num: 'provisioning',
 };
+// Every toggle lives in the nest-details panel now, so this is all of them.
+// Kept as a set rather than dropped: it is what stops a key setting a value on
+// a row where the panel is closed and nobody could see it.
+const NEST_ONLY_TOGGLES = new Set(['structure', 'bird', 'provisioning']);
+
+// The three list questions, all nest-only, all answered by the same picker.
+// They were one question until it became clear it was three: what the nest is
+// made of, what man-made material is in it, and where it sits. Anthropogenic
+// material used to be a top-level yes/no toggle; the list replaced it, and the
+// old column is now derived from this one in catalog.js.
+const PICKERS = {
+  // The only picker whose list changes: man-made structure is answered first
+  // and chooses between two shorter lists, so a tree is never offered as a
+  // man-made place and the reviewer reads seven terms instead of fourteen.
+  nest_location: {
+    label: 'location',
+    options: () => locationOptions(toggleOn('structure')),
+    multi: false, key: 'pick_location', numKey: 'pick_location_num',
+    // Typed terms are remembered against the list that was showing, so a
+    // man-made one doesn't come back while the natural list is up.
+    memory: () => (toggleOn('structure') ? 'nest_location_manmade'
+                                         : 'nest_location_natural'),
+  },
+  substrate: {
+    label: 'substrate',
+    options: SUBSTRATE_OPTIONS, multi: true,
+    key: 'pick_substrate', numKey: 'pick_substrate_num',
+  },
+  // "anthropogenic" is the word the column keeps, because three spreadsheets
+  // already carry it. On screen it says what it means: this is the man-made
+  // material the nest is built from — the twine and wire woven into it — and
+  // not the man-made thing it is sitting on, which is the structure toggle
+  // and the location picker between them.
+  // Multi-select for the same reason substrate is: a nest can hold plastic
+  // twine and wire at once, and making the reviewer choose one would throw the
+  // other away. It was single-select until Stella asked; nothing in the file
+  // format had to change, because the cell was already being written through
+  // joinTerms.
+  anthropogenic_material: {
+    label: 'man-made material',
+    options: ANTHROPOGENIC_OPTIONS, multi: true,
+    key: 'pick_anthropogenic', numKey: 'pick_anthropogenic_num',
+  },
+  // The second half of the feeding question — "if visible, what kind?" — so it
+  // only exists once provisioning says yes. Multi-select: one image can show
+  // more than one item.
+  prey_group: {
+    label: 'prey', options: PREY_OPTIONS, multi: true,
+    key: 'pick_prey', numKey: 'pick_prey_num',
+    shownWhen: () => toggleOn('provisioning'),
+  },
+};
+const PICKER_NAMES = Object.keys(PICKERS);
+
+// Two of them are not optional. Everything else about a nest can honestly be
+// left unanswered — there may be no bird in shot, no man-made material to
+// name — but where a nest is and what it is built from are the questions the
+// spreadsheet exists to answer, and a picker that sits quietly red reads as an
+// option nobody minds you skipping. These say REQUIRED instead, and the
+// advance key won't leave the row until they hold something.
+//
+// Both lists carry "unclear" for the photo that doesn't show it. Requiring an
+// answer without that would only buy confident-looking guesses.
+const REQUIRED_PICKERS = ['nest_location', 'substrate'];
+
+// Chick stage is three states rather than two, so it cycles rather than
+// toggling: blank -> early -> late -> unclear -> blank. The definition rides
+// on the label, because two reviewers drawing the downy/feathered line
+// differently is how this column goes wrong.
+const CHICK_STAGE_TEXT = {
+  early: 'early (downy)',
+  late: 'late (feathered)',
+  unclear: 'unclear',
+};
+// A picker's list and its remembered-terms key can both depend on another
+// answer, so they are resolved when the list is drawn rather than at startup.
+const pickerOptions = name => {
+  const o = PICKERS[name].options;
+  return typeof o === 'function' ? o() : o;
+};
+const pickerMemory = name => {
+  const m = PICKERS[name].memory;
+  return typeof m === 'function' ? m() : (m ?? name);
+};
+// Both the letter and number binding of a picker open the same list.
+const PICKER_ACTIONS = Object.fromEntries(PICKER_NAMES.flatMap(
+  name => [[PICKERS[name].key, name], [PICKERS[name].numKey, name]]));
 
 // Navigation actions that may be triggered from inside a count box.
 const ESCAPES_COUNT_BOX = new Set(['nest_yes', 'nest_no', 'forward', 'back']);
@@ -174,6 +314,15 @@ const state = {
   paceLog: [],   // when each item was reviewed this session, for the estimate
   wantedSrc: null,  // the media URL currently being asked for
   attempts: 0,      // how many times this asset has been tried
+  // The current row's answer to each list question, always held as an array so
+  // single- and multi-select differ only in how many entries are allowed.
+  picks: Object.fromEntries(PICKER_NAMES.map(name => [name, []])),
+  chickStage: '',   // '', 'early', 'late' or 'unclear'
+  carriedFrom: '',  // nest code these answers were pre-filled from, if any
+  dupePicks: new Set(), // row indices selected in the contact sheet
+  openPicker: null, // which picker is showing its list, if any
+  pickerRows: [],   // what the open picker is currently offering
+  pickerCursor: -1, // highlighted row in that list; -1 is "none yet"
 };
 
 // ------------------------------------------------------------------ screens
@@ -617,26 +766,33 @@ function showCurrent() {
   const row = catalog.rows[state.idx];
   const mlId = row[CATALOG_KEY];
   const total = catalog.rows.length;
-  const stats = catalog.stats();
 
   el.rowTitle.textContent = `${row['Common Name'] ?? ''} · ${row['Scientific Name'] ?? ''}`;
-  el.progress.textContent =
-    `[${state.idx + 1} / ${total}]   reviewed ${stats.reviewed}` +
-    (state.reviewingSkipped ? '   ·   reviewing skipped' : '');
-  renderProgress(stats, total);
+  renderProgressReadout();
   document.title = `bird-swipe · [${state.idx + 1}/${total}] · ML ${mlId}`;
 
   showAsset(mlId, row.Format ?? '');
   renderMeta(row);
   el.notes.value = row.notes ?? '';
   refreshNotesSize();
+  // An unreviewed asset in a group starts from what its nest already says.
+  // Nothing is written by looking — these are the controls, and the reviewer
+  // still has to press the key that commits them.
+  const carried = carriedFrom(row);
+  state.carriedFrom = carried ? carried.nest_id : '';
+  const source = carried ?? row;
   for (const [field, column] of Object.entries(TOGGLE_FIELDS)) {
-    setToggle(field, row[column] === 'yes');
+    setToggle(field, source[column] === 'yes');
   }
   for (const [field, column] of Object.entries(COUNTER_FIELDS)) {
-    setCount(field, row[column] ?? '');
+    setCount(field, source[column] ?? '');
   }
+  closePicker(); // never carry an open list onto the next item
+  // Legacy 'n/a' is already dropped as the file loads, so these are values or blanks.
+  for (const name of PICKER_NAMES) setPick(name, source[name] ?? '');
+  setChickStage(source.chick_stage ?? '');
   updateChip(row);
+  showNestDetails(row);
   renderNestLabels();
   prefetchUpcoming();
   resetNotesLabel();
@@ -687,6 +843,66 @@ function setToggle(field, on) {
 }
 const toggleOn = field => el.toggles[field].getAttribute('aria-pressed') === 'true';
 
+/**
+ * Follow-on work after a toggle is flipped by hand.
+ *
+ * Man-made structure chooses which location list is offered, so flipping it
+ * strands a location that came off the list now hidden — "man-made: tree" is
+ * not an answer anyone meant to give. That value is dropped and the picker
+ * goes back to empty, which is visible immediately since the reviewer is
+ * looking straight at it.
+ *
+ * Anything typed in is kept: nothing can tell which side of the line a typed
+ * term sits on, and throwing away what someone typed is the worse mistake.
+ */
+function afterToggle(field) {
+  // Answering "no" to feeding takes the prey answer with it, the same way a
+  // zero chick count takes the stage, so a stale one can't sit under a no.
+  if (field === 'provisioning') {
+    if (state.openPicker === 'prey_group' && !toggleOn('provisioning')) closePicker();
+    renderConditionalPickers();
+    return;
+  }
+  if (field !== 'structure') return;
+  reconcileLocation();
+  closePicker();               // its list just changed underneath it
+}
+
+/**
+ * Drop a recorded location that belongs to the list the structure answer has
+ * just turned away from. Split out from afterToggle because the location
+ * picker can switch lists with itself open (left/right inside it), and there
+ * the list changing is the point rather than a reason to close.
+ */
+function reconcileLocation() {
+  const [current] = state.picks.nest_location;
+  if (current && isListedLocation(current)
+      && !pickerOptions('nest_location').some(
+           o => o.toLowerCase() === current.toLowerCase())) {
+    state.picks.nest_location = [];
+  }
+  renderPickerButton('nest_location');
+}
+
+/**
+ * Natural or man-made, from inside the location list. It answers the structure
+ * question as a side effect, which is the point: the two were one decision
+ * being asked as two, and getting them in the wrong order meant picking off
+ * the wrong list and doing it again. Left and right are otherwise inert in a
+ * list, so this costs no key anyone was using.
+ */
+function switchLocationList() {
+  // Only ever reachable from the location filter, which only has focus while
+  // that list is open — but it re-renders whichever list is open, so say so
+  // rather than trusting the caller.
+  if (state.openPicker !== 'nest_location') return;
+  setToggle('structure', !toggleOn('structure'));
+  reconcileLocation();
+  state.pickerCursor = -1;     // a different list underneath it
+  renderPickerList();
+  saveOpenRow();
+}
+
 /** Show a saved count. Blank stays blank so a skipped row doesn't read as 0. */
 function setCount(field, value) {
   const { input } = el.counters[field];
@@ -719,15 +935,475 @@ function renderToggleLabels() {
   for (const field of Object.keys(TOGGLE_FIELDS)) {
     const letter = keyDisplay(state.keys[`toggle_${field}`]);
     const number = keyDisplay(state.keys[`toggle_${field}_num`]);
+    // While the location list is open, the arrows answer structure too — and
+    // saying so matters, because a panel that names a key it has just
+    // disabled is how somebody presses it and records a location they never
+    // chose.
+    const keys = field === 'structure' && state.openPicker === 'nest_location'
+      ? '←→' : `${letter}/${number}`;
     el.toggles[field].textContent = '';
     el.toggles[field].append(
       TOGGLE_LABELS[field] + '  ',
       Object.assign(document.createElement('span'),
-        { className: 'key', textContent: `(${letter}/${number})` }));
+        { className: 'key', textContent: `(${keys})` }));
   }
 }
 
+/**
+ * The panel is open exactly when the row is a nest, so it can never be
+ * answered for something that isn't one — and a saved yes reopens it with its
+ * answers, the same way the main toggles already show what's stored.
+ */
+function renderProgressReadout() {
+  const total = state.catalog.rows.length;
+  const stats = state.catalog.stats();
+  el.progress.textContent =
+    `[${state.idx + 1} / ${total}]   reviewed ${stats.reviewed}` +
+    (state.reviewingSkipped ? '   ·   reviewing skipped' : '');
+  renderProgress(stats, total);
+}
+
+function showNestDetails(row) {
+  const isNest = (row?.nest_label ?? '') === 'yes';
+  // Also shown for an asset that has inherited its nest's answers but has not
+  // been decided yet. The values are already sitting in the controls; keeping
+  // the panel shut until the decision meant the reviewer could not see what
+  // they were about to confirm, so the inheritance looked like it had not
+  // happened at all. Nothing is recorded by showing it.
+  const show = isNest || Boolean(state.carriedFrom);
+  el.nestDetails.hidden = !show;
+  if (show) {
+    const missing = missingRequired();
+    el.detailsHint.textContent = missing.length
+      ? `${missing.map(n => PICKERS[n].label).join(' and ')} still needed`
+      : state.carriedFrom
+        ? `filled in from nest ${state.carriedFrom} — check the counts, then `
+          + `${keyDisplay(state.keys.nest_yes)} to `
+          + `${isNest ? 'save and move on' : 'confirm and move on'}`
+        : `${keyDisplay(state.keys.nest_yes)} again to save and move on`;
+    renderPickerButtons();
+    renderConditionalPickers();
+    renderChickStage();
+  }
+}
+
+
+// ------------------------------------------------------------- the pickers
+// Three questions answered from lists that are meant to grow, so they are
+// answered by typing rather than by memorising a number: the key opens the
+// list, typing narrows it, Enter or a digit confirms. Nothing is recorded
+// until it is confirmed — a navigation key closes the list and leaves the
+// answer exactly as it was, so a half-typed filter can never land in the
+// spreadsheet as a real answer.
+//
+// Digits pick only from the unfiltered list, which is why they are numbered
+// only while the box is empty: once you are typing, a digit is part of what
+// you typed, so a term like "I-35 bridge" stays possible.
+//
+// Substrate is multi-select — a nest is often twigs and mud and fur — so
+// confirming a term there toggles it and leaves the list open for the next
+// one. The other two take a single answer and close on confirm.
+
+/** Load one picker from a row's cell. Multi-select cells hold "a; b; c". */
+function setPick(name, value) {
+  const terms = splitTerms(value);
+  state.picks[name] = PICKERS[name].multi ? terms : terms.slice(0, 1);
+  renderPickerButton(name);
+}
+
+/** One picker's answer as it goes into the file. */
+function pickValue(name) {
+  return joinTerms(state.picks[name]);
+}
+
+function renderPickerButton(name) {
+  const { label } = PICKERS[name];
+  const node = el.pickers[name];
+  const value = pickValue(name);
+  const required = REQUIRED_PICKERS.includes(name);
+  node.wrap.dataset.empty = String(value === '');
+  node.button.textContent = '';
+  node.button.append(
+    value ? `${label}: ${value}  `
+          : (required ? `${label} — REQUIRED  ` : `${label}  `),
+    Object.assign(document.createElement('span'), {
+      className: 'key',
+      textContent: `(${keyDisplay(state.keys[PICKERS[name].key])}`
+        + `/${keyDisplay(state.keys[PICKERS[name].numKey])})`,
+    }));
+}
+
+function renderPickerButtons() {
+  for (const name of PICKER_NAMES) renderPickerButton(name);
+}
+
+/**
+ * Hide a picker whose question doesn't apply yet, and drop what it held. Only
+ * prey has one: asking what is being fed before anyone has said feeding is
+ * happening is asking for a guess. Hidden elements aren't focusable, so it
+ * leaves the Tab order on its own.
+ */
+function renderConditionalPickers() {
+  for (const name of PICKER_NAMES) {
+    const shown = PICKERS[name].shownWhen?.() ?? true;
+    el.pickers[name].wrap.hidden = !shown;
+    if (!shown && state.picks[name].length) {
+      state.picks[name] = [];
+      renderPickerButton(name);
+    }
+  }
+}
+
+/**
+ * Chick stage, cycled one key at a time. It only exists where chicks were
+ * counted, so the control hides itself when the count is zero and the value
+ * goes with it — catalog.js writes blank there too, so a stale "late" cannot
+ * survive under a nest with no chicks in it.
+ */
+function setChickStage(value) {
+  state.chickStage = CHICK_STAGES.includes(value) ? value : '';
+  renderChickStage();
+}
+
+function cycleChickStage() {
+  if (el.nestDetails.hidden || el.chickStage.hidden) return;
+  const order = ['', ...CHICK_STAGES];
+  const next = order[(order.indexOf(state.chickStage) + 1) % order.length];
+  setChickStage(next);
+  saveOpenRow();
+}
+
+function renderChickStage() {
+  const counted = normalizeCount(countOf('chicks')) > 0;
+  el.chickStage.hidden = !counted;
+  if (!counted && state.chickStage) setChickStage('');
+  el.chickStage.dataset.empty = String(state.chickStage === '');
+  el.chickStage.textContent = '';
+  el.chickStage.append(
+    state.chickStage
+      ? `chick stage: ${CHICK_STAGE_TEXT[state.chickStage]}  `
+      : 'chick stage  ',
+    Object.assign(document.createElement('span'), {
+      className: 'key',
+      textContent: `(${keyDisplay(state.keys.cycle_chick_stage)}`
+        + `/${keyDisplay(state.keys.cycle_chick_stage_num)})`,
+    }));
+}
+
+/**
+ * Open the next required question that hasn't been answered, if there is one.
+ *
+ * This is what makes a nest cheap: marking one opens the location list without
+ * being asked, confirming that opens substrate, and the reviewer never presses
+ * a key whose only job is to open something. The required run chains; nothing
+ * else does, so the optional questions stay out of the way until they're
+ * wanted. Esc breaks out of it — it closes a list and chains nothing, which is
+ * how you get to the counts first if that's the order you like.
+ */
+function chainToNextRequired() {
+  const [next] = missingRequired();
+  if (next) openPicker(next);
+}
+
+/** The required questions still sitting empty, in the order they appear. */
+const missingRequired = () =>
+  REQUIRED_PICKERS.filter(name => pickValue(name) === '');
+
+/**
+ * Called when the advance key is pressed on a nest that isn't finished. Rather
+ * than only refusing, it puts the reviewer where the work is: the first empty
+ * one opens, all of them are marked, and the hint says what is wanted. `←` and
+ * `↓` are deliberately not gated — "this isn't a nest" and "I'm not answering
+ * this one" have to stay one press, or the requirement just teaches people to
+ * skip rows.
+ */
+function promptForRequired(missing) {
+  for (const name of missing) el.pickers[name].wrap.dataset.missing = 'true';
+  setTimeout(() => {
+    for (const name of missing) delete el.pickers[name].wrap.dataset.missing;
+  }, 1800);
+  const names = missing.map(n => PICKERS[n].label);
+  const keys = missing.map(n => keyDisplay(state.keys[PICKERS[n].key]));
+  el.detailsHint.textContent =
+    `${names.join(' and ')} needed before moving on `
+    + `(${keys.join(', ')}) — each list has “unclear” if the photo doesn't show it`;
+  openPicker(missing[0]);
+}
+
+/**
+ * A click made with the mouse, rather than the browser turning a keypress on a
+ * focused button into one. Those arrive with detail 0.
+ *
+ * The difference matters because a mouse click should hand the keyboard back
+ * to the label loop — the pointer is where the reviewer's attention is — while
+ * a keyboard activation has to leave focus exactly where it was, or Tab starts
+ * again from the top of the page every time you press Space.
+ */
+const fromPointer = event => event.detail > 0;
+
+const pickerOpen = () => state.openPicker !== null;
+
+function openPicker(name) {
+  if (el.nestDetails.hidden) return; // nothing to answer on a non-nest row
+  if (el.pickers[name].wrap.hidden) return; // its question hasn't come up yet
+  if (state.openPicker && state.openPicker !== name) closePicker();
+  const node = el.pickers[name];
+  state.openPicker = name;
+  node.pop.hidden = false;
+  renderToggleLabels(); // structure answers with the arrows while this is open
+  node.button.setAttribute('aria-expanded', 'true');
+  node.filter.value = '';
+  state.pickerCursor = -1;
+  renderPickerList();
+  node.filter.focus();
+}
+
+function closePicker() {
+  const name = state.openPicker;
+  if (!name) return;
+  const node = el.pickers[name];
+  // Hand focus back to the button that opened it, so Tab carries on from
+  // where the reviewer was rather than restarting at the top of the page.
+  // Only when the list actually had focus: closing one because the row
+  // changed underneath must not pull focus from wherever it has gone.
+  const hadFocus = document.activeElement === node.filter;
+  node.pop.hidden = true;
+  node.button.setAttribute('aria-expanded', 'false');
+  node.filter.blur();
+  state.openPicker = null;
+  renderToggleLabels(); // structure goes back to answering on its own keys
+  if (hadFocus) node.button.focus();
+}
+
+function renderPickerList() {
+  const name = state.openPicker;
+  if (!name) return;
+  const { multi } = PICKERS[name];
+  const options = pickerOptions(name);
+  const node = el.pickers[name];
+  const query = node.filter.value;
+  const numbered = query.trim() === '';
+  const chosen = state.picks[name];
+  state.pickerRows = filterTerms(options, query, getRememberedTerms(pickerMemory(name)));
+  node.list.textContent = '';
+  if (state.pickerCursor >= state.pickerRows.length) {
+    state.pickerCursor = state.pickerRows.length - 1;
+  }
+
+  state.pickerRows.forEach((term, i) => {
+    const li = document.createElement('li');
+    li.id = `${name}-opt-${i}`;
+    li.setAttribute('role', 'option');
+    const on = chosen.some(t => t.toLowerCase() === term.toLowerCase());
+    // Green marks what is recorded, in both kinds of list, so stepping back
+    // onto a labeled item shows its answers in place. Where the arrow keys
+    // have walked to is a separate mark: it moves, and it records nothing
+    // until Enter.
+    li.setAttribute('aria-selected', String(on));
+    if (i === state.pickerCursor) li.dataset.cursor = 'true';
+    // "1" belongs to the structure toggle in the location list, so the first
+    // row there carries no number. Showing one that doesn't work is worse than
+    // showing none: the rest still read 2-9 and still pick what they say.
+    const digitTaken = name === 'nest_location' && i === 0;
+    if (numbered && i < 9 && !digitTaken) {
+      li.append(Object.assign(document.createElement('span'),
+        { className: 'num', textContent: String(i + 1) }));
+    } else {
+      li.append(Object.assign(document.createElement('span'), { className: 'num' }));
+    }
+    li.append(term);
+    if (on) {
+      li.append(Object.assign(document.createElement('span'),
+        { className: 'current', textContent: 'recorded' }));
+    }
+    li.addEventListener('mousedown', event => {
+      event.preventDefault(); // keep focus in the filter box
+      confirmTerm(term);
+    });
+    node.list.append(li);
+  });
+
+  const at = node.list.children[state.pickerCursor];
+  node.filter.setAttribute('aria-activedescendant', at ? at.id : '');
+  if (at) at.scrollIntoView({ block: 'nearest' });
+
+  const typed = query.trim();
+  const exact = state.pickerRows.some(t => t.toLowerCase() === typed.toLowerCase());
+  // With nothing typed there is no match to take, so Enter means "done" —
+  // which is the only way out of a multi-select list besides Esc, and reads
+  // less like a cancel. Esc still works and still records nothing further.
+  const offer = state.pickerRows[state.pickerCursor]
+    ?? (typed ? state.pickerRows[0] : undefined);
+  // Which of the two location lists is showing, and how to swap them, put in
+  // the filter's placeholder rather than on a line of its own: it shows while
+  // the box is empty, which is exactly when the cue is wanted, and costs no
+  // height at all. The popup hangs over the photo, and every line of it is
+  // picture the reviewer can't see.
+  node.filter.placeholder = name === 'nest_location'
+    ? (toggleOn('structure') ? 'man-made places · ←→ for natural'
+                             : 'natural places · ←→ for man-made')
+    : 'type to narrow, or type anything new';
+
+  // Kept to one line. What the filter box is for is written in the filter box.
+  const picks = name === 'nest_location' ? '2–9 pick' : '1–9 pick';
+  const switches = name === 'nest_location'
+    ? ` · ←→ or ${keyDisplay(state.keys.toggle_structure)} switches the list` : '';
+  node.foot.textContent = offer
+    ? `Enter records “${offer}” · ↑↓ move · Esc`
+    : (typed
+        ? `Enter adds “${typed}” · ↑↓ move · Esc`
+        : `↑↓ move · ${picks} · Enter when done${switches}`);
+}
+
+/**
+ * Record a term. On a multi-select picker this toggles it and stays open, so
+ * twigs-and-mud-and-fur is three presses and no reopening; elsewhere it
+ * replaces the answer and closes. Anything typed is kept for next time.
+ */
+function confirmTerm(term) {
+  const name = state.openPicker;
+  const value = String(term ?? '').trim();
+  if (!name || !value) return;
+  const { multi } = PICKERS[name];
+
+  if (multi) {
+    const chosen = state.picks[name];
+    const at = chosen.findIndex(t => t.toLowerCase() === value.toLowerCase());
+    if (at >= 0) chosen.splice(at, 1);
+    else chosen.push(value);
+  } else {
+    state.picks[name] = [value];
+  }
+
+  rememberTerm(pickerMemory(name), value); // so the second one is a pick
+  renderPickerButton(name);
+  delete el.pickers[name].wrap.dataset.missing;
+  if (multi) {
+    el.pickers[name].filter.value = ''; // ready for the next one
+    // and the highlight goes with it: the list underneath has just changed
+    // back to the full one, and leaving the cursor behind would make the next
+    // Enter toggle a row nobody is looking at instead of finishing.
+    state.pickerCursor = -1;
+    renderPickerList();
+  } else {
+    closePicker();
+    // Answering one required question opens the next, so the run carries
+    // itself. Optional pickers chain nothing: finishing one means you went
+    // looking for it, and being handed another list would be a surprise.
+    if (REQUIRED_PICKERS.includes(name)) chainToNextRequired();
+  }
+  saveOpenRow();
+}
+
+/**
+ * Keep the file in step with a panel answer. The row is already marked yes —
+ * that is the only way the panel is open — so this re-records it in place
+ * rather than waiting for the reviewer to press → again.
+ */
+function saveOpenRow() {
+  if (state.catalog?.rows[state.idx]?.nest_label === 'yes') commit(true, false);
+}
+
+/**
+ * The answers this asset should start from, when it has none of its own.
+ *
+ * Assets grouped as one nest are one nest, so most of what is true of one is
+ * true of the rest — where it sits, what it is built from, whether it is on a
+ * human-made structure. Retyping that for the tenth frame of a burst is ten
+ * chances to differ from the first.
+ *
+ * So an unreviewed member starts filled in from the most recently answered
+ * member of its group. It is a starting point, not an answer: nothing is
+ * written until the reviewer presses the key that commits the row, which is
+ * the whole reason they are still made to walk through every asset. The
+ * things that genuinely change between visits — the counts, the chick stage,
+ * whether a parent is feeding — are exactly what they are there to correct,
+ * and the panel says where the values came from.
+ *
+ * A row that has already been reviewed is never overwritten: its answers are
+ * someone's judgement about that photograph, and a group is not a reason to
+ * throw that away.
+ */
+function carriedFrom(row) {
+  if (!row || row.reviewed === REVIEWED) return null;
+  if (!row.nest_id) return null;
+  const mates = state.catalog.nestGroup(row.nest_id)
+    .map(i => state.catalog.rows[i])
+    .filter(r => r !== row && r.reviewed === REVIEWED && r.nest_label === 'yes');
+  if (!mates.length) return null;
+  // The freshest judgement about this nest, which on a revisit is the one
+  // closest to what the reviewer is looking at now.
+  return mates.sort((a, b) =>
+    String(b.reviewed_at ?? '').localeCompare(String(a.reviewed_at ?? '')))[0];
+}
+
+/**
+ * The best-answered other member of a group — what a newly grouped asset
+ * should adopt. Excludes the row itself, which on the press that groups them
+ * is the most recently reviewed one and would otherwise be its own source.
+ */
+function groupAnswers(row) {
+  if (!row?.nest_id) return null;
+  const mates = state.catalog.nestGroup(row.nest_id)
+    .map(i => state.catalog.rows[i])
+    .filter(r => r !== row && r.reviewed === REVIEWED && r.nest_label === 'yes');
+  if (!mates.length) return null;
+  return mates.sort((a, b) =>
+    String(b.reviewed_at ?? '').localeCompare(String(a.reviewed_at ?? '')))[0];
+}
+
+/**
+ * Adopt a nest's answers into the panel, without overwriting anything the
+ * reviewer has already said about this photograph.
+ *
+ * Grouping is the reviewer declaring "this is that nest", so filling the panel
+ * in is what they asked for — but a field they have already answered is a
+ * judgement about the image in front of them, and that wins. In the ordinary
+ * case, a row marked yes seconds ago has nothing of its own and the whole
+ * panel fills.
+ *
+ * Returns what it filled, so the reviewer can be told rather than left to
+ * notice.
+ */
+function adoptGroupAnswers(source) {
+  if (!source) return 0;
+  let filled = 0;
+  for (const [field, column] of Object.entries(TOGGLE_FIELDS)) {
+    if (!toggleOn(field) && source[column] === 'yes') {
+      setToggle(field, true);
+      filled += 1;
+    }
+  }
+  for (const [field, column] of Object.entries(COUNTER_FIELDS)) {
+    if (normalizeCount(countOf(field)) === 0 && normalizeCount(source[column]) > 0) {
+      setCount(field, source[column]);
+      filled += 1;
+    }
+  }
+  for (const name of PICKER_NAMES) {
+    if (pickValue(name) === '' && (source[name] ?? '') !== '') {
+      setPick(name, source[name]);
+      filled += 1;
+    }
+  }
+  if (!state.chickStage && source.chick_stage) {
+    setChickStage(source.chick_stage);
+    filled += 1;
+  }
+  renderConditionalPickers();
+  renderChickStage();
+  return filled;
+}
+
 function updateChip(row) {
+  // The code sits with the decision rather than in the details panel, because
+  // the button that groups nests does too — and a reviewer checking whether
+  // they have seen this nest wants to know what it is already called.
+  const others = row.nest_id ? state.catalog.nestGroup(row.nest_id).length - 1 : 0;
+  el.nestCode.textContent = row.nest_id
+    ? `nest ${row.nest_id}${others > 0 ? ` · with ${others} more` : ''}`
+      + (state.carriedFrom ? ' · answers ready' : '')
+    : '';
   const label = row.nest_label ?? '';
   el.nestYes.setAttribute('aria-pressed', String(label === 'yes'));
   el.nestNo.setAttribute('aria-pressed', String(label === 'no'));
@@ -754,10 +1430,26 @@ function renderMeta(row) {
   head.append(strong, ' · ', link);
   el.meta.append(head);
 
+  // Recordist, date and checklist sit together, because that is how a
+  // reviewer recognises a nest they have seen before: the same person, out
+  // on the same day, on the same list. The checklist is a link — one click
+  // is the whole outing, which is worth more than the S-number itself.
   const inline = document.createElement('div');
-  for (const key of ['Format', 'Caption', 'Behaviors', 'Date', 'Locality', 'Asset Tags']) {
-    if (!row[key]) continue;
+  for (const key of ['Format', 'Caption', 'Behaviors',
+                     'Recordist', 'Recordist 2', 'Date', 'eBird Checklist ID',
+                     'Locality', 'Asset Tags']) {
+    if (!row[key]) continue;          // every field shows only when present
     const b = document.createElement('b');
+    if (key === 'eBird Checklist ID') {
+      b.textContent = 'Checklist: ';
+      const a = document.createElement('a');
+      a.href = checklistUrl(row[key]);
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = row[key];
+      inline.append(b, a, `   `);
+      continue;
+    }
     b.textContent = `${key}: `;
     inline.append(b, `${row[key]}   `);
   }
@@ -770,6 +1462,132 @@ function renderMeta(row) {
     b.textContent = `${key}: `;
     line.append(b, row[key]);
     el.meta.append(line);
+    // Both free-text fields, not just one. Media notes was the field Stella
+    // named, but the eBirders' own words land in Observation Details three
+    // times as often — translating one and not the other meant the note she
+    // was actually looking at stayed in Spanish.
+    offerTranslation(line, b, row[key], mlId, key);
+  }
+}
+
+// ------------------------------------------------------------- translation
+// Media notes are written by whoever uploaded the asset, in whatever language
+// they use, and are often the one line that says whether it is a nest. So they
+// are shown in English where that is possible — with the original one click
+// away, because the original is the record and a machine translation is not.
+//
+// Chrome wants a user gesture before it will build a model, so the first note
+// in a language cannot translate itself. Rather than assume that, this tries,
+// and puts up a button only when Chrome actually refuses. Once a click has
+// bought the model, every later note in that language translates on sight.
+const translators = new Translators();
+
+/** Swap a rendered note between the original and its translation. */
+function showNote(line, label, { field, original, english, language, showing }) {
+  const name = languageName(language);
+  line.textContent = '';
+  label.textContent = showing === 'english'
+    ? `${field} (translated from ${name}): `
+    : `${field} (${name}): `;
+  line.append(label, showing === 'english' ? english : original);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'link-btn';
+  button.textContent = showing === 'english'
+    ? `show original (${name})` : 'show translation';
+  button.addEventListener('click', () => showNote(line, label, {
+    field, original, english, language,
+    showing: showing === 'english' ? 'original' : 'english',
+  }));
+  line.append(' ', button);
+}
+
+/**
+ * Translate one free-text field in place, if the browser can and it isn't
+ * English. Called for both Observation Details and Media notes — they are the
+ * same kind of text, written by the same person, and either can be the line
+ * that says whether it is a nest.
+ *
+ * Everything here is best-effort: a browser without the APIs, a language with
+ * no model, a detection too weak to trust, or an outright failure all leave
+ * the note exactly as the eBirder wrote it. `mlId` guards against a slow
+ * translation landing on whatever row the reviewer has since moved to.
+ */
+async function offerTranslation(line, label, text, mlId, field) {
+  if (!canTranslate()) return;
+  const stale = () => state.catalog?.rows[state.idx]?.[CATALOG_KEY] !== mlId;
+
+  const linkButton = (text2, onClick) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'link-btn';
+    button.textContent = text2;
+    button.addEventListener('click', onClick);
+    line.append(' ', button);
+    return button;
+  };
+
+  const translateNow = async (language) => {
+    const english = await translators.translate(text, language);
+    if (stale() || !english || english === text) return;
+    showNote(line, label, { field, original: text, english, language,
+                            showing: 'english' });
+  };
+
+  const run = async () => {
+    const found = await translators.detect(text);
+    if (!found) return true;
+    // Confident, or a language this reviewer has already accepted once this
+    // session — either way, translate it. The second case is what makes a run
+    // of short notes in one language cost a single click rather than one
+    // each: having said yes to Spanish, they are not asked about Spanish
+    // again.
+    if (found.auto || (found.suggested && translators.ready(found.suggested))) {
+      await translateNow(found.auto ?? found.suggested);
+      return true;
+    }
+    // A guess too weak to act on is still worth offering. Two words of Spanish
+    // will never convince a detector, and the reviewer left staring at a note
+    // they cannot read is the worse failure.
+    if (found.suggested) {
+      const name = languageName(found.suggested);
+      linkButton(`translate from ${name}?`, async event => {
+        event.target.disabled = true;
+        event.target.textContent = 'translating…';
+        try {
+          await translateNow(found.suggested);
+        } catch (err) {
+          noteHandledError('translate media notes failed', err);
+          event.target.textContent = 'translation unavailable';
+        }
+      });
+    }
+    return true;
+  };
+
+  try {
+    await run();
+  } catch (err) {
+    if (!(err instanceof NeedsGestureError)) {
+      noteHandledError('translate media notes failed', err);
+      return;
+    }
+    // Chrome wants a click first, and until it has had one there is no
+    // detector, so nothing here knows what language the note is in — hence
+    // the general wording. Every note after this one can be specific.
+    if (stale()) return;
+    const button = linkButton('translate to English', async () => {
+      button.disabled = true;
+      button.textContent = 'translating…';
+      try {
+        await run();
+        if (button.isConnected) button.remove(); // run() put up its own
+      } catch (e) {
+        noteHandledError('translate media notes failed', e);
+        button.textContent = 'translation unavailable';
+      }
+    });
   }
 }
 
@@ -779,10 +1597,20 @@ function renderLegend() {
     [keyDisplay(k.nest_yes), 'YES'], [keyDisplay(k.nest_no), 'NO'],
     [keyDisplay(k.forward), 'next'], [keyDisplay(k.back), 'back'],
     [keyDisplay(k.notes), 'notes'],
+    // Same order as the panel itself, so the legend can be read straight
+    // across rather than hunted through.
     [`${keyDisplay(k.toggle_structure)}/${keyDisplay(k.toggle_structure_num)}`, 'structure'],
-    [`${keyDisplay(k.toggle_anthropogenic)}/${keyDisplay(k.toggle_anthropogenic_num)}`, 'anthro'],
+    [`${keyDisplay(k.pick_location)}/${keyDisplay(k.pick_location_num)}`, 'location'],
+    [`${keyDisplay(k.pick_substrate)}/${keyDisplay(k.pick_substrate_num)}`, 'substrate'],
+    [`${keyDisplay(k.pick_anthropogenic)}/${keyDisplay(k.pick_anthropogenic_num)}`, 'anthro'],
+    [`${keyDisplay(k.toggle_bird)}/${keyDisplay(k.toggle_bird_num)}`, 'bird'],
     [`${keyDisplay(k.count_eggs)}/${keyDisplay(k.count_eggs_num)}`, 'eggs'],
     [`${keyDisplay(k.count_chicks)}/${keyDisplay(k.count_chicks_num)}`, 'chicks'],
+    [`${keyDisplay(k.cycle_chick_stage)}/${keyDisplay(k.cycle_chick_stage_num)}`,
+     'chick stage'],
+    [`${keyDisplay(k.toggle_provisioning)}/${keyDisplay(k.toggle_provisioning_num)}`,
+     'feeding'],
+    [`${keyDisplay(k.pick_prey)}/${keyDisplay(k.pick_prey_num)}`, 'prey'],
     [keyDisplay(k.zoom), state.zoomed ? 'zoom out' : 'zoom in'],
     [keyDisplay(k.jump), 'jump to…'],
     [keyDisplay(k.close), 'close file'],
@@ -968,23 +1796,104 @@ function prefetchUpcoming(n = 3) {
 }
 
 // ----------------------------------------------------------------- labeling
-function commit(nest) {
+/**
+ * Record the decision for the current row. `move` false keeps us on it — see
+ * nestYes(), where the first press has to stay put so the nest-details panel
+ * can be answered.
+ */
+function commit(nest, move = true) {
   state.catalog.setLabel(state.idx, {
     nest,
     structure: toggleOn('structure'),
-    anthropogenic: toggleOn('anthropogenic'),
     eggCount: countOf('eggs'),
     chickCount: countOf('chicks'),
+    birdPresent: toggleOn('bird'),
+    substrate: pickValue('substrate'),
+    anthropogenicMaterial: pickValue('anthropogenic_material'),
+    nestLocation: pickValue('nest_location'),
+    chickStage: state.chickStage,
+    provisioning: toggleOn('provisioning'),
+    preyGroup: pickValue('prey_group'),
     reviewer: getReviewer(),
     notes: el.notes.value.trim(),
   });
   state.writer.schedule(state.catalog);
+  if (!move) { // same row, now answerable in more detail
+    const row = state.catalog.rows[state.idx];
+    showNestDetails(row);
+    updateChip(row);
+    renderProgressReadout(); // the row counts as reviewed from this moment
+    return;
+  }
   notePace();
   advance();
 }
 
+/**
+ * Nest = YES. The questions in the nest-details panel only apply where there
+ * is a nest, so the first press commits the yes and *stays*, opening the
+ * panel; the second press moves on. A nest therefore costs two presses and a
+ * non-nest stays one, which is where the volume is. Stepping back onto a row
+ * already marked yes lands in the second state, so → moves on from it.
+ */
+function nestYes() {
+  const alreadyYes = state.catalog.rows[state.idx]?.nest_label === 'yes';
+  // The first press opens the panel and answers nothing, so it can't be
+  // blocked. The second is the one that leaves the row, and that is where the
+  // required questions are enforced.
+  if (alreadyYes) {
+    const missing = missingRequired();
+    if (missing.length) { promptForRequired(missing); return; }
+  }
+  // A row grouped BEFORE the decision — which is the ordinary way round now
+  // that "seen this nest before?" sits above the nest buttons — adopts its
+  // nest's answers as it becomes a nest. Done before the commit, so the
+  // values are what gets written rather than a blank row saved and corrected
+  // a moment later.
+  const row = state.catalog.rows[state.idx];
+  if (!alreadyYes && adoptGroupAnswers(groupAnswers(row))) {
+    state.carriedFrom = row.nest_id;
+  }
+
+  // A nest costs two presses because the first one opens a panel to fill in.
+  // An asset that arrived with its nest's answers already in the panel has
+  // nothing to fill in, and has been sitting there visibly filled since the
+  // reviewer got to it — so the press that says "yes, this is that nest" is
+  // also the press that finishes it. One arrow per duplicate, which is the
+  // whole point of recognising them.
+  //
+  // Only when nothing required is still empty. An inherited row that is
+  // somehow short of an answer falls back to the normal two presses and gets
+  // asked for it, rather than being hurried past.
+  if (!alreadyYes && state.carriedFrom && !missingRequired().length) {
+    commit(true, true);
+    return;
+  }
+
+  commit(true, alreadyYes);
+  // Marking a nest opens the first thing it owes, rather than presenting a
+  // panel of seven buttons and leaving the reviewer to remember which two
+  // matter. Only on the press that opens the panel — stepping back onto a
+  // half-finished nest shouldn't have a list jump out during navigation.
+  // Nothing is owed if the nest just filled itself in, so nothing opens.
+  if (!alreadyYes) chainToNextRequired();
+}
+
+/**
+ * Save the nest-details panel before leaving the row it belongs to. The flow
+ * deliberately parks the reviewer on the row they have just marked yes, so
+ * moving off it with ↓ or ↑ would otherwise throw away an answer they can see
+ * set on the screen. Nothing to do on a row that isn't a nest.
+ */
+function flushNestDetails() {
+  const row = state.catalog?.rows[state.idx];
+  if (row?.nest_label !== 'yes') return;
+  commit(true, false); // same row, saved
+}
+
 /** Advance one item. An undecided item is recorded as a skip on the way out. */
 function forward() {
+  flushNestDetails();
   if (!state.catalog.isReviewed(state.idx)) {
     state.catalog.setSkip(state.idx, {
       reviewer: getReviewer(),
@@ -1014,6 +1923,7 @@ function advance() {
 }
 
 function goBack() {
+  flushNestDetails();
   if (state.reviewingSkipped) {
     // Walk back through items visited this pass — even ones since labeled (so
     // no longer "skip") — via a breadcrumb stack.
@@ -1061,6 +1971,9 @@ function showDone() {
     `nest yes: ${s.yes}   ·   nest no: ${s.no}   ·   skipped: ${s.skipped}`;
   el.doneObservations.textContent =
     `human-made structure: ${s.structure}   ·   anthropogenic: ${s.anthropogenic}` +
+    `   ·   bird visible: ${s.birds}   ·   provisioning: ${s.provisioning}` +
+    `   ·   substrate recorded: ${s.substrates}` +
+    `   ·   location recorded: ${s.locations}` +
     `   ·   images with eggs: ${s.eggs} (${s.eggTotal} counted)` +
     `   ·   images with chicks: ${s.chicks} (${s.chickTotal} counted)`;
 
@@ -1213,10 +2126,10 @@ el.doneOpenAnother.addEventListener('click', closeFile);
 // Clicking a nest button does exactly what its arrow key does: commit the
 // decision with the observation toggles as they stand, then advance.
 for (const [node, value] of [[el.nestYes, true], [el.nestNo, false]]) {
-  node.addEventListener('click', () => {
+  node.addEventListener('click', event => {
     if (!state.catalog || state.idx >= state.catalog.rows.length) return;
-    node.blur(); // keep arrow keys with the label loop
-    commit(value);
+    if (fromPointer(event)) node.blur(); // keep arrow keys with the label loop
+    if (value) nestYes(); else commit(false);
   });
 }
 
@@ -1226,6 +2139,7 @@ for (const [node, value] of [[el.nestYes, true], [el.nestNo, false]]) {
  * should mean three eggs, not twenty-three.
  */
 function focusCount(field) {
+  if (el.nestDetails.hidden) return; // counts are nest-only, like everything else
   const { input } = el.counters[field];
   input.focus();
   input.select();
@@ -1233,7 +2147,10 @@ function focusCount(field) {
 
 for (const [field, { box, input }] of Object.entries(el.counters)) {
   box.addEventListener('click', () => focusCount(field));
-  input.addEventListener('input', () => refreshCounter(field));
+  input.addEventListener('input', () => {
+    refreshCounter(field);
+    if (field === 'chicks') renderChickStage(); // appears once there is a chick
+  });
   input.addEventListener('keydown', event => {
     // Enter and Esc both return to the label loop; Esc must not reach the
     // document handler and close the file mid-count.
@@ -1258,13 +2175,136 @@ for (const [field, { box, input }] of Object.entries(el.counters)) {
     }
     event.stopPropagation();
   });
-  input.addEventListener('blur', () => refreshCounter(field));
+  input.addEventListener('blur', () => {
+    refreshCounter(field);
+    if (field === 'chicks') renderChickStage();
+  });
 }
 
+
+// The pickers' own keys. The filter box has focus while one is open, so the
+// document handler ignores everything — these are the only keys that matter.
+for (const name of PICKER_NAMES) {
+  const node = el.pickers[name];
+
+  node.button.addEventListener('click', () => {
+    if (state.openPicker === name) closePicker(); else openPicker(name);
+  });
+
+  node.filter.addEventListener('input', () => {
+    state.pickerCursor = -1; // the list underneath it just changed
+    renderPickerList();
+  });
+
+  node.filter.addEventListener('keydown', event => {
+    event.stopPropagation(); // never let a filter keystroke reach the label loop
+
+    if (event.key === 'Escape') { // close, recording nothing further
+      event.preventDefault();
+      closePicker();
+      return;
+    }
+
+    // Up and down walk the list. While a list is open the arrows belong to it,
+    // not to the label loop: moving to the next image out from under a
+    // half-answered question was never what the reviewer meant, and a list you
+    // can only reach with digits or by typing is a list you can't browse.
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const last = state.pickerRows.length - 1;
+      if (last < 0) return;
+      state.pickerCursor = event.key === 'ArrowDown'
+        ? Math.min(state.pickerCursor + 1, last)
+        // Up off the top returns to no selection, so Enter goes back to
+        // meaning "done" rather than trapping you on the first row.
+        : Math.max(state.pickerCursor - 1, -1);
+      renderPickerList();
+      return;
+    }
+
+    // In the location list, left and right switch between the natural and the
+    // man-made places — answering the structure question from inside the list
+    // it decides. Everywhere else they are left alone to move the caret, which
+    // is what a text box should do.
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (name !== 'nest_location') return;
+      event.preventDefault();
+      switchLocationList();
+      return;
+    }
+
+    // So do the structure toggle's own keys, which are what a reviewer
+    // actually reaches for: the toggle is on screen saying (Q/1) and the list
+    // it decides has the keyboard. Before this, Q typed a q into the filter
+    // and 1 recorded whatever sat at the top of the list — a wrong answer, in
+    // a required column, that nobody chose.
+    //
+    // Only while nothing is typed, the same rule the digits already follow:
+    // once there is a filter, every key is a character again. The cost is
+    // that a location typed from scratch cannot begin with the structure
+    // letter — "quarry" would switch the list instead — which only matters if
+    // such a term ever turns up.
+    const bound = actionForEvent(event, state.keys);
+    if (name === 'nest_location' && node.filter.value.trim() === ''
+        && (bound === 'toggle_structure' || bound === 'toggle_structure_num')) {
+      event.preventDefault();
+      switchLocationList();
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const typed = node.filter.value.trim();
+      // Whatever the arrows have walked to wins: it is the thing highlighted
+      // on screen, so it is what Enter is visibly offering.
+      if (state.pickerCursor >= 0) {
+        confirmTerm(state.pickerRows[state.pickerCursor]);
+        return;
+      }
+      // Nothing typed means there is no match being offered, so Enter is
+      // "done" rather than "take the first one". That is what finishes a
+      // multi-select list — picking clears the filter each time, so the
+      // gesture is E, 1, 2, Enter — and it stops a bare Enter on a
+      // single-select list quietly recording whatever happens to be at the
+      // top. Esc still closes and records nothing further.
+      if (!typed) {
+        closePicker();
+        if (REQUIRED_PICKERS.includes(name)) chainToNextRequired();
+        return;
+      }
+      // The first match is the offer; with no matches at all, what was typed is
+      // the answer — that is the "other, type it in" path, and it needs no
+      // separate control.
+      confirmTerm(state.pickerRows[0] || typed);
+      return;
+    }
+
+    // Digits pick, but only from the unnumbered full list: once there is a
+    // filter, a digit is part of what is being typed.
+    if (/^[1-9]$/.test(event.key) && node.filter.value.trim() === '') {
+      const pick = state.pickerRows[Number(event.key) - 1];
+      if (pick) {
+        event.preventDefault();
+        confirmTerm(pick);
+      }
+      return;
+    }
+
+  });
+}
+
+el.chickStage.addEventListener('click', event => {
+  cycleChickStage();
+  if (fromPointer(event)) el.chickStage.blur(); // arrows back to the label loop
+});
+
 for (const [field, node] of Object.entries(el.toggles)) {
-  node.addEventListener('click', () => {
+  node.addEventListener('click', event => {
+    if (NEST_ONLY_TOGGLES.has(field) && el.nestDetails.hidden) return;
     setToggle(field, !toggleOn(field));
-    node.blur(); // keep arrow keys with the label loop
+    if (fromPointer(event)) node.blur(); // keep arrow keys with the label loop
+    afterToggle(field);
+    if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
   });
 }
 
@@ -1294,10 +2334,18 @@ el.notes.addEventListener('keydown', event => {
 });
 
 document.addEventListener('keydown', event => {
-  if (el.prefs.open || el.jump.open || el.report.open || el.onedriveHelp.open) return;
+  if (el.prefs.open || el.jump.open || el.report.open || el.onedriveHelp.open
+      || el.dupes.open) return;
+  if (pickerOpen()) return; // the picker owns the keyboard while it is open
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+  // Enter and Space on a focused button belong to that button — the browser
+  // turns them into a click. Without this they would also run whatever the
+  // label loop binds them to, so tabbing to a picker and pressing Enter would
+  // open the list and jump to the notes box at the same time.
+  if (target instanceof HTMLButtonElement
+      && (event.key === 'Enter' || event.key === ' ')) return;
 
   const action = actionForEvent(event, state.keys);
   if (!action) return;
@@ -1319,7 +2367,16 @@ document.addEventListener('keydown', event => {
 function runLabelAction(action) {
   if (action in TOGGLE_ACTIONS) {
     const field = TOGGLE_ACTIONS[action];
+    // A nest-details key does nothing until the row is a nest: the panel is
+    // hidden, so flipping it would set a value nobody can see.
+    if (NEST_ONLY_TOGGLES.has(field) && el.nestDetails.hidden) return;
     setToggle(field, !toggleOn(field));
+    afterToggle(field);
+    if (NEST_ONLY_TOGGLES.has(field)) saveOpenRow();
+  } else if (action in PICKER_ACTIONS) {
+    openPicker(PICKER_ACTIONS[action]);
+  } else if (action === 'cycle_chick_stage' || action === 'cycle_chick_stage_num') {
+    cycleChickStage();
   } else if (action === 'zoom') {
     setZoom(!state.zoomed);
   } else if (action === 'jump') {
@@ -1333,7 +2390,7 @@ function runLabelAction(action) {
   } else if (action === 'forward') {
     forward();
   } else if (action === 'nest_yes') {
-    commit(true);
+    nestYes();
   } else if (action === 'nest_no') {
     commit(false);
   }
@@ -1501,6 +2558,213 @@ on(el.jumpSkipped, 'click', () => {
   const skipped = state.catalog.skippedIndices();
   if (skipped.length) goToIndex(skipped[0]);
 });
+
+// ----------------------------------------------------- identify duplicates
+// One nest is often photographed ten times in a burst, and again a month
+// later. The reviewer is the one who recognises it — no comparison of pixels
+// is going to beat someone who has just looked at both — so the app's job is
+// to put the candidates in front of them and record what they say.
+//
+// It shows the WHOLE spreadsheet, and filters nothing by guesswork. Two
+// earlier heuristics were tried and taken out: same recordist, which assumes
+// one person photographs a nest when two eBirders at the same site is
+// ordinary, and same coordinates, which assumes the coordinates are exact
+// when they are approximate. Both would have hidden real matches, and a
+// candidate hidden by a rule is one the reviewer never gets to judge.
+//
+// Recordist, date and distance still ride on every tile. That is the same
+// evidence, offered rather than enforced: it helps the person decide instead
+// of deciding for them.
+
+/** Metres between two coordinates. Flat-earth maths, fine at this range. */
+function metresApart(a, b) {
+  if (![a?.lat, a?.lon, b?.lat, b?.lon].every(Number.isFinite)) return Infinity;
+  const mPerDeg = 111_320;
+  const dy = (a.lat - b.lat) * mPerDeg;
+  const dx = (a.lon - b.lon) * mPerDeg * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+  return Math.hypot(dx, dy);
+}
+
+const coordsOf = row => ({
+  lat: Number.parseFloat(row?.Latitude), lon: Number.parseFloat(row?.Longitude),
+});
+
+/** How far apart, said loosely enough to be honest about the coordinates. */
+function roughDistance(a, b) {
+  const m = metresApart(a, b);
+  if (!Number.isFinite(m)) return 'distance unknown';
+  if (m < 25) return 'same spot';
+  if (m < 1000) return `≈${Math.round(m / 10) * 10} m away`;
+  const km = m / 1000;
+  // Coarser the further out, because "2942 km" claims four figures of
+  // precision about coordinates that do not have them, and at that range the
+  // only thing the reviewer needs is "nowhere near".
+  if (km < 10) return `≈${km.toFixed(1)} km away`;
+  if (km < 100) return `≈${Math.round(km)} km away`;
+  return `≈${Math.round(km / 100) * 100} km away`;
+}
+
+/**
+ * Everything in the spreadsheet, narrowed only by what the reviewer typed.
+ *
+ * An empty search box means every asset, which is the normal case: the point
+ * is to look. The search is there for a file of two hundred when you already
+ * know roughly what you are after, not to decide what deserves showing.
+ */
+function dupeCandidates() {
+  const rows = state.catalog?.rows ?? [];
+  if (!rows[state.idx]) return [];
+  const query = el.dupesSearch.value.trim().toLowerCase();
+  return rows.map((row, i) => ({ row, i })).filter(({ row, i }) => {
+    if (!query) return true;
+    if (i === state.idx || state.dupePicks.has(i)) return true; // never hide these
+    return [row[CATALOG_KEY], row.Date, row.Locality, row.Recordist, row.nest_id]
+      .some(v => String(v ?? '').toLowerCase().includes(query));
+  });
+}
+
+function renderDupes() {
+  const candidates = dupeCandidates();
+  const home = coordsOf(state.catalog?.rows[state.idx]);
+  el.dupesGrid.textContent = '';
+  for (const { row, i } of candidates) {
+    const mlId = row[CATALOG_KEY];
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'dupe' + (i === state.idx ? ' current' : '');
+    tile.setAttribute('aria-pressed', String(state.dupePicks.has(i)));
+
+    const img = document.createElement('img');
+    img.loading = 'lazy';              // an export runs to a couple of hundred
+    img.alt = '';
+    img.src = photoUrl(mlId, 320);
+    tile.append(img);
+
+    const meta = document.createElement('div');
+    meta.className = 'dupe-meta';
+    const who = document.createElement('b');
+    who.textContent = row.Recordist || 'unknown recordist';
+    const lat = Number.parseFloat(row.Latitude);
+    const lon = Number.parseFloat(row.Longitude);
+    // Distance from the row the reviewer came from, because comparing two
+    // decimal coordinate pairs by eye is not a thing people can do. Rounded
+    // hard and prefixed with ≈: the coordinates are approximate, so a figure
+    // that looked precise would be claiming more than the data supports.
+    const away = i === state.idx ? 'this one' : roughDistance(coordsOf(row), home);
+    const where = Number.isFinite(lat) && Number.isFinite(lon)
+      ? `${lat.toFixed(4)}, ${lon.toFixed(4)} · ${away}` : 'no coordinates';
+    meta.append(who, document.createElement('br'),
+                `${row.Date || 'no date'}`, document.createElement('br'), where);
+    tile.append(meta);
+
+    const id = document.createElement('div');
+    id.className = 'dupe-id';
+    // An unreviewed row can be grouped, but the grouping only reaches the file
+    // when the row is labeled — the labeled file is completed entries, and
+    // putting an unreviewed row in it would hand the project a row nobody has
+    // looked at. Saying so on the tile beats surprising anyone later.
+    const pending = row.reviewed !== REVIEWED ? ' · not reviewed yet' : '';
+    id.textContent = (row.nest_id ? `ML ${mlId} · ${row.nest_id}` : `ML ${mlId}`)
+      + pending;
+    tile.append(id);
+
+    tile.addEventListener('click', () => {
+      if (state.dupePicks.has(i)) state.dupePicks.delete(i);
+      else state.dupePicks.add(i);
+      renderDupes();
+    });
+    el.dupesGrid.append(tile);
+  }
+  el.dupesCount.textContent =
+    `${state.dupePicks.size} selected · ${candidates.length} shown`;
+
+  // Only a typed search can empty the sheet now, and the way out is to clear
+  // what was typed.
+  if (candidates.length <= state.dupePicks.size && el.dupesSearch.value.trim()) {
+    const empty = document.createElement('div');
+    empty.className = 'dupes-empty';
+    empty.append('Nothing else matches that search. ');
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'link-btn';
+    all.textContent = 'show everything again';
+    all.addEventListener('click', () => {
+      el.dupesSearch.value = '';
+      renderDupes();
+    });
+    empty.append(all);
+    el.dupesGrid.append(empty);
+  }
+}
+
+function openDupes() {
+  if (!state.catalog || state.idx >= state.catalog.rows.length) return;
+  // Save what is in the panel first. Grouping re-renders the row, and a count
+  // typed but not yet committed lives only in its box — without this, opening
+  // the sheet to group a nest silently threw away the eggs you had just
+  // counted. Same reason the arrow keys flush before they navigate.
+  flushNestDetails();
+  const row = state.catalog.rows[state.idx];
+  // Reopening a nest that already has a group starts from that group, so this
+  // is how you add a twelfth photograph to eleven rather than starting again.
+  const existing = row.nest_id ? state.catalog.nestGroup(row.nest_id) : [];
+  state.dupePicks = new Set([state.idx, ...existing]);
+  el.dupesSearch.value = '';
+  renderDupes();
+  el.dupes.showModal();
+  // Two hundred tiles in file order means the row you came from can be well
+  // off-screen. Put it where the reviewer is looking.
+  el.dupesGrid.querySelector('.dupe.current')?.scrollIntoView({ block: 'center' });
+}
+
+function saveDupes() {
+  const picks = [...state.dupePicks].sort((a, b) => a - b);
+  const later = picks.filter(i => state.catalog.rows[i].reviewed !== REVIEWED).length;
+  const id = state.catalog.setNestGroup(picks);
+  el.dupes.close();
+  showCurrent();
+
+  // The asset in front of the reviewer adopts the nest's answers straight
+  // away. Saying "this is that nest" is the request; making them then walk
+  // somewhere else and come back to see it take effect would be absurd.
+  const row = state.catalog.rows[state.idx];
+  // An undecided asset needs nothing here: showCurrent() above has already
+  // loaded its nest's answers and opened the panel to show them, and the
+  // decision stays the reviewer's to make. A decided one is a different case
+  // — it is already reviewed, so it loads its own answers rather than the
+  // nest's, and has to be filled in explicitly.
+  const filled = row?.nest_label === 'yes' ? adoptGroupAnswers(groupAnswers(row)) : 0;
+  if (filled) {
+    state.carriedFrom = id;
+    showNestDetails(row);
+    updateChip(row);
+    saveOpenRow();
+  }
+  state.writer.schedule(state.catalog);
+
+  const saved = picks.length - later;
+  announce('info',
+    `${picks.length} assets marked as nest ${id}.`
+    + (state.carriedFrom === id
+        ? ' This one filled in from the nest — check the counts.' : '')
+    + (later ? ` ${saved} saved now; the other ${later} save when you review them.`
+             : ''));
+}
+
+function ungroupDupes() {
+  const picks = [...state.dupePicks];
+  state.catalog.clearNestGroup(picks);
+  state.writer.schedule(state.catalog);
+  el.dupes.close();
+  showCurrent();
+  announce('info', 'Grouping cleared — each nest has its own code again.');
+}
+
+el.dupesOpen.addEventListener('click', openDupes);
+el.dupesCancel.addEventListener('click', () => el.dupes.close());
+el.dupesSave.addEventListener('click', saveDupes);
+el.dupesUngroup.addEventListener('click', ungroupDupes);
+el.dupesSearch.addEventListener('input', renderDupes);
 
 // --------------------------------------------------------------- reporting
 /**

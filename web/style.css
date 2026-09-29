@@ -456,6 +456,80 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   cursor: pointer;
 }
 .link-btn:hover:not(:disabled) { background: none; color: var(--text); }
+/* The same control inline in a line of metadata, where there is no card to
+   centre it against and it reads as part of the sentence. */
+#meta .link-btn { align-self: auto; vertical-align: baseline; }
+
+/* The nest's code, beside the decision it belongs to. Quiet: it is a label,
+   not an answer anybody has to give. */
+.nest-code {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: .08em;
+}
+
+/* ------------------------------------------------------ identify duplicates */
+/* A contact sheet of the spreadsheet. Wide, because the judgement is made by
+   eye and small thumbnails do not support it, and scrollable because an export
+   runs to a couple of hundred rows. */
+#dupes {
+  width: min(96vw, 1400px);
+  max-height: 90vh;
+}
+.dupes-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dupes-filter { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.dupes-bar input[type="text"] { flex: 1; min-width: 200px; }
+.dupes-count { font-size: 12px; color: var(--dim); }
+.dupes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  /* The sheet is the whole spreadsheet now that nothing is filtered out, so
+     it gets as much height as the dialog can spare. */
+  max-height: 70vh;
+  padding: 2px;
+}
+.dupe {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #1a1a1a;
+  padding: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dupe:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.dupe[aria-pressed="true"] { border-color: var(--green); background: #16301a; }
+/* The row the reviewer came from. Always in the sheet, always selected, and
+   marked so they can see where they are among two hundred thumbnails. */
+.dupe.current { border-style: dashed; border-color: #d9a400; }
+.dupe img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 5px;
+  background: #000;
+}
+.dupe-meta { font-size: 11px; line-height: 1.35; color: var(--dim); }
+.dupe-meta b { color: var(--text); font-weight: 600; }
+.dupe-id { font-size: 11px; color: var(--muted); }
+.dupes-empty {
+  grid-column: 1 / -1;
+  padding: 18px 4px;
+  font-size: 13px;
+  color: var(--dim);
+}
 
 /* -------------------------------------------------------------- reporting */
 /* One control, fixed at the bottom centre of every screen. The screens reserve
@@ -551,4 +625,176 @@ dialog h2 { margin: 0 0 14px; font-size: 18px; }
   font-weight: 600;
   letter-spacing: .03em;
   pointer-events: none;
+}
+
+/* --------------------------------------------------------- keyboard focus */
+/* Tab walks the panel in the order the controls are laid out, because that is
+   what the browser does with real buttons in DOM order — no key is taken from
+   it, so Shift-Tab and screen readers keep working. What was missing was being
+   able to SEE where Tab had got to, which is the whole difference between a
+   walkable row and a guess.
+ *
+ * :focus-visible rather than :focus, so clicking a control doesn't leave a
+ * ring behind; it shows for the keyboard and stays out of the way of the
+ * mouse. The ring is white against every state these controls take — green
+ * when set, red when empty, amber when required — which a coloured ring
+ * wouldn't be. */
+.chip:focus-visible,
+.toggle:focus-visible,
+.cycle:focus-visible,
+.picker-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------- nest details */
+/* The questions that only apply where there is a nest. Marking nest = yes
+   opens this row without advancing, so it appears under the decision it
+   depends on and is visibly a consequence of it — hence the left rule and the
+   indent rather than a second, equal row of chips. */
+.nest-details {
+  align-items: center;
+  margin: 0 14px 4px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--green);
+  background: #1a1a1a;
+  border-radius: 0 6px 6px 0;
+}
+.details-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.details-hint { font-size: 12px; color: var(--dim); }
+
+/* ------------------------------------------------------------ the picker */
+/* Substrate records a value rather than a state, so it reads like the count
+   boxes — red until answered — but opens a keyboard-first list instead of
+   taking a number. */
+.picker { position: relative; }
+.picker-btn {
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--green);
+  color: #fff;
+  min-width: 260px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.picker[data-empty="true"] .picker-btn { background: var(--red); }
+.picker-btn .key { opacity: .75; font-size: 12px; }
+.picker-btn::before {
+  content: "✓";
+  display: inline-block;
+  width: 1.1em;
+  font-weight: 700;
+}
+.picker[data-empty="true"] .picker-btn::before { content: "✗"; }
+
+/* Location and substrate have to be answered before a nest can be left, so they
+   have to read as questions rather than options. Empty, they say REQUIRED in
+   amber instead of sitting quietly red like the optional ones; pressing the
+   advance key with one still empty flashes the outline and opens it. */
+.picker[data-required="true"][data-empty="true"] .picker-btn {
+  background: var(--amber);
+  outline: 2px solid transparent;
+}
+.picker[data-required="true"][data-empty="true"] .picker-btn::before { content: "!"; }
+.picker[data-missing="true"] .picker-btn {
+  animation: nudge .9s ease-out 2;
+  outline: 2px solid #d9a400;
+}
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .picker[data-missing="true"] .picker-btn { animation: none; }
+}
+
+/* Chick stage: three states on one key, so it reads like a toggle that counts
+   past two rather than a list. Hidden until the chick count is above zero. */
+.cycle {
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--green);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.cycle[data-empty="true"] { background: var(--red); }
+.cycle .key { opacity: .75; font-size: 12px; }
+.cycle::before {
+  content: "\2713";
+  display: inline-block;
+  width: 1.1em;
+  font-weight: 700;
+}
+.cycle[data-empty="true"]::before { content: "\2717"; }
+
+/* Above the photo, and wide enough to read a long term without wrapping. */
+.picker-pop {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 320px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .6);
+}
+.picker-pop input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--edge);
+  background: #111;
+  color: var(--text);
+  font: inherit;
+}
+/* Kept short on purpose: this hangs over the photo, and the photo is what the
+   question is about. Nine terms fit without scrolling, which is every list
+   there is; a remembered pile of typed-in ones scrolls. */
+.picker-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+.picker-list li {
+  display: flex;
+  gap: 8px;
+  padding: 3px 8px;
+  line-height: 1.3;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.picker-list li[aria-selected="true"] { background: var(--green); }
+/* Where the arrow keys have walked to. Distinct from recorded (green): this
+   one moves and commits nothing until Enter, so it reads as an outline rather
+   than a fill, and the two can sit on the same row. */
+.picker-list li[data-cursor="true"] {
+  outline: 2px solid #d9a400;
+  outline-offset: -2px;
+}
+.picker-list li:hover { background: #2a2a2a; }
+.picker-list li[aria-selected="true"]:hover { background: var(--green); }
+.picker-list .num { color: var(--dim); min-width: 1.2em; font-size: 12px; }
+.picker-list .current { margin-left: auto; color: var(--dim); font-size: 11px; }
+.picker-foot {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--edge);
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.5;
 }
