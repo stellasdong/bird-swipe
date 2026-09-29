@@ -4,7 +4,7 @@
 > Qt app labeling two things. It is kept for the reasoning, not as a
 > description of what exists: the app is a static web page now, and the
 > questions it asks have grown well past nest and human-made structure. For
-> what it does today read [README.md](README.md); for what is left, and why
+> what it does today read [GUIDE.md](GUIDE.md); for what is left, and why
 > each decision went the way it did, read [TODO.md](TODO.md).
 
 "Bird Tinder" — a desktop app for rapidly reviewing Macaulay Library nest media
