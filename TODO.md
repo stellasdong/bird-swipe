@@ -1,9 +1,8 @@
 # bird-swipe — what's next
 
-The next round of labeling features, from Stella. The flow and M12–M25 and
-M29–M30 are built. Two bugs are open: **M32**, the structure hotkey swallowed
-by the location list, which can write a wrong answer; and **M31**, short media
-notes not translating. Then **detecting duplicates automatically**, the open
+The next round of labeling features, from Stella. The flow and M12–M25,
+M29–M30 and M32 are built. What is left: **M31**, short media notes not
+translating, a bug in M30; **detecting duplicates automatically**, the open
 half of M25; M26–M27 are low priority; M28 is small.
 
 Numbering carries on from the milestones at the bottom of the README (M0–M11).
@@ -1206,7 +1205,7 @@ Whatever is chosen, the fix wants a test with a **short** note in it — the
 existing ones all use full sentences, which is why this got through.
 
 
-## M32 — The structure hotkey doesn't work while the location list is open — **bug**
+## M32 — The structure hotkey doesn't work while the location list is open — **fixed**
 
 Stella: marking a nest opens the location list, and pressing `Q` / `1` to say
 it's a human-made structure goes into the dropdown instead of the toggle.
@@ -1233,19 +1232,29 @@ mistake; the app is advertising a key it has just disabled.
 the structure answer (M22). It works. It is just not what the panel tells you
 to press.
 
-**Options:**
+**Fixed, with both halves:**
 
-- [ ] **Make `Q` and `1` switch the list** while it is open — the same thing
-      `←` / `→` do. The cost is that `1` stops picking the first row in that
-      one list, which is a real loss, but a small one against silently
-      recording a location nobody chose. Recommended.
-- [ ] **Stop advertising the key**: render the structure toggle as **(←→)**
-      while the location list is open. Honest and tiny, and it fixes nothing
-      for someone who presses `1` from muscle memory before reading.
-- [ ] **Don't auto-open the location list**, so the toggle is reachable first.
-      Gives back the problem M22 was built to solve.
-- [ ] Both of the first two, which is probably the right answer: make the keys
-      work *and* stop the panel lying about them.
+- [x] **`Q` and `1` switch the list** while it is open, exactly as `←` / `→`
+      do — and only while nothing is typed, the same rule the digits already
+      follow, so a filter still filters.
+- [x] **The toggle reads (←→)** while the list is open, and goes back to
+      (Q/1) when it closes. The panel no longer names a key it has disabled.
+- [x] The location list **numbers from 2**, and its footer says so, because
+      `1` no longer picks its first row. Showing a number that does nothing
+      would be worse than showing none. Every other list still numbers from 1.
+
+**On the choice between the two wrong answers.** Inside a list, `1` genuinely
+means two things: "pick row one" and "human-made structure". Whichever loses,
+somebody presses it and gets a surprise. Picking the row is the surprise that
+writes a wrong location into a required column silently; switching the list is
+the surprise that changes the whole list in front of you, writes nothing, and
+undoes itself with another press. So the visible harmless one wins.
+
+**The wider trap is narrower than it looked.** Every panel hotkey is still
+swallowed by an open list — but for the rest that is correct: `a` inside the
+substrate list is somebody filtering for "animal fur", not reaching for the
+bird toggle. Structure is the only question a list depends on, which is why it
+is the only one that needed a key inside one.
 
 **Worth checking while fixing:** the same trap exists for every nest-details
 hotkey, not just structure. Any of `A S D F H J` pressed while a list is open

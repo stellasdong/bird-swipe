@@ -195,8 +195,12 @@ line above the list tells you which you're looking at. You read seven terms
 instead of fourteen, and a tree is never offered as a man-made place.
 
 Doing that *answers* the human-made structure question — it's the same
-decision, so you make it once, from inside the list it decides. `Q` still
-toggles it from the panel if you'd rather.
+decision, so you make it once, from inside the list it decides. **`Q` and `1`
+do the same thing while that list is open**, since they're the keys the toggle
+is labelled with and reaching for them is the natural instinct; the toggle
+shows **(←→)** while the list is up to say so. The cost is that `1` doesn't
+pick the first location, so that list numbers from **2** — which is why it says
+so at the bottom.
 
 Either way, a location that came off the list you just turned away from is
 **dropped** — "man-made: tree" isn't an answer anyone means to give, and the

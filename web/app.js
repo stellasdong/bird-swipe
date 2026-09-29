@@ -935,11 +935,17 @@ function renderToggleLabels() {
   for (const field of Object.keys(TOGGLE_FIELDS)) {
     const letter = keyDisplay(state.keys[`toggle_${field}`]);
     const number = keyDisplay(state.keys[`toggle_${field}_num`]);
+    // While the location list is open, the arrows answer structure too — and
+    // saying so matters, because a panel that names a key it has just
+    // disabled is how somebody presses it and records a location they never
+    // chose.
+    const keys = field === 'structure' && state.openPicker === 'nest_location'
+      ? '←→' : `${letter}/${number}`;
     el.toggles[field].textContent = '';
     el.toggles[field].append(
       TOGGLE_LABELS[field] + '  ',
       Object.assign(document.createElement('span'),
-        { className: 'key', textContent: `(${letter}/${number})` }));
+        { className: 'key', textContent: `(${keys})` }));
   }
 }
 
@@ -1144,6 +1150,7 @@ function openPicker(name) {
   const node = el.pickers[name];
   state.openPicker = name;
   node.pop.hidden = false;
+  renderToggleLabels(); // structure answers with the arrows while this is open
   node.button.setAttribute('aria-expanded', 'true');
   node.filter.value = '';
   state.pickerCursor = -1;
@@ -1164,6 +1171,7 @@ function closePicker() {
   node.button.setAttribute('aria-expanded', 'false');
   node.filter.blur();
   state.openPicker = null;
+  renderToggleLabels(); // structure goes back to answering on its own keys
   if (hadFocus) node.button.focus();
 }
 
@@ -1193,7 +1201,11 @@ function renderPickerList() {
     // until Enter.
     li.setAttribute('aria-selected', String(on));
     if (i === state.pickerCursor) li.dataset.cursor = 'true';
-    if (numbered && i < 9) {
+    // "1" belongs to the structure toggle in the location list, so the first
+    // row there carries no number. Showing one that doesn't work is worse than
+    // showing none: the rest still read 2-9 and still pick what they say.
+    const digitTaken = name === 'nest_location' && i === 0;
+    if (numbered && i < 9 && !digitTaken) {
       li.append(Object.assign(document.createElement('span'),
         { className: 'num', textContent: String(i + 1) }));
     } else {
@@ -1233,11 +1245,14 @@ function renderPickerList() {
     : 'type to narrow, or type anything new';
 
   // Kept to one line. What the filter box is for is written in the filter box.
+  const picks = name === 'nest_location' ? '2–9 pick' : '1–9 pick';
+  const switches = name === 'nest_location'
+    ? ` · ←→ or ${keyDisplay(state.keys.toggle_structure)} switches the list` : '';
   node.foot.textContent = offer
     ? `Enter records “${offer}” · ↑↓ move · Esc`
     : (typed
         ? `Enter adds “${typed}” · ↑↓ move · Esc`
-        : '↑↓ move · 1–9 pick · Enter when done');
+        : `↑↓ move · ${picks} · Enter when done${switches}`);
 }
 
 /**
@@ -2169,6 +2184,25 @@ for (const name of PICKER_NAMES) {
     // is what a text box should do.
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       if (name !== 'nest_location') return;
+      event.preventDefault();
+      switchLocationList();
+      return;
+    }
+
+    // So do the structure toggle's own keys, which are what a reviewer
+    // actually reaches for: the toggle is on screen saying (Q/1) and the list
+    // it decides has the keyboard. Before this, Q typed a q into the filter
+    // and 1 recorded whatever sat at the top of the list — a wrong answer, in
+    // a required column, that nobody chose.
+    //
+    // Only while nothing is typed, the same rule the digits already follow:
+    // once there is a filter, every key is a character again. The cost is
+    // that a location typed from scratch cannot begin with the structure
+    // letter — "quarry" would switch the list instead — which only matters if
+    // such a term ever turns up.
+    const bound = actionForEvent(event, state.keys);
+    if (name === 'nest_location' && node.filter.value.trim() === ''
+        && (bound === 'toggle_structure' || bound === 'toggle_structure_num')) {
       event.preventDefault();
       switchLocationList();
       return;
