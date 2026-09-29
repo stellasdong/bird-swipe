@@ -1,5 +1,12 @@
 # bird-swipe — Design & Implementation Plan
 
+> **Historical.** This is the original plan, from when bird-swipe was a desktop
+> Qt app labeling two things. It is kept for the reasoning, not as a
+> description of what exists: the app is a static web page now, and the
+> questions it asks have grown well past nest and human-made structure. For
+> what it does today read [README.md](README.md); for what is left, and why
+> each decision went the way it did, read [TODO.md](TODO.md).
+
 "Bird Tinder" — a desktop app for rapidly reviewing Macaulay Library nest media
 and labeling each asset **nest / not-nest** and **human-made structure / not**,
 driven entirely by arrow-key hotkeys, saving after every entry back into the

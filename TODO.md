@@ -1311,7 +1311,7 @@ to say so.
 - [ ] **Keyboard first.** Two of these want a dropdown. The app's value is that
       it's faster than a spreadsheet — every new control needs a key that opens
       it and a way out that still saves and advances.
-- [ ] **Tests.** `web/test.html` is 195 assertions and the only safety net;
+- [ ] **Tests.** `web/test.html` is 404 assertions and the only safety net;
       each new field needs its own — set, restored on resume, cleared on skip,
       round-tripped through the CSV, and blank on a non-nest row.
 - [ ] **The done screen and the nest split** read the label columns directly;
