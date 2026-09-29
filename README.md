@@ -1,3 +1,5 @@
+<img src="web/favicon.svg" alt="" width="76" align="right">
+
 # bird-swipe
 
 Swipe through Macaulay Library nest media and label each asset **nest yes/no**,
