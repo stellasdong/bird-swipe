@@ -110,6 +110,214 @@ export function pendingItems(items, filedNames) {
   return items.filter(i => !filedNames.has(i.name)).sort(byName);
 }
 
+// ------------------------------------------------------------- labels CSV
+
+/** The file written into the chosen folder: one row per sorted photo. */
+export const CSV_NAME = 'bird-swipe-basic-labels.csv';
+export const CSV_COLUMNS = [
+  'file', 'label', 'sorted_at', 'taken_at', 'file_modified',
+  'latitude', 'longitude', 'camera_make', 'camera_model', 'size_bytes', 'type',
+];
+
+export function csvLine(values) {
+  return values.map(v => {
+    const s = v == null ? '' : String(v);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',');
+}
+
+/** RFC 4180: quoted fields, doubled quotes, CRLF or LF. Returns arrays of cells. */
+export function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; } else quoted = false;
+      } else {
+        cell += c;
+      }
+    } else if (c === '"') {
+      quoted = true;
+    } else if (c === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (c === '\r' || c === '\n') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += c;
+    }
+  }
+  if (cell !== '' || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** The rows already in the folder's labels CSV, keyed by file name. */
+export async function readLabelRows(root) {
+  const rows = new Map();
+  let text;
+  try {
+    const file = await (await root.getFileHandle(CSV_NAME)).getFile();
+    text = await file.text();
+  } catch (e) {
+    if (e.name === 'NotFoundError') return rows;
+    throw e;
+  }
+  const [header, ...body] = parseCsv(text.replace(/^﻿/, ''));
+  if (!header) return rows;
+  for (const cells of body) {
+    const row = {};
+    header.forEach((h, i) => { row[h] = cells[i] ?? ''; });
+    if (row.file) rows.set(row.file, row);
+  }
+  return rows;
+}
+
+/** Rewrite the whole labels CSV. A BOM at the front lets Excel read the UTF-8. */
+export async function writeLabelRows(root, rows) {
+  const lines = [csvLine(CSV_COLUMNS), ...[...rows.values()].map(r => csvLine(CSV_COLUMNS.map(c => r[c])))];
+  const out = await root.getFileHandle(CSV_NAME, { create: true });
+  const writable = await out.createWritable();
+  await writable.write(`﻿${lines.join('\r\n')}\r\n`);
+  await writable.close();
+}
+
+// ------------------------------------------------------- photo metadata
+
+/** Metadata for one image file, in the columns the labels CSV uses. */
+export async function describeFile(file) {
+  // EXIF sits at the start of a JPEG, so the first 256 KB is enough to find it.
+  const exif = readExif(await file.slice(0, 256 * 1024).arrayBuffer());
+  return {
+    taken_at: exif.taken ?? '',
+    file_modified: new Date(file.lastModified).toISOString(),
+    latitude: exif.latitude ?? '',
+    longitude: exif.longitude ?? '',
+    camera_make: exif.make ?? '',
+    camera_model: exif.model ?? '',
+    size_bytes: file.size,
+    type: file.type || '',
+  };
+}
+
+/** "2024:05:01 13:22:10" (EXIF) to "2024-05-01T13:22:10". EXIF has no time zone. */
+export function exifDate(s) {
+  const m = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(s ?? '');
+  return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}` : undefined;
+}
+
+/**
+ * EXIF from the start of a JPEG: taken, make, model, latitude, longitude.
+ * Anything missing or unreadable is left out, and other formats give {}.
+ */
+export function readExif(buf) {
+  const out = {};
+  try {
+    const v = new DataView(buf);
+    if (v.byteLength < 4 || v.getUint16(0) !== 0xffd8) return out;
+    let p = 2;
+    while (p + 4 <= v.byteLength && v.getUint8(p) === 0xff) {
+      const marker = v.getUint8(p + 1);
+      if (marker === 0xda) break; // start of image data: no EXIF after this
+      const len = v.getUint16(p + 2);
+      if (marker === 0xe1 && readAscii(v, p + 4, 6) === 'Exif\0\0') {
+        parseTiff(v, p + 10, out);
+        break;
+      }
+      p += 2 + len;
+    }
+  } catch {
+    // Truncated or odd EXIF: keep whatever was read before the problem.
+  }
+  return out;
+}
+
+function readAscii(v, off, n) {
+  let s = '';
+  for (let i = 0; i < n; i++) s += String.fromCharCode(v.getUint8(off + i));
+  return s;
+}
+
+const TYPE_SIZE = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 };
+
+function parseTiff(v, base, out) {
+  const le = v.getUint16(base) === 0x4949; // "II" = little-endian
+  const u16 = o => v.getUint16(base + o, le);
+  const u32 = o => v.getUint32(base + o, le);
+  // Offsets below are relative to the TIFF header at `base`.
+  const entries = off => {
+    const map = new Map();
+    for (let i = 0, n = u16(off); i < n; i++) {
+      const e = off + 2 + i * 12;
+      map.set(u16(e), e);
+    }
+    return map;
+  };
+  const dataAt = e => (TYPE_SIZE[u16(e + 2)] * u32(e + 4) <= 4 ? e + 8 : u32(e + 8));
+  const ascii = e => {
+    const count = u32(e + 4);
+    const at = dataAt(e);
+    let s = '';
+    for (let i = 0; i < count; i++) s += String.fromCharCode(v.getUint8(base + at + i));
+    return s.replace(/\0+$/, '').trim();
+  };
+  const rationals = e => {
+    const count = u32(e + 4);
+    const at = dataAt(e);
+    const values = [];
+    for (let i = 0; i < count; i++) {
+      values.push(u32(at + i * 8) / (u32(at + i * 8 + 4) || 1));
+    }
+    return values;
+  };
+  const coord = (e, ref) => {
+    const r = rationals(e);
+    if (r.length < 3) return undefined;
+    const deg = r[0] + r[1] / 60 + r[2] / 3600;
+    return Number((ref === 'S' || ref === 'W' ? -deg : deg).toFixed(6));
+  };
+
+  const ifd0 = entries(u32(4));
+  if (ifd0.has(0x010f)) out.make = ascii(ifd0.get(0x010f));
+  if (ifd0.has(0x0110)) out.model = ascii(ifd0.get(0x0110));
+
+  let dateStr;
+  const exifPtr = ifd0.get(0x8769);
+  if (exifPtr) {
+    const sub = entries(u32(exifPtr + 8));
+    if (sub.has(0x9003)) dateStr = ascii(sub.get(0x9003)); // DateTimeOriginal
+  }
+  if (!dateStr && ifd0.has(0x0132)) dateStr = ascii(ifd0.get(0x0132)); // DateTime
+  out.taken = exifDate(dateStr);
+
+  const gpsPtr = ifd0.get(0x8825);
+  if (gpsPtr) {
+    const gps = entries(u32(gpsPtr + 8));
+    if (gps.has(2)) {
+      const ref = gps.has(1) ? ascii(gps.get(1)) : 'N';
+      out.latitude = coord(gps.get(2), ref);
+    }
+    if (gps.has(4)) {
+      const ref = gps.has(3) ? ascii(gps.get(3)) : 'E';
+      out.longitude = coord(gps.get(4), ref);
+    }
+  }
+}
+
+function joinWarnings(...parts) {
+  return parts.filter(Boolean).join(' ') || null;
+}
+
 // ------------------------------------------------------------------- DOM
 
 if (typeof document !== 'undefined') init();
@@ -149,6 +357,7 @@ function init() {
     index: 0,        // position in queue
     history: [],     // [{ name, label }] per step; label is null for a skip, so undo just walks back
     counts: {},      // label -> number of images filed in that folder
+    rows: new Map(), // file name -> CSV row, mirrors bird-swipe-basic-labels.csv
     busy: false,
     url: null,       // object URL of the photo on screen
     photoToken: 0,   // ignores a photo that finished loading after the user moved on
@@ -228,6 +437,7 @@ function init() {
     state.index = 0;
     state.history = [];
     state.counts = counts;
+    state.rows = await readLabelRows(root);
     el.folderName.textContent = root.name;
     el.changeFolder.hidden = false;
     el.keysOpen.hidden = false;
@@ -290,8 +500,12 @@ function init() {
     let label = null;
     if (action !== 'skip') {
       label = action.folder;
+      // Read the metadata before the file moves, while it is still here to read.
+      const meta = await describeFile(await item.handle.getFile());
       warning = await moveFile(state.root, item.name, await childDir(state.root, label, true));
       state.counts[label] = (state.counts[label] || 0) + 1;
+      state.rows.set(item.name, { file: item.name, label, sorted_at: new Date().toISOString(), ...meta });
+      warning = joinWarnings(warning, await saveLabels());
     }
     state.history.push({ name: item.name, label });
     state.index++;
@@ -299,16 +513,31 @@ function init() {
   }
 
   async function undo() {
-    const last = state.history.pop();
+    const last = state.history[state.history.length - 1];
     if (!last) return null;
-    state.index--;
     let warning = null;
+    // Only step back once the file is back where it was, so a failed move
+    // leaves the history as it was and the next press can try again.
     if (last.label !== null) {
       const dir = await childDir(state.root, last.label, false);
       if (dir) warning = await moveFile(dir, last.name, state.root);
       state.counts[last.label]--;
+      state.rows.delete(last.name);
+      warning = joinWarnings(warning, await saveLabels());
     }
+    state.history.pop();
+    state.index--;
     return warning;
+  }
+
+  /** Rewrite the labels CSV. The move has already happened, so a failure is a warning. */
+  async function saveLabels() {
+    try {
+      await writeLabelRows(state.root, state.rows);
+      return null;
+    } catch (e) {
+      return `The labels file couldn't be saved (${e.message}). It will be tried again on the next swipe.`;
+    }
   }
 
   /**
@@ -385,7 +614,7 @@ function init() {
     el.status.textContent = [`${left} to sort`, ...filed].join(' · ');
 
     if (!item) {
-      el.doneCounts.textContent = `${filed.join(', ')}, all saved in the folder.`;
+      el.doneCounts.textContent = `${filed.join(', ')}, all saved in the folder. Labels are in ${CSV_NAME}.`;
       setPhoto(null);
       return;
     }

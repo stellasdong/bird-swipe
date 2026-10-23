@@ -410,6 +410,12 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   align-items: center;
   gap: 8px;
 }
+#basic-open {
+  background: var(--amber);
+  border-color: #a07c00;
+  color: #fff;
+}
+#basic-open:hover:not(:disabled) { background: #8f6d00; }
 .separate-caption {
   margin: 0;
   color: var(--muted);
