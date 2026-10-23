@@ -59,6 +59,7 @@ const el = {
   reviewer: $('reviewer'),
   openExport: $('open-export'),
   prefsWelcome: $('prefs-welcome'),
+  basicOpen: $('basic-open'),
   folderInfo: $('folder-info'),
   autosaveChoose: $('autosave-choose'),
   autosaveOff: $('autosave-off'),
@@ -370,6 +371,12 @@ async function startDevMode(url) {
 async function initWelcome() {
   el.version.textContent = BUILD.startsWith('__') ? VERSION : `${VERSION} (${BUILD})`;
   if (el.devBadge) el.devBadge.hidden = !IS_DEV;
+  // The basic sorter lives on its own branch and is only offered on the dev
+  // preview for now.
+  if (el.basicOpen) {
+    el.basicOpen.hidden = !IS_DEV;
+    el.basicOpen.addEventListener('click', () => { location.href = 'basic/'; });
+  }
   el.reviewer.value = getReviewer();
   el.reviewer.addEventListener('change', () => setReviewer(el.reviewer.value));
 
