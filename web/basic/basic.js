@@ -1,16 +1,16 @@
 // bird-swipe basic: sort a local folder of images into yes/ and no/.
 //
 // Deliberately separate from the Macaulay app. No imports, no shared settings,
-// no CSV. Each swiped image is copied into yes/ or no/ inside the chosen
-// folder; the originals are never moved or changed. Anything already sitting in
-// yes/ or no/ is skipped on reopen, so the work resumes for free.
+// no CSV. Each swiped image is moved into yes/ or no/ inside the chosen folder.
+// Anything already sitting in yes/ or no/ is skipped on reopen, so the work
+// resumes for free.
 //
 // Needs the File System Access API: Chrome or Edge on a Mac or Windows PC.
 
 const IMAGE_RE = /\.(jpe?g|png|gif|webp|bmp|avif)$/i;
 
 // The four things a key can do. Yes and no sort; undo steps back; skip moves
-// on without copying anything.
+// on without moving anything.
 export const ACTIONS = ['yes', 'no', 'undo', 'skip'];
 export const LABELS = { yes: 'Yes', no: 'No', undo: 'Undo', skip: 'Skip' };
 export const DEFAULT_KEYS = {
@@ -216,43 +216,74 @@ function init() {
     if (state.busy || !state.root) return;
     state.busy = true;
     try {
-      if (action === 'undo') await undo();
-      else await sort(action);
-      el.sortError.hidden = true;
+      const warning = action === 'undo' ? await undo() : await sort(action);
       show();
+      if (warning) showError(el.sortError, warning);
+      else el.sortError.hidden = true;
     } catch (e) {
-      showError(el.sortError, `Nothing was changed: ${e.message}`);
+      showError(el.sortError, `Nothing was moved: ${e.message}`);
     } finally {
       state.busy = false;
     }
   }
 
+  // Returns a warning string when the move half-worked, otherwise null.
   async function sort(action) {
     const item = state.queue[state.index];
-    if (!item) return;
+    if (!item) return null;
+    let warning = null;
     if (action !== 'skip') {
-      // Copy first, and only then count it: if the write fails the image
-      // stays on screen and the next press tries again.
-      const dir = await childDir(state.root, action, true);
-      const file = await item.handle.getFile();
-      const out = await dir.getFileHandle(item.name, { create: true });
-      const writable = await out.createWritable();
-      await writable.write(file);
-      await writable.close();
+      warning = await moveFile(state.root, item.name, await childDir(state.root, action, true));
       state.counts[action]++;
     }
     state.history.push({ name: item.name, choice: action });
     state.index++;
+    return warning;
   }
 
   async function undo() {
     const last = state.history.pop();
-    if (!last) return;
+    if (!last) return null;
     state.index--;
+    let warning = null;
     if (last.choice !== 'skip') {
       const dir = await childDir(state.root, last.choice, false);
-      if (dir) await dir.removeEntry(last.name);
+      if (dir) warning = await moveFile(dir, last.name, state.root);
       state.counts[last.choice]--;
+    }
+    return warning;
+  }
+
+  /**
+   * Move one file between two folders: copy it across, then remove the
+   * original. Refuses to overwrite a file already at the destination. If the
+   * copy worked but the original can't be removed, the file is still safely
+   * filed, so this returns a warning for the reviewer instead of failing.
+   */
+  async function moveFile(fromDir, name, toDir) {
+    if (await fileExists(toDir, name)) {
+      throw new Error(`${name} is already in ${toDir.name}/, so it was left alone.`);
+    }
+    const file = await (await fromDir.getFileHandle(name)).getFile();
+    const out = await toDir.getFileHandle(name, { create: true });
+    const writable = await out.createWritable();
+    await writable.write(file);
+    await writable.close();
+    try {
+      await fromDir.removeEntry(name);
+      return null;
+    } catch (e) {
+      return `${name} is now in ${toDir.name}/, but the original couldn't be removed (${e.message}). Delete it by hand.`;
+    }
+  }
+
+  async function fileExists(dir, name) {
+    try {
+      await dir.getFileHandle(name);
+      return true;
+    } catch (e) {
+      if (e.name === 'NotFoundError') return false;
+      throw e;
     }
   }
 
