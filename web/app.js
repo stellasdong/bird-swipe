@@ -372,10 +372,9 @@ async function startDevMode(url) {
 async function initWelcome() {
   el.version.textContent = BUILD.startsWith('__') ? VERSION : `${VERSION} (${BUILD})`;
   if (el.devBadge) el.devBadge.hidden = !IS_DEV;
-  // The basic sorter lives on its own branch and is only offered on the dev
-  // preview for now.
+  // The basic sorter is a separate tool at basic/, offered on every copy.
   if (el.basicOpen) {
-    el.basicBlock.hidden = !IS_DEV;
+    el.basicBlock.hidden = false;
     el.basicOpen.addEventListener('click', () => { location.href = 'basic/'; });
   }
   el.reviewer.value = getReviewer();
