@@ -113,7 +113,9 @@ export function pendingItems(items, filedNames) {
 // ------------------------------------------------------------- labels CSV
 
 /** The file written into the chosen folder: one row per sorted photo. */
-export const CSV_NAME = 'bird-swipe-basic-labels.csv';
+export const CSV_NAME = 'labels.csv';
+/** The folder's own key setup, so it travels with the folder. */
+export const KEYS_NAME = 'keys.json';
 export const CSV_COLUMNS = [
   'file', 'label', 'sorted_at', 'taken_at', 'file_modified',
   'latitude', 'longitude', 'camera_make', 'camera_model', 'size_bytes', 'type',
@@ -181,6 +183,24 @@ export async function readLabelRows(root) {
     if (row.file) rows.set(row.file, row);
   }
   return rows;
+}
+
+/** The folder's saved key setup, or null if it has none or the file is unusable. */
+export async function readKeysFile(root) {
+  try {
+    const text = await (await (await root.getFileHandle(KEYS_NAME)).getFile()).text();
+    const config = JSON.parse(text);
+    return validateConfig(config) === null ? config : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeKeysFile(root, config) {
+  const out = await root.getFileHandle(KEYS_NAME, { create: true });
+  const writable = await out.createWritable();
+  await writable.write(`${JSON.stringify(config, null, 2)}\n`);
+  await writable.close();
 }
 
 /** Rewrite the whole labels CSV. A BOM at the front lets Excel read the UTF-8. */
@@ -357,7 +377,7 @@ function init() {
     index: 0,        // position in queue
     history: [],     // [{ name, label }] per step; label is null for a skip, so undo just walks back
     counts: {},      // label -> number of images filed in that folder
-    rows: new Map(), // file name -> CSV row, mirrors bird-swipe-basic-labels.csv
+    rows: new Map(), // file name -> CSV row, mirrors labels.csv
     busy: false,
     url: null,       // object URL of the photo on screen
     photoToken: 0,   // ignores a photo that finished loading after the user moved on
@@ -429,6 +449,12 @@ function init() {
     const images = [];
     for await (const [name, handle] of root.entries()) {
       if (handle.kind === 'file' && IMAGE_RE.test(name)) images.push({ name, handle });
+    }
+    // The folder's own key setup wins over the last one used in this browser.
+    const fromFolder = await readKeysFile(root);
+    if (fromFolder) {
+      state.config = fromFolder;
+      saveConfig(fromFolder);
     }
     const { filed, counts } = await scanFolders(root, state.config);
 
@@ -686,15 +712,22 @@ function init() {
     state.config = config;
     saveConfig(config);
     renderActions();
+    let warning = null;
     if (state.root) {
+      try {
+        await writeKeysFile(state.root, config);
+      } catch (e) {
+        warning = `The keys couldn't be saved in the folder (${e.message}). They are kept in this browser only.`;
+      }
       // Renaming or adding a folder changes what is already filed, so recount.
       try {
         state.counts = (await scanFolders(state.root, config)).counts;
       } catch (e) {
-        showError(el.sortError, `Couldn't recount the folders: ${e.message}`);
+        warning = joinWarnings(warning, `Couldn't recount the folders: ${e.message}`);
       }
     }
     show();
+    if (warning) showError(el.sortError, warning);
   }
 
   function setKey(slot, key) {
