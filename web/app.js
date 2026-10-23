@@ -59,6 +59,7 @@ const el = {
   reviewer: $('reviewer'),
   openExport: $('open-export'),
   prefsWelcome: $('prefs-welcome'),
+  basicBlock: $('basic-block'),
   basicOpen: $('basic-open'),
   folderInfo: $('folder-info'),
   autosaveChoose: $('autosave-choose'),
@@ -374,7 +375,7 @@ async function initWelcome() {
   // The basic sorter lives on its own branch and is only offered on the dev
   // preview for now.
   if (el.basicOpen) {
-    el.basicOpen.hidden = !IS_DEV;
+    el.basicBlock.hidden = !IS_DEV;
     el.basicOpen.addEventListener('click', () => { location.href = 'basic/'; });
   }
   el.reviewer.value = getReviewer();

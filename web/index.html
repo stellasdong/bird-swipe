@@ -73,8 +73,13 @@
     <div class="stack">
       <button id="open-export" class="primary">Open a spreadsheet…</button>
       <button id="prefs-welcome">Preferences…</button>
-      <!-- Dev preview only (app.js shows it when IS_DEV): the basic image sorter. -->
-      <button id="basic-open" hidden>Basic: sort a folder of images…</button>
+    </div>
+
+    <!-- Dev preview only (app.js shows this block when IS_DEV). Kept apart from
+         the bird-swipe flow: a separate tool, not part of labelling. -->
+    <div id="basic-block" class="separate-tool" hidden>
+      <p class="separate-caption">Separate tool — not part of bird-swipe</p>
+      <button id="basic-open">Sort a folder of images (basic)…</button>
     </div>
 
     <div id="resume-block" hidden>
