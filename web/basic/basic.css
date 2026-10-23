@@ -149,7 +149,7 @@ h2 { font-size: 22px; margin: 0; }
   justify-content: center;
   flex-wrap: wrap;
 }
-.actions button {
+.actions .action {
   min-width: 140px;
   padding: 14px 18px;
   font-size: 16px;
@@ -159,10 +159,8 @@ h2 { font-size: 22px; margin: 0; }
   gap: 8px;
   align-items: center;
 }
-.actions button.yes { background: var(--green); border-color: var(--green); color: #fff; }
-.actions button.no  { background: var(--red);   border-color: var(--red);   color: #fff; }
-.actions button#btn-undo,
-.actions button#btn-skip { min-width: 110px; font-weight: 400; font-size: 14px; }
+/* Undo and Skip stay quiet; the folder buttons are the ones to aim for. */
+.actions .action.utility { min-width: 110px; font-weight: 400; font-size: 14px; }
 
 /* ------------------------------------------------------------------ keys */
 
@@ -177,14 +175,32 @@ dialog {
 dialog::backdrop { background: rgba(0, 0, 0, .55); }
 dialog h2 { margin-bottom: 8px; }
 
-.keygrid {
+.keys-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.folder-row,
+.fixed-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 14px;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
   align-items: center;
-  margin: 14px 0;
+}
+.fixed-row { grid-template-columns: 1fr auto; padding-top: 6px; border-top: 1px solid var(--edge); }
+.folder-row input {
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: var(--bg);
+  color: var(--text);
+  min-width: 0;
 }
 .keybtn { min-width: 120px; font-family: ui-monospace, Menlo, monospace; }
+.folder-row .remove { padding: 4px 10px; line-height: 1; }
+button.add { margin-top: 2px; }
 
 .dialog-actions {
   display: flex;

@@ -14,7 +14,7 @@
   <span class="folder" id="folder-name"></span>
   <span class="spacer"></span>
   <span class="status" id="status"></span>
-  <button id="keys-open" type="button" hidden>Keys…</button>
+  <button id="keys-open" type="button" hidden>Folders &amp; keys…</button>
   <button id="change-folder" type="button" hidden>Change folder</button>
 </header>
 
@@ -46,12 +46,8 @@
   </div>
   <div class="name" id="file-name"></div>
 
-  <div class="actions">
-    <button type="button" id="btn-no" class="no">No <kbd></kbd></button>
-    <button type="button" id="btn-undo">Undo <kbd></kbd></button>
-    <button type="button" id="btn-skip">Skip <kbd></kbd></button>
-    <button type="button" id="btn-yes" class="yes">Yes <kbd></kbd></button>
-  </div>
+  <!-- One button per folder, then Undo and Skip. Built from the config in basic.js. -->
+  <div class="actions" id="actions"></div>
 
   <div class="notice error" id="sort-error" hidden></div>
 </section>
@@ -67,9 +63,14 @@
 
 <!-- ---------------------------------------------------------------- keys -->
 <dialog id="keys">
-  <h2>Keys</h2>
-  <p class="subtitle small">Click a key, then press the new key. Esc cancels.</p>
-  <div class="keygrid" id="keygrid"></div>
+  <h2>Folders &amp; keys</h2>
+  <p class="subtitle small">
+    Each folder is a button and a key. Its name is the folder that images are
+    moved into. Renaming a folder doesn't move anything already sorted. Click a
+    key, then press the new key. Esc cancels.
+  </p>
+  <div class="keys-rows" id="keys-rows"></div>
+  <button type="button" id="keys-add" class="add">+ Add folder</button>
   <div class="notice error" id="keys-warning" hidden></div>
   <div class="dialog-actions">
     <button id="keys-reset" type="button">Reset to defaults</button>
