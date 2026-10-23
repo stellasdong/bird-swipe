@@ -399,6 +399,31 @@ textarea:focus { outline: 2px solid #1d4ed8; outline-offset: -1px; }
   word-break: break-all;
 }
 
+/* ------------------------------------- separate tool (dev preview, welcome) */
+.separate-tool {
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--edge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+#basic-open {
+  background: var(--amber);
+  border-color: #a07c00;
+  color: #fff;
+}
+#basic-open:hover:not(:disabled) { background: #8f6d00; }
+.separate-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
 /* ------------------------------------------------- folder cards (welcome) */
 /* Deliberately the same object as the done screen's save cards: one bounded
    block per folder, so neither reads as more required than the other. */

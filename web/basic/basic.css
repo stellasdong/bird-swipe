@@ -1,0 +1,210 @@
+/* bird-swipe basic. Self-contained: it shares no CSS with the main app. */
+
+:root {
+  --bg: #111;
+  --panel: #1a1a1a;
+  --edge: #333;
+  --text: #eee;
+  --muted: #888;
+  --green: #1b5e20;
+  --red: #7f1d1d;
+  --link: #7ab7ff;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f5f5f4;
+    --panel: #fff;
+    --edge: #d6d3d1;
+    --text: #1c1917;
+    --muted: #78716c;
+    --green: #15803d;
+    --red: #b91c1c;
+    --link: #1d4ed8;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 var(--font);
+  display: flex;
+  flex-direction: column;
+}
+
+[hidden] { display: none !important; }
+
+a { color: var(--link); }
+code, kbd { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+
+button {
+  font: inherit;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+button:hover:not(:disabled) { filter: brightness(1.15); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 .4em;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: .7;
+  text-align: center;
+}
+
+.spacer { flex: 1; }
+
+/* ----------------------------------------------------------------- header */
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--edge);
+}
+.top .folder { font-weight: 600; }
+.top .status { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- centred */
+
+.centered {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 16px;
+  text-align: center;
+}
+h1 { font-size: 30px; margin: 0; }
+h2 { font-size: 22px; margin: 0; }
+.subtitle { color: var(--muted); margin: 0; max-width: 34em; }
+.subtitle.small { font-size: 12px; }
+
+.notice {
+  max-width: 34em;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  text-align: left;
+}
+.notice.error { background: #2a1212; border-color: #7f1d1d; color: #fca5a5; }
+
+/* ------------------------------------------------------------------ sort */
+
+#sorter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  min-height: 0;
+}
+
+.stage {
+  flex: 1;
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.stage img {
+  max-width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.placeholder { color: var(--muted); text-align: center; padding: 20px; }
+
+.name {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.actions .action {
+  min-width: 140px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+}
+/* Undo and Skip stay quiet; the folder buttons are the ones to aim for. */
+.actions .action.utility { min-width: 110px; font-weight: 400; font-size: 14px; }
+
+/* ------------------------------------------------------------------ keys */
+
+dialog {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: 20px;
+  width: min(420px, 92vw);
+}
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog h2 { margin-bottom: 8px; }
+
+.keys-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.folder-row,
+.fixed-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.fixed-row { grid-template-columns: 1fr auto; padding-top: 6px; border-top: 1px solid var(--edge); }
+.folder-row input {
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: var(--bg);
+  color: var(--text);
+  min-width: 0;
+}
+.keybtn { min-width: 120px; font-family: ui-monospace, Menlo, monospace; }
+.folder-row .remove { padding: 4px 10px; line-height: 1; }
+button.add { margin-top: 2px; }
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
