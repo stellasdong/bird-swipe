@@ -12,7 +12,6 @@
 // JPEG preview the camera stores inside them. The file itself is moved as is.
 const IMAGE_RE = /\.(jpe?g|png|gif|webp|bmp|avif|arw)$/i;
 const RAW_RE = /\.arw$/i;
-const CONFIG_STORE = 'bird-swipe-basic:config';
 const BAD_NAME = /[\/\\:*?"<>|\x00-\x1f]/;
 const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta'];
 const KEY_NAMES = {
@@ -34,24 +33,6 @@ export const DEFAULT_CONFIG = {
 
 const clone = c => JSON.parse(JSON.stringify(c));
 
-/** Saved config if it is valid, otherwise the defaults. */
-export function loadConfig() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(CONFIG_STORE) || 'null');
-    if (saved && validateConfig(saved) === null) return saved;
-  } catch {
-    // Storage blocked or corrupt: the defaults are fine.
-  }
-  return clone(DEFAULT_CONFIG);
-}
-
-export function saveConfig(config) {
-  try {
-    localStorage.setItem(CONFIG_STORE, JSON.stringify(config));
-  } catch {
-    // Not saved: the config still applies for this visit.
-  }
-}
 
 /** A message describing what is wrong with `config`, or null if it is usable. */
 export function validateConfig(config) {
@@ -415,7 +396,7 @@ function init() {
   };
 
   const state = {
-    config: loadConfig(),
+    config: clone(DEFAULT_CONFIG),
     root: null,      // FileSystemDirectoryHandle the user picked
     queue: [],       // [{ name, handle }] still to sort, in order
     index: 0,        // position in queue
@@ -494,12 +475,9 @@ function init() {
     for await (const [name, handle] of root.entries()) {
       if (handle.kind === 'file' && IMAGE_RE.test(name)) images.push({ name, handle });
     }
-    // The folder's own key setup wins over the last one used in this browser.
-    const fromFolder = await readKeysFile(root);
-    if (fromFolder) {
-      state.config = fromFolder;
-      saveConfig(fromFolder);
-    }
+    // Each folder has its own key setup, kept in keys.json inside it. A folder
+    // without one starts from the defaults, never from another folder's setup.
+    state.config = (await readKeysFile(root)) ?? clone(DEFAULT_CONFIG);
     const { filed, counts } = await scanFolders(root, state.config);
 
     state.root = root;
@@ -755,7 +733,6 @@ function init() {
     }
     closeKeys();
     state.config = config;
-    saveConfig(config);
     renderActions();
     let warning = null;
     if (state.root) {
