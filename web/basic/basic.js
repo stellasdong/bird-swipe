@@ -8,7 +8,10 @@
 //
 // Needs the File System Access API: Chrome or Edge on a Mac or Windows PC.
 
-const IMAGE_RE = /\.(jpe?g|png|gif|webp|bmp|avif)$/i;
+// Raw (.arw) files can't be drawn by a browser, so they are shown through the
+// JPEG preview the camera stores inside them. The file itself is moved as is.
+const IMAGE_RE = /\.(jpe?g|png|gif|webp|bmp|avif|arw)$/i;
+const RAW_RE = /\.arw$/i;
 const CONFIG_STORE = 'bird-swipe-basic:config';
 const BAD_NAME = /[\/\\:*?"<>|\x00-\x1f]/;
 const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta'];
@@ -244,7 +247,13 @@ export function readExif(buf) {
   const out = {};
   try {
     const v = new DataView(buf);
-    if (v.byteLength < 4 || v.getUint16(0) !== 0xffd8) return out;
+    if (v.byteLength < 4) return out;
+    if (v.getUint16(0) === 0x4949 || v.getUint16(0) === 0x4d4d) {
+      // Raw files (ARW) are TIFF from the very start, with the tags at the top.
+      parseTiff(v, 0, out);
+      return out;
+    }
+    if (v.getUint16(0) !== 0xffd8) return out;
     let p = 2;
     while (p + 4 <= v.byteLength && v.getUint8(p) === 0xff) {
       const marker = v.getUint8(p + 1);
@@ -260,6 +269,41 @@ export function readExif(buf) {
     // Truncated or odd EXIF: keep whatever was read before the problem.
   }
   return out;
+}
+
+/**
+ * The largest complete JPEG inside a raw file, as a Blob a browser can show.
+ * Returns null if none is found. Only the JPEG's own segments are walked, so a
+ * small thumbnail nested inside the preview's metadata is not mistaken for it.
+ */
+export async function embeddedJpeg(file) {
+  const b = new Uint8Array(await file.arrayBuffer());
+  let best = null;
+  for (let s = 0; s + 3 < b.length; s++) {
+    if (b[s] !== 0xff || b[s + 1] !== 0xd8 || b[s + 2] !== 0xff) continue;
+    const end = jpegEnd(b, s);
+    if (end < 0) continue;
+    if (!best || end - s > best[1] - best[0]) best = [s, end];
+    s = end - 1;
+  }
+  return best ? new Blob([b.subarray(best[0], best[1])], { type: 'image/jpeg' }) : null;
+}
+
+/** Offset just past the JPEG that starts at `s`, or -1 if it does not parse. */
+function jpegEnd(b, s) {
+  // Inside scan data, 0xFF is only a marker when the next byte is not 00 or a restart marker.
+  const isMarker = (q) => b[q] === 0xff && b[q + 1] !== 0 && !(b[q + 1] >= 0xd0 && b[q + 1] <= 0xd7);
+  let p = s + 2;
+  while (p + 4 <= b.length && b[p] === 0xff) {
+    const marker = b[p + 1];
+    if (marker === 0xd9) return p + 2; // end of image
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { p += 2; continue; }
+    p += 2 + ((b[p + 2] << 8) | b[p + 3]); // skip this segment
+    if (marker === 0xda) {
+      while (p + 1 < b.length && !isMarker(p)) p++; // skip compressed image data
+    }
+  }
+  return -1;
 }
 
 function readAscii(v, off, n) {
@@ -660,8 +704,9 @@ function init() {
     if (!item) return;
     try {
       const file = await item.handle.getFile();
+      const shown = RAW_RE.test(item.name) ? (await embeddedJpeg(file)) ?? file : file;
       if (token !== state.photoToken) return;
-      state.url = URL.createObjectURL(file);
+      state.url = URL.createObjectURL(shown);
       el.photo.src = state.url;
     } catch (e) {
       if (token !== state.photoToken) return;
